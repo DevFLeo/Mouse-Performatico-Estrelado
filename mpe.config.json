@@ -3,10 +3,10 @@
   "appName": "M.P.E - Mouse Performático Estrelado",
   "repository": "https://github.com/DevFLeo/Mouse-Performatico-Estrelado",
   "profile": {
-    "userName": "",
-    "isRegistered": false,
+    "userName": "Leonardo",
+    "isRegistered": true,
     "languageTone": "amigavel",
-    "lastUpdated": "2026-11-12T01:15:46.009Z"
+    "lastUpdated": "2026-11-12T01:30:34.111Z"
   },
   "theme": {
     "preset": "gold-obsidian",
@@ -202,7 +202,14 @@
       "startWithWindows": false,
       "savedScreenshotsFolder": "./Capturas_MPE",
       "themePreset": "gold-obsidian",
-      "lastActive": "2026-11-12T01:15:46.009Z"
+      "lastActive": "2026-11-12T01:30:34.111Z"
     }
+  },
+  "originSystem": {
+    "hwnd": "0",
+    "windowTitle": "Sistema Windows Ativo",
+    "windowRect": null,
+    "fullSnapPath": "",
+    "winSnapPath": ""
   }
 }

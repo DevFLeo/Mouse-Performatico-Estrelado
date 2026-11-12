@@ -170,7 +170,15 @@
     }, 3800);
   }
 
+  let initInterval = null;
+  let welcomeTimeout = null;
+  let welcomeHideTimeout = null;
+
   function runInitializationSequence() {
+    if (initInterval) clearInterval(initInterval);
+    if (welcomeTimeout) clearTimeout(welcomeTimeout);
+    if (welcomeHideTimeout) clearTimeout(welcomeHideTimeout);
+
     const splash = document.getElementById('splash-screen');
     const phaseInit = document.getElementById('splash-phase-init');
     const phaseWelcome = document.getElementById('splash-phase-welcome');
@@ -186,14 +194,15 @@
     progressBar.style.width = '0%';
 
     let progress = 0;
-    const interval = setInterval(() => {
-      progress += 12;
+    initInterval = setInterval(() => {
+      progress += 14;
       progressBar.style.width = `${Math.min(100, progress)}%`;
       if (progress >= 100) {
-        clearInterval(interval);
+        clearInterval(initInterval);
+        initInterval = null;
         onInitBarCompleted();
       }
-    }, 110);
+    }, 95);
   }
 
   function onInitBarCompleted() {
@@ -204,19 +213,29 @@
       currentConfig.profile.userName.trim().length > 0;
 
     if (!hasName) {
-      document.getElementById('modal-register').classList.remove('hidden');
-      document.getElementById('reg-user-name').focus();
+      // Oculta a tela de splash e abre o modal de cadastro em primeiro plano (z-index: 200)
+      const splash = document.getElementById('splash-screen');
+      splash.classList.add('hidden');
+      const regModal = document.getElementById('modal-register');
+      regModal.classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('reg-user-name').focus();
+      }, 50);
     } else {
       showWelcomePhase(currentConfig.profile.userName.trim());
     }
   }
 
   function showWelcomePhase(userName) {
+    if (welcomeTimeout) clearTimeout(welcomeTimeout);
+    if (welcomeHideTimeout) clearTimeout(welcomeHideTimeout);
+
     const splash = document.getElementById('splash-screen');
     const phaseInit = document.getElementById('splash-phase-init');
     const phaseWelcome = document.getElementById('splash-phase-welcome');
     const dict = getToneDict();
 
+    splash.classList.remove('hidden', 'fade-out');
     phaseInit.classList.add('hidden');
     phaseWelcome.classList.remove('hidden');
 
@@ -224,15 +243,15 @@
     document.getElementById('splash-welcome-sub').textContent = dict.splashWelcomeSub(userName);
     playUiSound('welcome');
 
-    setTimeout(() => {
+    welcomeTimeout = setTimeout(() => {
       splash.classList.add('fade-out');
       if (astrolabe) {
         astrolabe.triggerIntroAnimation();
       }
-      setTimeout(() => {
+      welcomeHideTimeout = setTimeout(() => {
         splash.classList.add('hidden');
       }, 650);
-    }, 1550);
+    }, 1500);
   }
 
   function handlePointHover(point) {
@@ -618,7 +637,7 @@
       });
     });
 
-    document.getElementById('btn-save-register').addEventListener('click', async () => {
+    async function submitRegistration() {
       const nameInput = document.getElementById('reg-user-name').value.trim() || 'DevFLeo';
       const selectedRadio = document.querySelector('input[name="reg-tone"]:checked');
       const tone = selectedRadio ? selectedRadio.value : 'amigavel';
@@ -634,6 +653,22 @@
       applyLanguageToneUI();
       document.getElementById('modal-register').classList.add('hidden');
       showWelcomePhase(nameInput);
+    }
+
+    document.getElementById('btn-save-register').addEventListener('click', submitRegistration);
+    document.getElementById('reg-user-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitRegistration();
+      }
+    });
+
+    document.getElementById('splash-screen').addEventListener('click', () => {
+      if (initInterval) {
+        clearInterval(initInterval);
+        initInterval = null;
+        onInitBarCompleted();
+      }
     });
 
     document.getElementById('pt-action-type').addEventListener('change', updatePointModalFields);
