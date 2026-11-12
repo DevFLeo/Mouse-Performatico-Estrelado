@@ -70,7 +70,7 @@ class ConfigManager {
     if (!rootData.telegram) {
       rootData.telegram = {
         deliveryMode: 'desktop_and_bot',
-        savedChatPath: 'tg://resolve?domain=me',
+        savedChatPath: 'Eu | Você | Leonardo',
         savedScreenshotsFolder: './Capturas_MPE',
         botToken: '',
         chatId: '',

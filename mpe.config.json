@@ -6,17 +6,17 @@
     "userName": "Leonardo",
     "isRegistered": true,
     "languageTone": "amigavel",
-    "lastUpdated": "2026-11-12T04:32:50.786Z"
+    "lastUpdated": "2026-11-12T04:40:07.662Z"
   },
   "theme": {
     "preset": "gold-obsidian",
-    "bgPrimary": "#040406",
-    "bgSecondary": "#171206",
-    "goldPrimary": "#E5B84B",
-    "goldSecondary": "#FFE08A",
+    "bgPrimary": "#050304",
+    "bgSecondary": "#1e090c",
+    "goldPrimary": "#d9a74a",
+    "goldSecondary": "#ffd584",
     "goldDim": "#7A5B18",
-    "vectorAccent": "#5C73B8",
-    "nexusRed": "#9E2A2B",
+    "vectorAccent": "#b84a5c",
+    "nexusRed": "#e63946",
     "glowIntensity": 0.85
   },
   "system": {
@@ -180,18 +180,27 @@
       }
     },
     {
-      "id": "star-01-7",
-      "code": "01 7",
-      "title": "Novo Ponto / Config",
-      "description": "Abre o Forjador de Estrelas para cadastrar um novo ponto orbital ou configurar integracao entre sistemas.",
-      "actionType": "open_settings",
-      "orbit": 1,
-      "angle": 292,
-      "elevation": 26,
+      "id": "star-1794458369303",
+      "code": "10 7",
+      "title": "mudança 3d",
+      "description": "Comando programado: mudança 3d",
+      "actionType": "toggle_2d_3d",
+      "orbit": 3,
+      "angle": 10,
+      "elevation": 0,
       "vectorStyle": "gold",
       "glyph": "Π",
       "hasArrow": false,
-      "params": {}
+      "params": {
+        "captureScope": "fullscreen",
+        "saveDir": "./Capturas_MPE",
+        "targetSystem": "Telegram",
+        "telegramTarget": "tg://resolve?domain=me",
+        "targetPath": "",
+        "url": "",
+        "command": "",
+        "autoSendEnter": true
+      }
     }
   ],
   "machines": {
@@ -202,7 +211,7 @@
       "startWithWindows": true,
       "savedScreenshotsFolder": "./Capturas_MPE",
       "themePreset": "gold-obsidian",
-      "lastActive": "2026-11-12T04:32:50.786Z"
+      "lastActive": "2026-11-12T04:40:07.662Z"
     }
   },
   "originSystem": {

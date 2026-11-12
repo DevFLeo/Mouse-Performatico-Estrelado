@@ -303,9 +303,10 @@ namespace MpeNative
         private static IntPtr FindSystemWindow(string query)
         {
             if (string.IsNullOrWhiteSpace(query)) return IntPtr.Zero;
-            string q = query.Trim().ToLowerInvariant();
+            string qRaw = query.Trim().ToLowerInvariant();
+            string qNormalized = qRaw.Replace("|", " ");
 
-            // 1. Busca direta nos processos com MainWindowHandle ativo
+            // 1. Busca direta pelo titulo exato/parcial (incluindo "Eu | Você | Leonardo") nos processos
             foreach (Process p in Process.GetProcesses())
             {
                 try
@@ -315,7 +316,11 @@ namespace MpeNative
                     string procName = p.ProcessName ?? "";
                     if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) continue;
 
-                    if (title.ToLowerInvariant().Contains(q) || procName.ToLowerInvariant().Contains(q))
+                    string titleLow = title.ToLowerInvariant();
+                    string titleNorm = titleLow.Replace("|", " ");
+                    string procLow = procName.ToLowerInvariant();
+
+                    if (titleLow.Contains(qRaw) || titleNorm.Contains(qNormalized) || procLow.Contains(qRaw))
                     {
                         return p.MainWindowHandle;
                     }
@@ -332,7 +337,8 @@ namespace MpeNative
                 if (string.IsNullOrWhiteSpace(title)) return true;
                 if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) return true;
 
-                if (title.ToLowerInvariant().Contains(q))
+                string titleLow = title.ToLowerInvariant();
+                if (titleLow.Contains(qRaw) || titleLow.Contains(qNormalized))
                 {
                     found = hWnd;
                     return false;
@@ -340,7 +346,28 @@ namespace MpeNative
                 return true;
             }, IntPtr.Zero);
 
-            return found;
+            if (found != IntPtr.Zero) return found;
+
+            // 3. Se o destino for a pasta/conversa do Telegram ("Eu | Você | Leonardo"), foca a janela do Telegram Desktop
+            if (qRaw.Contains("leonardo") || qRaw.Contains("eu |") || qRaw.Contains("voce") || qRaw.Contains("você") || qRaw.Contains("telegram"))
+            {
+                foreach (Process p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (p.MainWindowHandle == IntPtr.Zero) continue;
+                        string procLow = (p.ProcessName ?? "").ToLowerInvariant();
+                        string titleLow = (p.MainWindowTitle ?? "").ToLowerInvariant();
+                        if (procLow.Contains("telegram") || titleLow.Contains("telegram"))
+                        {
+                            return p.MainWindowHandle;
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            return IntPtr.Zero;
         }
 
         private static void ListOpenWindowsJson()
@@ -373,6 +400,7 @@ namespace MpeNative
             }
 
             string[][] defaults = new string[][] {
+                new string[] { "Eu | Você | Leonardo", "Telegram (Pasta/Destino: Eu | Você | Leonardo)" },
                 new string[] { "Telegram", "Telegram Desktop (tg://)" },
                 new string[] { "WhatsApp", "WhatsApp Desktop" },
                 new string[] { "Discord", "Discord" },

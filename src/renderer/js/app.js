@@ -474,11 +474,11 @@
         p.saveDir ||
         (currentConfig.telegram && currentConfig.telegram.savedScreenshotsFolder) ||
         './Capturas_MPE';
-      document.getElementById('pt-target-system').value = p.targetSystem || 'Telegram';
+      document.getElementById('pt-target-system').value = p.targetSystem || 'Eu | Você | Leonardo';
       document.getElementById('pt-telegram-target').value =
         p.telegramTarget ||
         (currentConfig.telegram && currentConfig.telegram.savedChatPath) ||
-        'tg://resolve?domain=me';
+        'Eu | Você | Leonardo';
       document.getElementById('pt-target-path').value = p.targetPath || '';
       document.getElementById('pt-url').value = p.url || '';
       document.getElementById('pt-command').value = p.command || '';
@@ -502,10 +502,10 @@
       document.getElementById('pt-save-dir').value =
         (currentConfig.telegram && currentConfig.telegram.savedScreenshotsFolder) ||
         './Capturas_MPE';
-      document.getElementById('pt-target-system').value = 'Telegram';
+      document.getElementById('pt-target-system').value = 'Eu | Você | Leonardo';
       document.getElementById('pt-telegram-target').value =
         (currentConfig.telegram && currentConfig.telegram.savedChatPath) ||
-        'tg://resolve?domain=me';
+        'Eu | Você | Leonardo';
       document.getElementById('pt-target-path').value = '';
       document.getElementById('pt-url').value = '';
       document.getElementById('pt-command').value = '';
@@ -542,9 +542,9 @@
       params: {
         captureScope: document.getElementById('pt-capture-scope').value || 'active_window',
         saveDir: document.getElementById('pt-save-dir').value.trim() || './Capturas_MPE',
-        targetSystem: document.getElementById('pt-target-system').value.trim() || 'Telegram',
+        targetSystem: document.getElementById('pt-target-system').value.trim() || 'Eu | Você | Leonardo',
         telegramTarget:
-          document.getElementById('pt-telegram-target').value.trim() || 'tg://resolve?domain=me',
+          document.getElementById('pt-telegram-target').value.trim() || 'Eu | Você | Leonardo',
         targetPath: document.getElementById('pt-target-path').value.trim(),
         url: document.getElementById('pt-url').value.trim(),
         command: document.getElementById('pt-command').value.trim(),
@@ -592,7 +592,7 @@
     );
 
     const tg = cfg.telegram || {};
-    document.getElementById('cfg-tg-chat').value = tg.savedChatPath || 'tg://resolve?domain=me';
+    document.getElementById('cfg-tg-chat').value = tg.savedChatPath || 'Eu | Você | Leonardo';
     document.getElementById('cfg-tg-folder').value = tg.savedScreenshotsFolder || './Capturas_MPE';
     document.getElementById('cfg-tg-token').value = tg.botToken || '';
     document.getElementById('cfg-tg-chatid').value = tg.chatId || '';
@@ -626,7 +626,7 @@
 
     currentConfig.telegram = Object.assign({}, currentConfig.telegram, {
       savedChatPath:
-        document.getElementById('cfg-tg-chat').value.trim() || 'tg://resolve?domain=me',
+        document.getElementById('cfg-tg-chat').value.trim() || 'Eu | Você | Leonardo',
       savedScreenshotsFolder:
         document.getElementById('cfg-tg-folder').value.trim() || './Capturas_MPE',
       botToken: document.getElementById('cfg-tg-token').value.trim(),
@@ -890,7 +890,7 @@
       const target =
         currentConfig.telegram && currentConfig.telegram.savedChatPath
           ? currentConfig.telegram.savedChatPath
-          : 'tg://resolve?domain=me';
+          : 'Eu | Você | Leonardo';
       await window.mpeApi.sendTextToTelegram({ text: txt, target });
       document.getElementById('modal-text-selection').classList.add('hidden');
       showToast('Texto enviado para a conversa salva no Telegram!');

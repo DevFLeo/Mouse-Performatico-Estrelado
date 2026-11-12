@@ -256,7 +256,7 @@ class ActionExecutor {
       }
     }
 
-    const targetChat = (customTarget || tg.savedChatPath || 'tg://resolve?domain=me').trim();
+    const targetChat = (customTarget || tg.savedChatPath || 'Eu | Você | Leonardo').trim();
 
     if (targetChat) {
       let deepLink = targetChat;
@@ -274,11 +274,21 @@ class ActionExecutor {
         if (fs.existsSync(resolved)) {
           await shell.openPath(resolved);
         } else if (this.hookBridge) {
-          // Tenta focar diretamente na janela do Telegram ou sistema informado
+          if (!pngBuffer && textMessage) {
+            clipboard.writeText(textMessage);
+          }
+          // Tenta focar diretamente na janela "Eu | Você | Leonardo" / Telegram Desktop e colar/enviar
           const res = await this.hookBridge.deliverToSystem(targetChat, tg.autoSend !== false);
           if (res && res.ok) {
-            return { ok: true, botSent, targetChat: res.matchedTitle, filePath: filePath || null };
+            return {
+              ok: true,
+              botSent,
+              targetChat: `${targetChat} (${res.matchedTitle || 'Telegram'})`,
+              filePath: filePath || null
+            };
           }
+          // Caso a janela do Telegram esteja minimizada na bandeja, desperta via protocolo tg://
+          await shell.openExternal('tg://');
         }
       }
 

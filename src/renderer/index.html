@@ -197,7 +197,7 @@
           <div id="group-target-system">
             <label class="field-label">Sistema de Destino (Titulo da Janela, Processo ou Caminho)</label>
             <div class="input-with-btn">
-              <input type="text" id="pt-target-system" class="field-input" placeholder="Ex: Telegram, WhatsApp, Discord, Paint, Word..." />
+              <input type="text" id="pt-target-system" class="field-input" placeholder="Ex: Eu | Você | Leonardo, Telegram, WhatsApp, Discord..." />
               <button type="button" id="btn-detect-systems" class="hud-btn small">Detectar</button>
             </div>
             <select id="pt-open-windows-list" class="field-input hidden" style="margin-top:6px;">
@@ -206,8 +206,8 @@
           </div>
 
           <div id="group-telegram-target">
-            <label class="field-label">Conversa / Caminho do Telegram (Ex: @usuario, tg:// ou link)</label>
-            <input type="text" id="pt-telegram-target" class="field-input" placeholder="tg://resolve?domain=me ou @seu_contato" />
+            <label class="field-label">Pasta / Conversa do Telegram de Destino</label>
+            <input type="text" id="pt-telegram-target" class="field-input" placeholder="Eu | Você | Leonardo" />
           </div>
 
           <div id="group-target-path" class="hidden">
@@ -309,8 +309,8 @@
           </label>
 
           <h3 class="section-subtitle">Configuracao Global do Telegram e Destino</h3>
-          <label class="field-label">Conversa Padrao Salva (tg://, @usuario ou Link)</label>
-          <input type="text" id="cfg-tg-chat" class="field-input" placeholder="tg://resolve?domain=me" />
+          <label class="field-label">Pasta / Conversa Padrao Salva no Telegram</label>
+          <input type="text" id="cfg-tg-chat" class="field-input" placeholder="Eu | Você | Leonardo" />
 
           <label class="field-label">Pasta Padrao para Salvar Prints</label>
           <div class="input-with-btn">
