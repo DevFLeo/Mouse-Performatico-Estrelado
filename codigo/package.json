@@ -1,0 +1,21 @@
+{
+  "name": "mpe-mouse-performatico-estrelado",
+  "version": "1.0.0",
+  "description": "M.P.E (Mouse Performático Estrelado) - HUD 3D Interativo de Produtividade e Automação Estelar",
+  "main": "src/main/main.js",
+  "author": "DevFLeo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevFLeo/Mouse-Performatico-Estrelado.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "open": "electron . --show",
+    "test": "node scripts/run-tests.js",
+    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
+  },
+  "dependencies": {
+    "electron": "^35.0.0"
+  }
+}
