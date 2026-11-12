@@ -353,11 +353,11 @@ class Astrolabe3D {
 
     ctx.clearRect(0, 0, w, h);
 
-    // 1. Fundo Degradê Preto & Dourado Imperial (Obsidiana -> Ouro Escuro -> Preto)
-    const bgGrad = ctx.createRadialGradient(cx, cy, baseR * 0.05, cx, cy, Math.max(w, h) * 0.72);
+    // 1. Fundo Degrade Preto e Dourado Imperial com transparencia de Overlay Nativo do Windows
+    const bgGrad = ctx.createRadialGradient(cx, cy, baseR * 0.1, cx, cy, Math.max(w, h) * 0.75);
     bgGrad.addColorStop(0, this.theme.bgSecondary || '#171206');
-    bgGrad.addColorStop(0.52, this.theme.bgPrimary || '#050508');
-    bgGrad.addColorStop(1, '#020204');
+    bgGrad.addColorStop(0.46, this.theme.bgPrimary || '#050508');
+    bgGrad.addColorStop(1, 'rgba(2, 2, 4, 0.76)');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 

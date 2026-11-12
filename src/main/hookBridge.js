@@ -6,8 +6,8 @@ const EventEmitter = require('events');
 /**
  * Ponte de Comunicacao com o Subsistema Nativo Win32 (MpeHook.exe).
  * Escuta o evento global Shift + Ctrl + Alt + Botao Direito do Mouse,
- * identifica o Sistema de Origem (HWND, Retangulo, Titulo) e executa
- * transferencia direta (Foco + Colagem + Disparo) para qualquer Sistema de Destino no Windows.
+ * recebe os snapshots pre-capturados do Sistema de Origem (Zero Flicker)
+ * e executa transferencia direta para qualquer Sistema de Destino no Windows.
  */
 class HookBridge extends EventEmitter {
   constructor(rootDir) {
@@ -17,6 +17,8 @@ class HookBridge extends EventEmitter {
     this.proc = null;
     this.lastHwnd = '0';
     this.lastWindowRect = null;
+    this.lastFullSnapPath = '';
+    this.lastWinSnapPath = '';
     this.lastWindowTitle = '';
     this.isStopping = false;
   }
@@ -52,10 +54,15 @@ class HookBridge extends EventEmitter {
           const y = parseInt(parts[2] || '0', 10);
           const hwnd = parts[3] || '0';
           const rectRaw = (parts[4] || '0,0,0,0').split(',').map((n) => parseInt(n, 10));
-          const winTitle = parts.slice(5).join(' ').trim();
+          const fullSnap = parts[5] || '';
+          const winSnap = parts[6] || '';
+          const winTitle = parts.slice(7).join(' ').trim();
 
           this.lastHwnd = hwnd;
+          this.lastFullSnapPath = fullSnap;
+          this.lastWinSnapPath = winSnap;
           this.lastWindowTitle = winTitle;
+
           if (rectRaw.length === 4 && rectRaw[2] > rectRaw[0] && rectRaw[3] > rectRaw[1]) {
             this.lastWindowRect = {
               left: rectRaw[0],
@@ -74,6 +81,8 @@ class HookBridge extends EventEmitter {
             y,
             hwnd,
             windowRect: this.lastWindowRect,
+            fullSnapPath: this.lastFullSnapPath,
+            winSnapPath: this.lastWinSnapPath,
             windowTitle: this.lastWindowTitle
           });
         }
@@ -92,7 +101,9 @@ class HookBridge extends EventEmitter {
     return {
       hwnd: this.lastHwnd,
       windowTitle: this.lastWindowTitle || 'Sistema Windows Ativo',
-      windowRect: this.lastWindowRect
+      windowRect: this.lastWindowRect,
+      fullSnapPath: this.lastFullSnapPath,
+      winSnapPath: this.lastWinSnapPath
     };
   }
 

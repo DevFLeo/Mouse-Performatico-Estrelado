@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,12 +12,13 @@ using System.Windows.Forms;
 namespace MpeNative
 {
     /// <summary>
-    /// M.P.E (Mouse Performatico Estrelado) - Subsistema Nativo de Integracao Win32.
-    /// Opera diretamente sobre user32.dll e kernel32.dll para:
-    /// 1. Interceptar globalmente Shift + Ctrl + Alt + Botao Direito do Mouse em qualquer sistema aberto.
-    /// 2. Identificar a janela e coordenadas exatas do Sistema de Origem ativo (HWND, Titulo, Retangulo).
-    /// 3. Capturar selecao de texto ou imagem do Sistema de Origem e transferir automaticamente
-    ///    (Foco Nativo + Colagem Ctrl+V + Disparo Enter) para qualquer Sistema de Destino no Windows.
+    /// M.P.E (Mouse Performatico Estrelado) - Subsistema Nativo de Integracao Direta do Windows (Win32).
+    /// Opera em nivel de sistema operacional (user32.dll, dwmapi.dll, gdi32.dll) para:
+    /// 1. Interceptar globalmente Shift + Ctrl + Alt + Botao Direito do Mouse sobre qualquer sistema.
+    /// 2. Pre-capturar instantaneamente a imagem limpa do Sistema de Origem (Janela Ativa e Tela Inteira)
+    ///    antes mesmo da renderizacao do HUD 3D (Zero Flicker / Latencia Zero).
+    /// 3. Transferir prints e textos de um sistema diretamente para outro sistema aberto no Windows
+    ///    (Ativacao Nativa de Janela + Injeção de Clipboard Ctrl+V + Disparo Automatico).
     /// </summary>
     internal static class MpeHook
     {
@@ -32,11 +35,14 @@ namespace MpeNative
         private const byte VK_RETURN = 0x0D;
         private const uint KEYEVENTF_KEYUP = 0x0002;
         private const int SW_RESTORE = 9;
+        private const int SW_SHOW = 5;
+        private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
         private static LowLevelMouseProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
         private static bool _suppressNextRightUp = false;
         private static IntPtr _lastForegroundHwnd = IntPtr.Zero;
+        private static string _cacheDir = "";
 
         private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -67,6 +73,9 @@ namespace MpeNative
             public IntPtr dwExtraInfo;
         }
 
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDPIAware();
+
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
 
@@ -90,6 +99,9 @@ namespace MpeNative
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll")]
@@ -103,6 +115,9 @@ namespace MpeNative
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
 
         [DllImport("user32.dll")]
         private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
@@ -122,8 +137,15 @@ namespace MpeNative
         [STAThread]
         public static void Main(string[] args)
         {
+            try { SetProcessDPIAware(); } catch { }
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
+
+            _cacheDir = Path.Combine(Path.GetTempPath(), "MPE_PreCapture");
+            if (!Directory.Exists(_cacheDir))
+            {
+                Directory.CreateDirectory(_cacheDir);
+            }
 
             if (args.Length > 0)
             {
@@ -145,6 +167,68 @@ namespace MpeNative
             UnhookWindowsHookEx(_hookID);
         }
 
+        private static RECT GetAccurateWindowRect(IntPtr hWnd)
+        {
+            RECT r;
+            if (DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(RECT))) == 0)
+            {
+                if (r.Right > r.Left && r.Bottom > r.Top)
+                {
+                    return r;
+                }
+            }
+            GetWindowRect(hWnd, out r);
+            return r;
+        }
+
+        /// <summary>
+        /// Pre-captura instantaneamente o Sistema de Origem no exato momento em que o usuario
+        /// aciona Shift + Ctrl + Alt + Botao Direito, antes de exibir o HUD 3D.
+        /// </summary>
+        private static void CaptureOriginSnapshots(IntPtr originHwnd, RECT winRect, out string fullPath, out string winPath)
+        {
+            fullPath = Path.Combine(_cacheDir, "origin_fullscreen.png");
+            winPath = Path.Combine(_cacheDir, "origin_window.png");
+
+            try
+            {
+                Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
+                using (Bitmap bmpFull = new Bitmap(screenBounds.Width, screenBounds.Height, PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(bmpFull))
+                    {
+                        g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
+                    }
+                    bmpFull.Save(fullPath, ImageFormat.Png);
+
+                    int wLeft = Math.Max(screenBounds.Left, winRect.Left);
+                    int wTop = Math.Max(screenBounds.Top, winRect.Top);
+                    int wRight = Math.Min(screenBounds.Right, winRect.Right);
+                    int wBottom = Math.Min(screenBounds.Bottom, winRect.Bottom);
+                    int wWidth = wRight - wLeft;
+                    int wHeight = wBottom - wTop;
+
+                    if (wWidth > 80 && wHeight > 80)
+                    {
+                        Rectangle cropRect = new Rectangle(wLeft - screenBounds.Left, wTop - screenBounds.Top, wWidth, wHeight);
+                        using (Bitmap bmpWin = bmpFull.Clone(cropRect, bmpFull.PixelFormat))
+                        {
+                            bmpWin.Save(winPath, ImageFormat.Png);
+                        }
+                    }
+                    else
+                    {
+                        bmpFull.Save(winPath, ImageFormat.Png);
+                    }
+                }
+            }
+            catch
+            {
+                fullPath = "";
+                winPath = "";
+            }
+        }
+
         private static void ForceActivateWindow(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return;
@@ -158,15 +242,21 @@ namespace MpeNative
             {
                 ShowWindow(hWnd, SW_RESTORE);
             }
+            else
+            {
+                ShowWindow(hWnd, SW_SHOW);
+            }
 
             if (fgThread != curThread && fgThread != 0)
             {
                 AttachThreadInput(curThread, fgThread, true);
+                BringWindowToTop(hWnd);
                 SetForegroundWindow(hWnd);
                 AttachThreadInput(curThread, fgThread, false);
             }
             else
             {
+                BringWindowToTop(hWnd);
                 SetForegroundWindow(hWnd);
             }
         }
@@ -184,6 +274,7 @@ namespace MpeNative
             if (string.IsNullOrWhiteSpace(query)) return IntPtr.Zero;
             string q = query.Trim().ToLowerInvariant();
 
+            // 1. Busca direta nos processos com MainWindowHandle ativo
             foreach (Process p in Process.GetProcesses())
             {
                 try
@@ -200,7 +291,25 @@ namespace MpeNative
                 }
                 catch { }
             }
-            return IntPtr.Zero;
+
+            // 2. Busca profunda via EnumWindows para janelas secundarias ou UWP
+            IntPtr found = IntPtr.Zero;
+            EnumWindows(delegate (IntPtr hWnd, IntPtr lParam)
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+                string title = GetWindowTitle(hWnd);
+                if (string.IsNullOrWhiteSpace(title)) return true;
+                if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) return true;
+
+                if (title.ToLowerInvariant().Contains(q))
+                {
+                    found = hWnd;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            return found;
         }
 
         private static void ListOpenWindowsJson()
@@ -232,11 +341,12 @@ namespace MpeNative
                 catch { }
             }
 
-            // Inclui alvos de integracao padrao do Windows caso ainda nao listados
             string[][] defaults = new string[][] {
                 new string[] { "Telegram", "Telegram Desktop (tg://)" },
                 new string[] { "WhatsApp", "WhatsApp Desktop" },
                 new string[] { "Discord", "Discord" },
+                new string[] { "Slack", "Slack" },
+                new string[] { "Teams", "Microsoft Teams" },
                 new string[] { "msedge", "Microsoft Edge" },
                 new string[] { "chrome", "Google Chrome" },
                 new string[] { "notepad", "Bloco de Notas (Notepad)" },
@@ -272,7 +382,7 @@ namespace MpeNative
                 {
                     IntPtr targetHwnd = new IntPtr(hwndVal);
                     ForceActivateWindow(targetHwnd);
-                    Thread.Sleep(140);
+                    Thread.Sleep(150);
                 }
                 SendCtrlKey(VK_C);
                 Thread.Sleep(150);
@@ -281,14 +391,13 @@ namespace MpeNative
             else if (cmd == "--PASTE-AND-SEND")
             {
                 bool autoSend = args.Length <= 1 || args[1] != "0";
-                Thread.Sleep(550);
+                Thread.Sleep(620);
                 SendCtrlKey(VK_V);
                 if (autoSend)
                 {
-                    Thread.Sleep(420);
-                    keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
-                    Thread.Sleep(40);
-                    keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                    // Aguarda modal de preview de imagem (Telegram, WhatsApp, Discord, Teams) e confirma com Enter
+                    Thread.Sleep(550);
+                    SendReturnKey();
                 }
                 return;
             }
@@ -301,14 +410,12 @@ namespace MpeNative
                 if (targetHwnd != IntPtr.Zero)
                 {
                     ForceActivateWindow(targetHwnd);
-                    Thread.Sleep(380);
+                    Thread.Sleep(450);
                     SendCtrlKey(VK_V);
                     if (autoSend)
                     {
-                        Thread.Sleep(360);
-                        keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
-                        Thread.Sleep(40);
-                        keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                        Thread.Sleep(550);
+                        SendReturnKey();
                     }
                     Console.WriteLine("DELIVERED_TO_WINDOW|" + GetWindowTitle(targetHwnd));
                 }
@@ -318,6 +425,13 @@ namespace MpeNative
                 }
                 return;
             }
+        }
+
+        private static void SendReturnKey()
+        {
+            keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(45);
+            keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
         private static void ListenStdin()
@@ -348,7 +462,7 @@ namespace MpeNative
 
             keybd_event((byte)VK_CONTROL, 0, 0, UIntPtr.Zero);
             keybd_event(vKey, 0, 0, UIntPtr.Zero);
-            Thread.Sleep(40);
+            Thread.Sleep(45);
             keybd_event(vKey, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event((byte)VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
@@ -384,22 +498,22 @@ namespace MpeNative
                         MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
                         _lastForegroundHwnd = GetForegroundWindow();
                         string winTitle = GetWindowTitle(_lastForegroundHwnd);
+                        RECT r = GetAccurateWindowRect(_lastForegroundHwnd);
+                        string rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
 
-                        RECT r;
-                        string rectStr = "0,0,0,0";
-                        if (GetWindowRect(_lastForegroundHwnd, out r))
-                        {
-                            rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
-                        }
+                        string fullSnap, winSnap;
+                        CaptureOriginSnapshots(_lastForegroundHwnd, r, out fullSnap, out winSnap);
 
                         _suppressNextRightUp = true;
 
                         Console.WriteLine(string.Format(
-                            "TRIGGER_HUD|{0}|{1}|{2}|{3}|{4}",
+                            "TRIGGER_HUD|{0}|{1}|{2}|{3}|{4}|{5}|{6}",
                             hookStruct.pt.x,
                             hookStruct.pt.y,
                             _lastForegroundHwnd.ToInt64(),
                             rectStr,
+                            fullSnap,
+                            winSnap,
                             winTitle
                         ));
                         Console.Out.Flush();

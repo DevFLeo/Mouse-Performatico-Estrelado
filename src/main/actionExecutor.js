@@ -20,12 +20,36 @@ class ActionExecutor {
   }
 
   /**
-   * Captura a tela ou a janela exata do Sistema de Origem em alta resolucao
+   * Captura a tela ou a janela exata do Sistema de Origem em alta resolucao.
+   * Prioriza o snapshot pre-capturado pelo daemon Win32 no instante exato do atalho (Zero Flicker).
    */
   async captureScreenImage(cropToOriginWindow = false) {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.size;
     const scaleFactor = primaryDisplay.scaleFactor || 1;
+
+    if (this.hookBridge) {
+      const candidatePath = cropToOriginWindow
+        ? this.hookBridge.lastWinSnapPath || this.hookBridge.lastFullSnapPath
+        : this.hookBridge.lastFullSnapPath;
+
+      if (candidatePath && fs.existsSync(candidatePath)) {
+        try {
+          const stat = fs.statSync(candidatePath);
+          // Se o snapshot foi capturado recentemente, utiliza-o em 0ms sem piscar a tela
+          if (Date.now() - stat.mtimeMs < 120000) {
+            const preImg = nativeImage.createFromPath(candidatePath);
+            if (!preImg.isEmpty()) {
+              return {
+                image: preImg,
+                displaySize: { width, height, scaleFactor },
+                fromPreCapture: true
+              };
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     const thumbWidth = Math.floor(width * scaleFactor);
     const thumbHeight = Math.floor(height * scaleFactor);

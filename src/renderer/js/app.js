@@ -717,6 +717,15 @@
         astrolabe.wheelVelocity -= 0.012;
       } else if (e.key === 'ArrowRight') {
         astrolabe.wheelVelocity += 0.012;
+      } else if (/^[1-9]$/.test(e.key)) {
+        const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
+        const splashVisible = !document.getElementById('splash-screen').classList.contains('hidden');
+        if (openModals.length === 0 && !splashVisible && currentConfig && Array.isArray(currentConfig.points)) {
+          const idx = parseInt(e.key, 10) - 1;
+          if (currentConfig.points[idx]) {
+            handlePointExecute(currentConfig.points[idx]);
+          }
+        }
       }
     });
 
