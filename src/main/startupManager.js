@@ -1,19 +1,31 @@
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
-const REG_VALUE_NAME = 'MPE_MousePerformaticoEstrelado';
+const REG_VALUE_NAME = 'M.P.E - Mouse Performatico Estrelado';
 
 /**
- * Gerenciador Nativo de Inicialização com o Windows ("Iniciar com o Windows").
- * Registra o executável principal MPE.exe em HKCU\Software\Microsoft\Windows\CurrentVersion\Run
- * para inicialização silenciosa em segundo plano junto ao login do usuário.
+ * Gerenciador Nativo de Inicializacao com o Windows ("Aplicativos de inicializacao").
+ * Registra o executavel principal MPE.exe em HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+ * e na pasta Startup do Windows para aparecer em "Aplicativos de inicializacao" do Gerenciador de Tarefas.
  */
 class StartupManager {
   constructor(rootDir) {
     this.rootDir = rootDir;
     this.launcherExe = path.join(rootDir, 'MPE.exe');
+    this.startupFolder = path.join(
+      os.homedir(),
+      'AppData',
+      'Roaming',
+      'Microsoft',
+      'Windows',
+      'Start Menu',
+      'Programs',
+      'Startup'
+    );
+    this.shortcutPath = path.join(this.startupFolder, 'M.P.E - Mouse Performatico Estrelado.lnk');
   }
 
   getStartupCommand() {
@@ -30,30 +42,15 @@ class StartupManager {
         return resolve({ ok: false, reason: 'Apenas suportado no Windows' });
       }
 
-      if (enable) {
-        const cmdValue = this.getStartupCommand();
-        execFile(
-          'reg.exe',
-          ['add', REG_KEY, '/v', REG_VALUE_NAME, '/t', 'REG_SZ', '/d', cmdValue, '/f'],
-          { windowsHide: true },
-          (err) => {
-            if (err) {
-              console.error('[M.P.E Startup] Erro ao registrar inicialização:', err);
-              return resolve({ ok: false, error: err.message });
-            }
-            resolve({ ok: true, enabled: true, command: cmdValue });
-          }
-        );
-      } else {
-        execFile(
-          'reg.exe',
-          ['delete', REG_KEY, '/v', REG_VALUE_NAME, '/f'],
-          { windowsHide: true },
-          () => {
-            resolve({ ok: true, enabled: false });
-          }
-        );
+      if (fs.existsSync(this.launcherExe)) {
+        const flag = enable ? '--enable-startup' : '--disable-startup';
+        execFile(this.launcherExe, [flag], { windowsHide: true }, () => {
+          resolve({ ok: true, enabled: Boolean(enable), command: this.getStartupCommand() });
+        });
+        return;
       }
+
+      resolve({ ok: true, enabled: Boolean(enable) });
     });
   }
 
@@ -61,6 +58,9 @@ class StartupManager {
     return new Promise((resolve) => {
       if (process.platform !== 'win32') {
         return resolve(false);
+      }
+      if (fs.existsSync(this.shortcutPath)) {
+        return resolve(true);
       }
       execFile(
         'reg.exe',
@@ -70,7 +70,7 @@ class StartupManager {
           if (err || !stdout) {
             return resolve(false);
           }
-          resolve(stdout.includes(REG_VALUE_NAME));
+          resolve(stdout.includes('MPE.exe'));
         }
       );
     });

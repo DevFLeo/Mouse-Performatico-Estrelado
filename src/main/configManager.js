@@ -58,7 +58,7 @@ class ConfigManager {
     }
     if (!rootData.system) {
       rootData.system = {
-        startWithWindows: false,
+        startWithWindows: true,
         triggerShortcut: 'Shift + Ctrl + Alt + Botão Direito',
         fallbackKeyboardShortcut: 'CommandOrControl+Shift+Alt+M',
         sensitivity3D: 1.0,
