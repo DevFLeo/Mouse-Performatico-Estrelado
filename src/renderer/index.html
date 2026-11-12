@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>M.P.E — Mouse Performático Estrelado</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>M.P.E — Mouse Performatico Estrelado</title>
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
-  <!-- 1. TELA CINEMATOGRÁFICA DE INICIALIZAÇÃO ("M . P . E Inicializando" -> "Bem-vindo [Nome]") -->
+  <!-- 1. TELA CINEMATOGRAFICA DE INICIALIZACAO ("M . P . E Inicializando" -> "Bem-vindo [Nome]") -->
   <div id="splash-screen" class="splash-screen">
     <div class="splash-rings">
       <div class="splash-ring ring-outer"></div>
@@ -17,35 +18,35 @@
     </div>
 
     <div id="splash-phase-init" class="splash-content">
-      <div class="splash-tag">SISTEMA ORBITAL 3D • ATALHO GLOBAL ATIVO</div>
+      <div class="splash-tag">INTEGRACAO NATIVA WINDOWS • SISTEMA ORBITAL 3D</div>
       <h1 id="splash-init-title" class="splash-title">M . P . E &nbsp; Inicializando</h1>
-      <p id="splash-init-sub" class="splash-subtitle">Alinhando suas estrelas e preparando seus atalhos favoritos...</p>
+      <p id="splash-init-sub" class="splash-subtitle">Alinhando suas estrelas e preparando a integracao com os seus sistemas...</p>
       <div class="splash-progress-track">
         <div id="splash-progress-bar" class="splash-progress-bar"></div>
       </div>
     </div>
 
     <div id="splash-phase-welcome" class="splash-content hidden">
-      <div class="splash-tag">SINCRONIZAÇÃO CONCLUÍDA</div>
+      <div class="splash-tag">SINCRONIZACAO CONCLUIDA</div>
       <h1 id="splash-welcome-title" class="splash-title gold-shimmer">Bem-vindo</h1>
       <p id="splash-welcome-sub" class="splash-subtitle"></p>
     </div>
   </div>
 
-  <!-- 2. CANVAS 3D INTERATIVO DO ASTROLÁBIO ESTELAR -->
+  <!-- 2. CANVAS 3D INTERATIVO DO ASTROLABIO ESTELAR -->
   <canvas id="astrolabe-canvas"></canvas>
 
   <!-- 3. BARRA SUPERIOR DO HUD -->
   <header class="hud-topbar">
     <div class="hud-brand">
-      <div class="brand-emblem">✦</div>
+      <div class="brand-emblem">O</div>
       <div>
-        <div class="brand-title">M . P . E <span class="brand-badge">3D</span></div>
-        <div id="hud-status-text" class="brand-subtitle">Arraste para os lados para girar o Círculo 3D</div>
+        <div class="brand-title">M . P . E <span class="brand-badge">3D WIN32</span></div>
+        <div id="hud-status-text" class="brand-subtitle">Arraste para os lados para girar o Circulo 3D</div>
       </div>
     </div>
 
-    <!-- Seletor Rápido de Tom de Linguagem (Amigável, Neutra, Profissional) -->
+    <!-- Seletor Rapido de Tom de Linguagem (Amigavel, Neutra, Profissional) -->
     <div class="tone-switcher" title="Alternar Tom de Linguagem">
       <button class="tone-pill active" data-tone="amigavel">Amigável</button>
       <button class="tone-pill" data-tone="neutra">Neutra</button>
@@ -54,9 +55,9 @@
 
     <div class="hud-actions">
       <button id="btn-add-star" class="hud-btn primary">+ Salvar Novo Ponto</button>
-      <button id="btn-settings" class="hud-btn">⚙ Configurar &amp; Cores</button>
-      <button id="btn-recenter" class="hud-btn" title="Centralizar Eixo 3D">◎ 3D</button>
-      <button id="btn-replay-intro" class="hud-btn" title="Ver Animação de Boas-Vindas">🎬 Intro</button>
+      <button id="btn-settings" class="hud-btn">Configurar Cores e Sistema</button>
+      <button id="btn-recenter" class="hud-btn" title="Centralizar Eixo 3D">Centralizar 3D</button>
+      <button id="btn-replay-intro" class="hud-btn" title="Ver Animacao de Boas-Vindas">Intro</button>
       <button id="btn-hide-hud" class="hud-btn subtle" title="Ocultar em Segundo Plano (ESC)">Ocultar HUD</button>
     </div>
   </header>
@@ -67,8 +68,8 @@
       <div class="inspector-default" id="inspector-default">
         <span class="gold-dot"></span>
         <span>
-          <strong>Interatividade 3D:</strong> Arraste para os lados para girar o círculo estelar •
-          Clique em um ponto salvo para executar • Botão Direito no ponto para editar •
+          <strong>Integracao Entre Sistemas 3D:</strong> Arraste para os lados para girar o circulo •
+          Clique em um ponto salvo para capturar no sistema atual e enviar para outro sistema •
           Gatilho Global: <kbd>Shift + Ctrl + Alt + Botão Direito</kbd>
         </span>
       </div>
@@ -76,11 +77,11 @@
         <div class="inspector-code" id="insp-code">08 7</div>
         <div class="inspector-info">
           <div class="inspector-title" id="insp-title">Print + Telegram</div>
-          <div class="inspector-desc" id="insp-desc">Descrição da estrela selecionada</div>
+          <div class="inspector-desc" id="insp-desc">Descricao da estrela selecionada</div>
         </div>
         <div class="inspector-buttons">
-          <button id="btn-insp-exec" class="hud-btn primary small">⚡ Acionar Ponto</button>
-          <button id="btn-insp-edit" class="hud-btn small">✎ Editar</button>
+          <button id="btn-insp-exec" class="hud-btn primary small">Acionar Ponto</button>
+          <button id="btn-insp-edit" class="hud-btn small">Editar</button>
         </div>
       </div>
     </div>
@@ -90,29 +91,29 @@
   <div id="modal-register" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h2 id="reg-modal-title">Boas-vindas ao M.P.E ✨</h2>
-        <p id="reg-modal-subtitle">Como você gostaria de ser chamado(a) sempre que o sistema inicializar?</p>
+        <h2 id="reg-modal-title">Boas-vindas ao M.P.E</h2>
+        <p id="reg-modal-subtitle">Como voce gostaria de ser chamado sempre que o sistema inicializar?</p>
       </div>
       <div class="modal-body">
-        <label class="field-label">Seu Nome ou Identificação (Salvo no JSON Portátil)</label>
+        <label class="field-label">Seu Nome ou Identificacao (Salvo no JSON Portatil)</label>
         <input type="text" id="reg-user-name" class="field-input" placeholder="Ex: DevFLeo" maxlength="40" />
 
         <label class="field-label">Escolha o Estilo de Linguagem do Sistema</label>
         <div class="tone-cards">
           <label class="tone-card selected" data-tone-card="amigavel">
             <input type="radio" name="reg-tone" value="amigavel" checked />
-            <div class="tone-card-title">✨ Linguagem Amigável</div>
+            <div class="tone-card-title">Linguagem Amigável</div>
             <div class="tone-card-desc">Calorosa, receptiva e inspiradora para o seu dia a dia.</div>
           </label>
           <label class="tone-card" data-tone-card="neutra">
             <input type="radio" name="reg-tone" value="neutra" />
-            <div class="tone-card-title">⚖ Linguagem Neutra (Interpessoal)</div>
-            <div class="tone-card-desc">Inclusiva, equilibrada e sem marcação de gênero.</div>
+            <div class="tone-card-title">Linguagem Neutra (Interpessoal)</div>
+            <div class="tone-card-desc">Inclusiva, equilibrada e sem marcacao de genero.</div>
           </label>
           <label class="tone-card" data-tone-card="profissional">
             <input type="radio" name="reg-tone" value="profissional" />
-            <div class="tone-card-title">🏛 Linguagem Profissional</div>
-            <div class="tone-card-desc">Executiva, técnica, direta e focada em alta performance.</div>
+            <div class="tone-card-title">Linguagem Profissional</div>
+            <div class="tone-card-desc">Executiva, tecnica, direta e focada em alta performance.</div>
           </label>
         </div>
       </div>
@@ -126,36 +127,47 @@
   <div id="modal-point" class="modal-backdrop hidden">
     <div class="modal-card wide">
       <div class="modal-header">
-        <h2 id="point-modal-heading">Salvar Ponto Estelar no Círculo 3D</h2>
-        <p>Configure o que este ponto fará ao ser clicado no seu Astrolábio 3D.</p>
+        <h2 id="point-modal-heading">Salvar Ponto Estelar no Circulo 3D</h2>
+        <p>Configure o comando programado para capturar em um sistema e enviar para outro.</p>
       </div>
       <div class="modal-body grid-2">
         <div>
-          <label class="field-label">Título do Atalho / Ponto</label>
-          <input type="text" id="pt-title" class="field-input" placeholder="Ex: Print + Telegram Cliente" />
+          <label class="field-label">Titulo do Atalho / Ponto</label>
+          <input type="text" id="pt-title" class="field-input" placeholder="Ex: Print ERP -> Enviar p/ Sistema" />
 
-          <label class="field-label">Código Estelar (Exibido no Anel 3D)</label>
+          <label class="field-label">Codigo Estelar (Exibido no Anel 3D)</label>
           <input type="text" id="pt-code" class="field-input" placeholder="Ex: 10 7" maxlength="8" />
 
-          <label class="field-label">Tipo de Ação Performática</label>
+          <label class="field-label">Tipo de Acao Performatica</label>
           <select id="pt-action-type" class="field-input">
-            <option value="print_telegram">📸 Print Tela Inteira + Enviar p/ Conversa no Telegram</option>
-            <option value="area_print_telegram">✂️ Selecionar Área (Print) + Enviar p/ Conversa no Telegram</option>
-            <option value="print">🖼️ Print Instantâneo (Salvar em Pasta + Clipboard)</option>
-            <option value="area_print">📐 Recorte de Área da Tela (Salvar + Clipboard)</option>
-            <option value="text_selection">📝 Seleção de Texto (Capturar Texto Selecionado)</option>
-            <option value="text_telegram">💬 Seleção de Texto + Enviar p/ Conversa no Telegram</option>
-            <option value="open_path">📁 Abrir Pasta / Aplicativo / Executável Salvo</option>
-            <option value="open_url">🌐 Abrir Site / URL Favorita</option>
-            <option value="command">⚡ Executar Comando / Script Personalizado</option>
+            <option value="system_to_system_print">Print do Sistema Atual -> Enviar para Outro Sistema (Win32)</option>
+            <option value="area_print_system">Recorte de Sistema -> Enviar para Outro Sistema (Win32)</option>
+            <option value="print_telegram">Print + Enviar para Conversa no Telegram (Caminho Salvo)</option>
+            <option value="area_print_telegram">Selecionar Area (Print) + Enviar para Conversa no Telegram</option>
+            <option value="print">Print Instantaneo (Salvar em Pasta + Clipboard)</option>
+            <option value="area_print">Recorte de Area da Tela (Salvar + Clipboard)</option>
+            <option value="text_selection">Selecao de Texto (Capturar Texto do Sistema Atual)</option>
+            <option value="text_to_system">Selecao de Texto -> Enviar para Outro Sistema</option>
+            <option value="text_telegram">Selecao de Texto -> Enviar para Conversa no Telegram</option>
+            <option value="open_path">Abrir Pasta / Aplicativo / Executavel Salvo</option>
+            <option value="open_url">Abrir Site / URL Favorita</option>
+            <option value="command">Executar Comando / Script Personalizado</option>
           </select>
 
-          <label class="field-label">Descrição Curta</label>
+          <div id="group-capture-scope">
+            <label class="field-label">Escopo da Captura no Sistema de Origem</label>
+            <select id="pt-capture-scope" class="field-input">
+              <option value="active_window">Apenas a Janela do Sistema Ativo (HWND)</option>
+              <option value="fullscreen">Tela Inteira do Monitor</option>
+            </select>
+          </div>
+
+          <label class="field-label">Descricao Curta</label>
           <input type="text" id="pt-desc" class="field-input" placeholder="Resumo do que este ponto executa" />
         </div>
 
         <div>
-          <!-- Campos dinâmicos conforme tipo de ação -->
+          <!-- Campos dinamicos conforme tipo de acao -->
           <div id="group-save-dir">
             <label class="field-label">Pasta para Salvar o Print (Caminho Salvo)</label>
             <div class="input-with-btn">
@@ -164,13 +176,24 @@
             </div>
           </div>
 
+          <div id="group-target-system">
+            <label class="field-label">Sistema de Destino (Titulo da Janela, Processo ou Caminho)</label>
+            <div class="input-with-btn">
+              <input type="text" id="pt-target-system" class="field-input" placeholder="Ex: Telegram, WhatsApp, Discord, Paint, Word..." />
+              <button type="button" id="btn-detect-systems" class="hud-btn small">Detectar</button>
+            </div>
+            <select id="pt-open-windows-list" class="field-input hidden" style="margin-top:6px;">
+              <option value="">-- Selecione um Sistema Aberto Agora --</option>
+            </select>
+          </div>
+
           <div id="group-telegram-target">
             <label class="field-label">Conversa / Caminho do Telegram (Ex: @usuario, tg:// ou link)</label>
             <input type="text" id="pt-telegram-target" class="field-input" placeholder="tg://resolve?domain=me ou @seu_contato" />
           </div>
 
           <div id="group-target-path" class="hidden">
-            <label class="field-label">Caminho da Pasta, Arquivo ou Executável</label>
+            <label class="field-label">Caminho da Pasta, Arquivo ou Executavel</label>
             <div class="input-with-btn">
               <input type="text" id="pt-target-path" class="field-input" placeholder="C:\Caminho\Aplicativo.exe" />
               <button type="button" id="btn-browse-file" class="hud-btn small">Arquivo...</button>
@@ -178,7 +201,7 @@
           </div>
 
           <div id="group-url" class="hidden">
-            <label class="field-label">Endereço Web (URL)</label>
+            <label class="field-label">Endereco Web (URL)</label>
             <input type="text" id="pt-url" class="field-input" placeholder="https://github.com/DevFLeo/Mouse-Performatico-Estrelado" />
           </div>
 
@@ -189,15 +212,15 @@
 
           <div class="subgrid-3">
             <div>
-              <label class="field-label">Órbita (1-3)</label>
+              <label class="field-label">Orbita (1-3)</label>
               <select id="pt-orbit" class="field-input">
                 <option value="1">1 (Interna)</option>
-                <option value="2">2 (Média)</option>
+                <option value="2">2 (Media)</option>
                 <option value="3" selected>3 (Externa)</option>
               </select>
             </div>
             <div>
-              <label class="field-label">Ângulo (0°-360°)</label>
+              <label class="field-label">Angulo (0-360)</label>
               <input type="number" id="pt-angle" class="field-input" min="0" max="360" value="45" />
             </div>
             <div>
@@ -215,7 +238,7 @@
               </select>
             </div>
             <div>
-              <label class="field-label">Glifo Geométrico</label>
+              <label class="field-label">Glifo Geometrico</label>
               <select id="pt-glyph" class="field-input">
                 <option value="Π">Π (Pi Estelar)</option>
                 <option value="Δ">Δ (Delta)</option>
@@ -228,33 +251,33 @@
         </div>
       </div>
       <div class="modal-footer between">
-        <button id="btn-delete-point" class="hud-btn danger hidden">🗑 Excluir Ponto</button>
+        <button id="btn-delete-point" class="hud-btn danger hidden">Excluir Ponto</button>
         <div class="footer-right">
           <button id="btn-cancel-point" class="hud-btn subtle">Cancelar</button>
-          <button id="btn-save-point" class="hud-btn primary">💾 Salvar Ponto no JSON</button>
+          <button id="btn-save-point" class="hud-btn primary">Salvar Ponto no JSON</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 7. MODAL DE CONFIGURAÇÕES DO SISTEMA, DEGRADÊ DE CORES, TELEGRAM & INICIAR COM WINDOWS -->
+  <!-- 7. MODAL DE CONFIGURACOES DO SISTEMA, DEGRADE DE CORES, TELEGRAM & INICIAR COM WINDOWS -->
   <div id="modal-settings" class="modal-backdrop hidden">
     <div class="modal-card wide">
       <div class="modal-header">
-        <h2>Configurações do M.P.E &amp; Personalização Visual</h2>
-        <p>Ajuste cores do degradê Preto &amp; Dourado, integração com Telegram, inicialização com Windows e perfil portátil.</p>
+        <h2>Configuracoes do M.P.E e Personalizacao Visual</h2>
+        <p>Ajuste cores do degrade Preto e Dourado, integracao com outros sistemas, Telegram e inicializacao com Windows.</p>
       </div>
       <div class="modal-body grid-2">
         <div>
-          <h3 class="section-subtitle">👤 Perfil &amp; Inicialização</h3>
+          <h3 class="section-subtitle">Perfil e Inicializacao</h3>
           <label class="field-label">Nome Exibido no "Bem-vindo [Nome]"</label>
           <input type="text" id="cfg-user-name" class="field-input" placeholder="Seu nome" />
 
           <label class="field-label">Tom de Linguagem</label>
           <select id="cfg-language-tone" class="field-input">
-            <option value="amigavel">Amigável (Calorosa &amp; Próxima)</option>
-            <option value="neutra">Neutra (Interpessoal &amp; Inclusiva)</option>
-            <option value="profissional">Profissional (Executiva &amp; Técnica)</option>
+            <option value="amigavel">Amigável (Calorosa e Proxima)</option>
+            <option value="neutra">Neutra (Interpessoal e Inclusiva)</option>
+            <option value="profissional">Profissional (Executiva e Tecnica)</option>
           </select>
 
           <label class="checkbox-row">
@@ -264,14 +287,14 @@
 
           <label class="checkbox-row">
             <input type="checkbox" id="cfg-auto-orbit" checked />
-            <span>Movimento orbital contínuo suave em 3D</span>
+            <span>Movimento orbital continuo suave em 3D</span>
           </label>
 
-          <h3 class="section-subtitle">✈️ Configuração Global do Telegram</h3>
-          <label class="field-label">Conversa Padrão Salva (tg://, @usuario ou Link)</label>
+          <h3 class="section-subtitle">Configuracao Global do Telegram e Destino</h3>
+          <label class="field-label">Conversa Padrao Salva (tg://, @usuario ou Link)</label>
           <input type="text" id="cfg-tg-chat" class="field-input" placeholder="tg://resolve?domain=me" />
 
-          <label class="field-label">Pasta Padrão para Salvar Prints</label>
+          <label class="field-label">Pasta Padrao para Salvar Prints</label>
           <div class="input-with-btn">
             <input type="text" id="cfg-tg-folder" class="field-input" placeholder="./Capturas_MPE" />
             <button type="button" id="btn-cfg-browse-folder" class="hud-btn small">Escolher...</button>
@@ -285,13 +308,13 @@
         </div>
 
         <div>
-          <h3 class="section-subtitle">🎨 Cores &amp; Degradê (Preto &amp; Dourado)</h3>
-          <label class="field-label">Predefinições de Tema (Presets)</label>
+          <h3 class="section-subtitle">Cores e Degrade (Preto e Dourado)</h3>
+          <label class="field-label">Predefinicoes de Tema (Presets)</label>
           <div class="preset-chips">
-            <button type="button" class="preset-chip" data-preset="gold-obsidian">✦ Ouro &amp; Preto (Imagem)</button>
-            <button type="button" class="preset-chip" data-preset="solar-imperial">☀ Ouro Imperial Intenso</button>
-            <button type="button" class="preset-chip" data-preset="cyber-cyan">💠 Cyber Cyan &amp; Ouro</button>
-            <button type="button" class="preset-chip" data-preset="crimson-eclipse">🩸 Eclipse Carmesim</button>
+            <button type="button" class="preset-chip" data-preset="gold-obsidian">Ouro e Preto (Original)</button>
+            <button type="button" class="preset-chip" data-preset="solar-imperial">Ouro Imperial Intenso</button>
+            <button type="button" class="preset-chip" data-preset="cyber-cyan">Cyber Cyan e Ouro</button>
+            <button type="button" class="preset-chip" data-preset="crimson-eclipse">Eclipse Carmesim</button>
           </div>
 
           <div class="color-grid">
@@ -300,7 +323,7 @@
               <input type="color" id="clr-gold-primary" value="#E5B84B" />
             </div>
             <div class="color-item">
-              <label>Brilho Secundário</label>
+              <label>Brilho Secundario</label>
               <input type="color" id="clr-gold-secondary" value="#FFE08A" />
             </div>
             <div class="color-item">
@@ -308,7 +331,7 @@
               <input type="color" id="clr-bg-primary" value="#040406" />
             </div>
             <div class="color-item">
-              <label>Centro do Degradê</label>
+              <label>Centro do Degrade</label>
               <input type="color" id="clr-bg-secondary" value="#171206" />
             </div>
             <div class="color-item">
@@ -325,51 +348,54 @@
           <input type="range" id="cfg-sensitivity" min="0.4" max="2.2" step="0.1" value="1.0" class="field-range" />
 
           <div class="machine-info-box">
-            <div><strong>Máquina Atual:</strong> <span id="info-machine-name">-</span></div>
-            <div><strong>JSON Portátil na Raiz:</strong> <code>./mpe.config.json</code> (Sincronizado)</div>
-            <div class="machine-hint">Ao copiar a pasta do projeto para outro PC, todos os seus pontos e cores são lidos automaticamente da raiz.</div>
+            <div><strong>Maquina Atual:</strong> <span id="info-machine-name">-</span></div>
+            <div><strong>JSON Portatil na Raiz:</strong> <code>./mpe.config.json</code> (Sincronizado)</div>
+            <div class="machine-hint">Ao copiar a pasta do projeto para outro PC, todos os seus pontos e cores sao lidos automaticamente da raiz.</div>
           </div>
         </div>
       </div>
       <div class="modal-footer end">
         <button id="btn-cancel-settings" class="hud-btn subtle">Fechar</button>
-        <button id="btn-save-settings" class="hud-btn primary">💾 Salvar Todas as Configurações</button>
+        <button id="btn-save-settings" class="hud-btn primary">Salvar Todas as Configuracoes</button>
       </div>
     </div>
   </div>
 
-  <!-- 8. MODAL DE SELEÇÃO DE TEXTO INTELIGENTE -->
+  <!-- 8. MODAL DE SELECAO DE TEXTO E TRANSFERENCIA ENTRE SISTEMAS -->
   <div id="modal-text-selection" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>📝 Seleção de Texto Capturada</h2>
-        <p>Edite, copie ou envie diretamente para a sua conversa salva no Telegram.</p>
+        <h2>Selecao de Texto Capturada do Sistema Ativo</h2>
+        <p>Edite, copie ou transfira diretamente para outro sistema aberto ou Telegram.</p>
       </div>
       <div class="modal-body">
-        <textarea id="captured-text-area" class="field-textarea" rows="6" placeholder="O texto selecionado aparecerá aqui..."></textarea>
+        <textarea id="captured-text-area" class="field-textarea" rows="5" placeholder="O texto selecionado aparecera aqui..."></textarea>
+        <label class="field-label">Transferir para Outro Sistema Aberto (Ex: Notepad, Word, Discord, WhatsApp)</label>
+        <input type="text" id="captured-target-system" class="field-input" placeholder="Digite o nome da janela/sistema de destino" />
       </div>
       <div class="modal-footer between">
         <button id="btn-close-text-modal" class="hud-btn subtle">Fechar</button>
         <div class="footer-right">
-          <button id="btn-copy-captured-text" class="hud-btn">📋 Copiar</button>
-          <button id="btn-send-captured-telegram" class="hud-btn primary">✈️ Enviar para o Telegram</button>
+          <button id="btn-copy-captured-text" class="hud-btn">Copiar</button>
+          <button id="btn-send-captured-system" class="hud-btn">Enviar p/ Sistema</button>
+          <button id="btn-send-captured-telegram" class="hud-btn primary">Enviar p/ Telegram</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 9. OVERLAY DE SELEÇÃO DE ÁREA PARA RECORTE DE TELA -->
+  <!-- 9. OVERLAY DE SELECAO DE AREA PARA RECORTE DE TELA -->
   <div id="area-selector-overlay" class="area-selector-overlay hidden">
     <div class="area-selector-banner">
-      Arraste com o botão esquerdo para selecionar a área do Print • Clique Direito ou ESC para cancelar
+      Arraste com o botao esquerdo para selecionar a area do Print • Clique Direito ou ESC para cancelar
     </div>
     <canvas id="area-selector-canvas"></canvas>
   </div>
 
-  <!-- 10. NOTIFICAÇÃO FLUTUANTE ESTELAR (TOAST) -->
+  <!-- 10. NOTIFICACAO FLUTUANTE ESTELAR (TOAST) -->
   <div id="hud-toast" class="hud-toast hidden">
-    <span class="toast-icon">✦</span>
-    <span id="hud-toast-text">Ação executada!</span>
+    <span class="toast-icon">[M.P.E]</span>
+    <span id="hud-toast-text">Acao executada!</span>
   </div>
 
   <script src="js/i18n-tones.js"></script>

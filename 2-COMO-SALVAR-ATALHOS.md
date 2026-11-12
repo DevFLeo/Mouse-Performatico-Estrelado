@@ -1,18 +1,18 @@
 # 2. Manual Completo: Como Salvar, Configurar e Migrar Atalhos (Pontos Estelares)
 
 > **Repositório Oficial:** [https://github.com/DevFLeo/Mouse-Performatico-Estrelado](https://github.com/DevFLeo/Mouse-Performatico-Estrelado)  
-> Este documento detalha passo a passo como criar novos pontos no Círculo 3D, configurar automações (Print, Seleção de Texto, Print + Telegram com caminho salvo, Executáveis, Scripts) e migrar seus atalhos entre máquinas usando o JSON da raiz.
+> Este documento detalha passo a passo como criar novos pontos no Círculo 3D, configurar automações de integração entre sistemas no Windows (Print de um sistema e envio direto para outro sistema, Seleção de Texto, Print + Telegram com caminho salvo, Executáveis, Scripts) e migrar seus atalhos entre máquinas usando o JSON da raiz.
 
 ---
 
-## 1. Como Invocar o M.P.E a Qualquer Momento
+## 1. Como Invocar o M.P.E Sobre Qualquer Sistema do Windows
 
-Com o M.P.E aberto ou em execução silenciosa na Bandeja do Sistema (System Tray):
+Enquanto estiver utilizando qualquer programa ou sistema no Windows (ERP, navegador, editor de código, planilha, jogo, documento):
 
 1. Pressione simultaneamente:
    $$\mathbf{Shift + Ctrl + Alt + \text{Botão Direito do Mouse}}$$
-   *(ou o atalho complementar de teclado `Ctrl + Shift + Alt + M`, ou clique no ícone dourado do M.P.E perto do relógio do Windows, ou execute `MPE.exe`).*
-2. O **Astrolábio 3D** surgirá instantaneamente sobre a sua tela.
+   *(ou o atalho complementar de teclado `Ctrl + Shift + Alt + M`, ou clique no ícone do M.P.E na Bandeja do Sistema do Windows, ou execute `MPE.exe`).*
+2. O M.P.E detecta automaticamente em qual sistema você estava trabalhando (exibindo no topo: `Sistema Detectado: [Nome do Sistema]`) e abre o **Astrolábio 3D** sobre a tela.
 3. **Para movimentar o Círculo 3D para os lados:**
    * **Arraste com o botão esquerdo do mouse** para a esquerda ou direita para girar o círculo estelar com inércia física.
    * **Gire a roda do mouse (Scroll Wheel)** para rotacionar a órbita 3D lateralmente.
@@ -20,89 +20,88 @@ Com o M.P.E aberto ou em execução silenciosa na Bandeja do Sistema (System Tra
 
 ---
 
-## 2. Como Salvar um Novo Ponto (Atalho) Pela Interface Gráfica
+## 2. Como Salvar um Novo Ponto (Comando Programado) Pela Interface Gráfica
 
-1. Na barra superior do HUD, clique no botão dourado **`+ Salvar Novo Ponto`** *(ou clique na estrela central `01 7 - Novo Ponto / Config`)*.
-2. A janela **Forjador de Estrelas** será aberta. Preencha os campos:
-   * **Título do Atalho / Ponto:** O nome que aparecerá abaixo da estrela no círculo 3D (ex: `Print + Telegram Equipe`, `Abrir VS Code`, `Texto p/ Telegram`).
-   * **Código Estelar:** A coordenada sci-fi exibida acima do anel dourado (ex: `10 7`, `12 4`, `08 9`), mantendo a estética idêntica à imagem original.
-   * **Tipo de Ação Performática:** Escolha uma das 9 automações nativas (detalhadas na Seção 3 abaixo).
+1. Na barra superior do HUD, clique no botão **`+ Salvar Novo Ponto`** *(ou clique no ponto central `01 7 - Novo Ponto / Config`)*.
+2. Na janela **Salvar Ponto Estelar no Círculo 3D**, preencha:
+   * **Título do Atalho / Ponto:** O nome exibido abaixo do ponto no círculo 3D (ex: `Print ERP -> Sistema`, `Print + Telegram`, `Texto -> Outro Sistema`).
+   * **Código Estelar:** A coordenada sci-fi exibida acima do anel dourado (ex: `10 7`, `12 4`, `08 9`).
+   * **Tipo de Ação Performática:** Escolha a automação desejada (detalhada na Seção 3 abaixo).
    * **Posição no Círculo 3D:**
      * **Órbita (`1`, `2` ou `3`):** Define em qual anel concêntrico do astrolábio o ponto ficará (`1 = Interna`, `2 = Média`, `3 = Externa`).
-     * **Ângulo (`0°` a `360°`):** Define a posição ao redor do círculo.
-     * **Profundidade 3D (`-45` a `+45`):** Define a elevação no eixo $Z$ (faz o ponto flutuar mais à frente ou mais ao fundo quando você gira o círculo 3D para os lados).
-   * **Cor do Vetor e Glifo:** Escolha entre linha vetorial **Dourado Imperial** (com halo duplo) ou **Azul Celestial** (com seta direcional `▲`) e o símbolo geométrico (`Π`, `Δ`, `h`, `C`).
-3. Clique em **`💾 Salvar Ponto no JSON`**. O ponto aparece imediatamente no Círculo 3D e já está salvo de forma permanente!
+     * **Ângulo (`0` a `360`):** Define a posição ao redor do círculo.
+     * **Profundidade 3D (`-45` a `+45`):** Define a elevação no eixo $Z$.
+   * **Cor do Vetor e Glifo:** Escolha entre linha vetorial **Dourado Imperial** (com halo duplo) ou **Azul Celestial** (com seta direcional) e o símbolo geométrico (`Π`, `Δ`, `h`, `C`).
+3. Clique em **`Salvar Ponto no JSON`**. O ponto passa a integrar imediatamente o Círculo 3D.
 
-> **Dica Rápida para Editar ou Excluir um Ponto Existente:**  
-> Basta clicar com o **Botão Direito do Mouse diretamente em cima de qualquer estrela** no círculo 3D (ou passar o mouse sobre ela e clicar em `✎ Editar` na barra inferior).
+> **Para Editar ou Excluir um Ponto Existente:**  
+> Clique com o **Botão Direito do Mouse diretamente em cima de qualquer ponto** no círculo 3D (ou passe o mouse sobre ele e clique em `Editar` na barra inferior).
 
 ---
 
-## 3. Como Configurar Cada Tipo de Ação Especial
+## 3. Como Configurar Cada Tipo de Ação e Integração Entre Sistemas
 
-### 3.1. 📸 Print + Envio para Conversa no Telegram com Caminho Salvo
-Permite tirar um print da tela inteira (`print_telegram`) ou selecionar um recorte retangular (`area_print_telegram`), salvar automaticamente o arquivo `.png` na sua pasta escolhida e enviá-lo direto para uma conversa específica do Telegram.
+### 3.1. Print do Sistema Atual $\rightarrow$ Enviar para Outro Sistema (`system_to_system_print` e `area_print_system`)
+Permite tirar o print do sistema que você está usando agora (apenas a janela ativa daquele sistema ou a tela inteira, ou ainda recortar uma área) e enviá-lo automaticamente para qualquer outro sistema aberto no Windows, com um único clique no M.P.E.
 
 * **Como configurar:**
-  1. Selecione **`📸 Print Tela Inteira + Enviar p/ Conversa no Telegram`** (ou **`✂️ Selecionar Área (Print) + Enviar p/ Conversa no Telegram`**).
-  2. Em **Pasta para Salvar o Print (Caminho Salvo)**, clique em `Pasta...` para escolher qualquer diretório da sua máquina (ex: `C:\Users\SeuUsuario\Pictures\Prints_MPE` ou mantenha `./Capturas_MPE` para salvar dentro da pasta do projeto).
-  3. Em **Conversa / Caminho do Telegram**, você pode informar qualquer um dos formatos abaixo:
-     * **Mensagens Salvas (Saved Messages do próprio Telegram):** `tg://resolve?domain=me`
-     * **Nome de usuário de um contato ou grupo:** `@nome_do_usuario` ou `https://t.me/nome_do_usuario`
-     * **Telefone do contato:** `tg://resolve?phone=5511999999999`
-     * **Caminho do executável local do Telegram:** `C:\Users\SeuUsuario\AppData\Roaming\Telegram Desktop\Telegram.exe`
-  4. *(Opcional — Envio Silencioso via Bot API)*: No menu **`⚙ Configurar & Cores`**, se você preencher um `Bot Token` e `Chat ID`, o M.P.E enviará a imagem diretamente em background via HTTPS sem nem precisar tirar o foco da sua tela! Caso não preencha o Bot Token, o M.P.E copia a imagem para a Área de Transferência, abre automaticamente a conversa salva no seu Telegram Desktop e cola/envia a imagem para você.
+  1. Selecione **`Print do Sistema Atual -> Enviar para Outro Sistema (Win32)`** (ou **`Recorte de Sistema -> Enviar para Outro Sistema (Win32)`**).
+  2. Em **Escopo da Captura no Sistema de Origem**, escolha:
+     * **`Apenas a Janela do Sistema Ativo (HWND)`:** Recorta automaticamente apenas a janela do software onde você apertou o comando do M.P.E.
+     * **`Tela Inteira do Monitor`:** Captura todo o monitor.
+  3. Em **Pasta para Salvar o Print (Caminho Salvo)**, defina onde o arquivo `.png` será gravado (ex: `./Capturas_MPE`).
+  4. Em **Sistema de Destino**, clique no botão **`Detectar`** para listar todos os sistemas abertos no seu Windows naquele momento e escolher um da lista, ou digite o nome da janela/processo de destino (ex: `Telegram`, `WhatsApp`, `Discord`, `Slack`, `Teams`, `Paint`, `Word`, `Notepad`).
+  5. Quando você acionar esse ponto no Círculo 3D, o M.P.E captura a imagem do primeiro sistema, salva na pasta, ativa a janela do segundo sistema, cola a imagem (`Ctrl + V`) e dispara o envio (`Enter`) automaticamente.
 
-### 3.2. 🖼️ Print Instantâneo ou 📐 Recorte de Área
-* **`Print Instantâneo` (`print`):** Oculta o HUD em milissegundos, captura a tela inteira na resolução nativa do monitor, salva o arquivo `.png` com data/hora na pasta configurada e copia a imagem para o seu `Ctrl + V` (Clipboard).
-* **`Recorte de Área` (`area_print`):** Congela a tela e permite desenhar um retângulo dourado sobre a região exata que você deseja recortar. Ao soltar o mouse, salva o recorte na pasta configurada e copia para a Área de Transferência.
+### 3.2. Print + Envio para Conversa no Telegram com Caminho Salvo (`print_telegram` e `area_print_telegram`)
+1. Selecione **`Print + Enviar para Conversa no Telegram (Caminho Salvo)`** (ou a versão de recorte de área).
+2. Defina a **Pasta para Salvar o Print**.
+3. Em **Conversa / Caminho do Telegram**, informe:
+   * **Mensagens Salvas:** `tg://resolve?domain=me`
+   * **Usuário ou Grupo:** `@nome_do_usuario` ou `https://t.me/nome_do_usuario`
+   * **Telefone:** `tg://resolve?phone=5511999999999`
+   * **Caminho local do executável:** `C:\Users\SeuUsuario\AppData\Roaming\Telegram Desktop\Telegram.exe`
+4. *(Opcional)* No menu **`Configurar Cores e Sistema`**, se você preencher um `Bot Token` e `Chat ID`, o envio também pode ser realizado diretamente via HTTPS em segundo plano.
 
-### 3.3. 📝 Seleção de Texto Inteligente e 💬 Texto $\rightarrow$ Telegram
-* **Como funciona:**
-  1. Enquanto estiver lendo um PDF, navegador ou editor de código, basta deixar um trecho de texto grifado/selecionado.
-  2. Acione o M.P.E (`Shift + Ctrl + Alt + Botão Direito`) e clique na estrela **`Seleção de Texto`** (`08 1`) ou **`Texto → Telegram`** (`07 7`).
-  3. O daemon nativo do M.P.E captura automaticamente o texto que estava selecionado na janela anterior:
-     * Na opção **Seleção de Texto**, abre o painel rápido onde você pode editar o texto, copiar ou disparar para o Telegram.
-     * Na opção **Texto → Telegram**, envia o trecho selecionado diretamente para a conversa salva no Telegram.
+### 3.3. Seleção de Texto no Sistema Atual e Transferência Entre Sistemas (`text_selection`, `text_to_system`, `text_telegram`)
+1. Deixe um texto selecionado em qualquer sistema aberto no Windows.
+2. Acione o M.P.E (`Shift + Ctrl + Alt + Botão Direito`) e clique no ponto configurado.
+3. O subsistema nativo do M.P.E extrai automaticamente o texto selecionado da janela de origem e pode abrir o painel de edição/transferência ou colá-lo e enviá-lo diretamente no sistema de destino configurado.
 
-### 3.4. 📁 Abrir Pasta / Executável, 🌐 Abrir URL e ⚡ Comando
-* **`Abrir Pasta / Aplicativo` (`open_path`):** Clique em `Arquivo...` para selecionar qualquer `.exe`, documento, projeto ou diretório do Windows.
-* **`Abrir Site / URL` (`open_url`):** Abre instantaneamente qualquer endereço web no navegador padrão.
-* **`Executar Comando` (`command`):** Dispara scripts PowerShell, `.bat`, comandos `code .`, `calc.exe`, etc.
+### 3.4. Abrir Pasta / Executável (`open_path`), Abrir URL (`open_url`) e Comando (`command`)
+* **`open_path`:** Abre qualquer executável `.exe`, documento ou pasta do Windows.
+* **`open_url`:** Abre qualquer endereço web no navegador padrão.
+* **`command`:** Executa comandos ou scripts locais do sistema.
 
 ---
 
-## 4. Como Salvar ou Editar Diretamente no JSON (`mpe.config.json`) e Migrar de Máquina
+## 4. Como Salvar Diretamente no JSON (`mpe.config.json`) e Migrar Entre Máquinas
 
-Todos os atalhos ficam salvos de forma legível e portátil no arquivo **[`mpe.config.json`](file:///c:/Projetos/MousePerformaticoEstrelado/mpe.config.json)** na raiz do projeto.
+Todos os pontos ficam salvos no arquivo **[`mpe.config.json`](file:///c:/Projetos/MousePerformaticoEstrelado/mpe.config.json)** na raiz do projeto.
 
-### Exemplo de estrutura de um ponto salvo dentro de `mpe.config.json`:
+### Exemplo de estrutura de um ponto de integração entre sistemas em `mpe.config.json`:
 
 ```json
 {
-  "id": "star-custom-01",
-  "code": "11 7",
-  "title": "Print + Telegram Dev",
-  "description": "Salva print na pasta de projetos e envia para o grupo de desenvolvimento",
-  "actionType": "print_telegram",
-  "orbit": 3,
-  "angle": 140,
-  "elevation": 20,
-  "vectorStyle": "gold",
-  "glyph": "Π",
-  "hasArrow": false,
+  "id": "star-cross-system-01",
+  "code": "04 7",
+  "title": "Print Sistema -> Sistema",
+  "description": "Captura o print do sistema atual e transfere automaticamente para outro sistema aberto no Windows.",
+  "actionType": "system_to_system_print",
+  "orbit": 2,
+  "angle": 358,
+  "elevation": -14,
+  "vectorStyle": "blue",
+  "glyph": "",
+  "hasArrow": true,
   "params": {
-    "captureMode": "fullscreen",
+    "captureScope": "active_window",
     "saveDir": "./Capturas_MPE",
-    "telegramTarget": "@meu_grupo_dev",
-    "copyToClipboard": true
+    "targetSystem": "Telegram",
+    "autoSendEnter": true
   }
 }
 ```
 
-### Como Migrar para Outra Máquina sem Perder Nada:
-1. O M.P.E utiliza **Persistência Híbrida**:
-   * **Configurações por Máquina:** Ficam registradas em `machines["NOME-DO-PC"]` e em `%APPDATA%`, guardando preferências locais como o status de inicialização do Windows daquela máquina.
-   * **Atalhos, Cadastro e Cores Portáteis:** Ficam na raiz em `mpe.config.json`.
-2. Quando você for para outro computador (ou fizer `git clone` / copiar a pasta do projeto com o seu `mpe.config.json`), basta abrir o **`MPE.exe`**: ele lerá automaticamente o `mpe.config.json` da raiz, reconhecerá seu nome de cadastro (`"Bem-vindo, [Seu Nome]"`), suas cores do degradê Preto & Dourado e todas as suas estrelas salvas!
+### Migração Automática para Outra Máquina:
+* Ao copiar a pasta do projeto (ou o arquivo `mpe.config.json` da raiz) para outra máquina e abrir o **`MPE.exe`**, o sistema lê automaticamente todos os pontos já salvos, suas cores e seu nome cadastrado (`"Bem-vindo, [Seu Nome]"`), registrando a nova máquina na seção `machines` do JSON e em `%APPDATA%`.

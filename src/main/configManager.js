@@ -74,7 +74,7 @@ class ConfigManager {
         savedScreenshotsFolder: './Capturas_MPE',
         botToken: '',
         chatId: '',
-        captionTemplate: '✨ [M.P.E] Captura enviada por {user} em {date}'
+        captionTemplate: '[M.P.E] Captura enviada por {user} em {date}'
       };
     }
     if (!Array.isArray(rootData.points)) {

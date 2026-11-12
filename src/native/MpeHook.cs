@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -9,10 +10,12 @@ using System.Windows.Forms;
 namespace MpeNative
 {
     /// <summary>
-    /// M.P.E (Mouse Performático Estrelado) - Daemon Nativo Win32 de Baixa Latência.
-    /// Monitora em nível de kernel/user32 o gatilho global:
-    /// Shift + Ctrl + Alt + Botão Direito do Mouse (WM_RBUTTONDOWN)
-    /// Sem consumir CPU (Event-Driven Message Loop) e suprimindo o menu de contexto nativo.
+    /// M.P.E (Mouse Performatico Estrelado) - Subsistema Nativo de Integracao Win32.
+    /// Opera diretamente sobre user32.dll e kernel32.dll para:
+    /// 1. Interceptar globalmente Shift + Ctrl + Alt + Botao Direito do Mouse em qualquer sistema aberto.
+    /// 2. Identificar a janela e coordenadas exatas do Sistema de Origem ativo (HWND, Titulo, Retangulo).
+    /// 3. Capturar selecao de texto ou imagem do Sistema de Origem e transferir automaticamente
+    ///    (Foco Nativo + Colagem Ctrl+V + Disparo Enter) para qualquer Sistema de Destino no Windows.
     /// </summary>
     internal static class MpeHook
     {
@@ -22,12 +25,13 @@ namespace MpeNative
 
         private const int VK_SHIFT = 0x10;
         private const int VK_CONTROL = 0x11;
-        private const int VK_MENU = 0x12; // ALT
+        private const int VK_MENU = 0x12;
 
         private const byte VK_C = 0x43;
         private const byte VK_V = 0x56;
         private const byte VK_RETURN = 0x0D;
         private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const int SW_RESTORE = 9;
 
         private static LowLevelMouseProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
@@ -35,12 +39,22 @@ namespace MpeNative
         private static IntPtr _lastForegroundHwnd = IntPtr.Zero;
 
         private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
         {
             public int x;
             public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -76,6 +90,33 @@ namespace MpeNative
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder strText, int maxCount);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll")]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
         [STAThread]
@@ -84,14 +125,12 @@ namespace MpeNative
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
-            // Modo utilitário de execução única via linha de comando (ex: capturar seleção de texto ou colar no Telegram)
             if (args.Length > 0)
             {
                 HandleSingleCommand(args);
                 return;
             }
 
-            // Thread assíncrona para escutar comandos vindos do processo principal via STDIN
             Thread stdinThread = new Thread(ListenStdin)
             {
                 IsBackground = true
@@ -106,17 +145,134 @@ namespace MpeNative
             UnhookWindowsHookEx(_hookID);
         }
 
+        private static void ForceActivateWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return;
+
+            IntPtr fgHwnd = GetForegroundWindow();
+            uint dummyPid;
+            uint fgThread = GetWindowThreadProcessId(fgHwnd, out dummyPid);
+            uint curThread = GetCurrentThreadId();
+
+            if (IsIconic(hWnd))
+            {
+                ShowWindow(hWnd, SW_RESTORE);
+            }
+
+            if (fgThread != curThread && fgThread != 0)
+            {
+                AttachThreadInput(curThread, fgThread, true);
+                SetForegroundWindow(hWnd);
+                AttachThreadInput(curThread, fgThread, false);
+            }
+            else
+            {
+                SetForegroundWindow(hWnd);
+            }
+        }
+
+        private static string GetWindowTitle(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return "";
+            StringBuilder sb = new StringBuilder(256);
+            GetWindowText(hWnd, sb, 256);
+            return sb.ToString().Replace("|", " ").Replace("\r", "").Replace("\n", "").Trim();
+        }
+
+        private static IntPtr FindSystemWindow(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return IntPtr.Zero;
+            string q = query.Trim().ToLowerInvariant();
+
+            foreach (Process p in Process.GetProcesses())
+            {
+                try
+                {
+                    if (p.MainWindowHandle == IntPtr.Zero) continue;
+                    string title = p.MainWindowTitle ?? "";
+                    string procName = p.ProcessName ?? "";
+                    if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) continue;
+
+                    if (title.ToLowerInvariant().Contains(q) || procName.ToLowerInvariant().Contains(q))
+                    {
+                        return p.MainWindowHandle;
+                    }
+                }
+                catch { }
+            }
+            return IntPtr.Zero;
+        }
+
+        private static void ListOpenWindowsJson()
+        {
+            List<string> items = new List<string>();
+            HashSet<string> seen = new HashSet<string>();
+
+            foreach (Process p in Process.GetProcesses())
+            {
+                try
+                {
+                    string procName = (p.ProcessName ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(procName)) continue;
+
+                    string title = (p.MainWindowTitle ?? "").Trim();
+                    if (title.Contains("M.P.E") || title == "Program Manager") continue;
+
+                    if (p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrWhiteSpace(title))
+                    {
+                        string key = procName + "|" + title;
+                        if (seen.Add(key))
+                        {
+                            string safeTitle = title.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "");
+                            string safeProc = procName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                            items.Add(string.Format("{{\"hwnd\":\"{0}\",\"process\":\"{1}\",\"title\":\"{2}\"}}", p.MainWindowHandle.ToInt64(), safeProc, safeTitle));
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Inclui alvos de integracao padrao do Windows caso ainda nao listados
+            string[][] defaults = new string[][] {
+                new string[] { "Telegram", "Telegram Desktop (tg://)" },
+                new string[] { "WhatsApp", "WhatsApp Desktop" },
+                new string[] { "Discord", "Discord" },
+                new string[] { "msedge", "Microsoft Edge" },
+                new string[] { "chrome", "Google Chrome" },
+                new string[] { "notepad", "Bloco de Notas (Notepad)" },
+                new string[] { "mspaint", "Paint" },
+                new string[] { "explorer", "Windows Explorer" }
+            };
+
+            foreach (string[] d in defaults)
+            {
+                if (seen.Add(d[0]))
+                {
+                    items.Add(string.Format("{{\"hwnd\":\"0\",\"process\":\"{0}\",\"title\":\"{1}\"}}", d[0], d[1]));
+                }
+            }
+
+            Console.WriteLine("[" + string.Join(",", items.ToArray()) + "]");
+            Console.Out.Flush();
+        }
+
         private static void HandleSingleCommand(string[] args)
         {
             string cmd = args[0].ToUpperInvariant();
-            if (cmd == "--COPY-SELECTION" && args.Length > 1)
+
+            if (cmd == "--LIST-WINDOWS")
+            {
+                ListOpenWindowsJson();
+                return;
+            }
+            else if (cmd == "--COPY-SELECTION" && args.Length > 1)
             {
                 long hwndVal;
                 if (long.TryParse(args[1], out hwndVal) && hwndVal != 0)
                 {
                     IntPtr targetHwnd = new IntPtr(hwndVal);
-                    SetForegroundWindow(targetHwnd);
-                    Thread.Sleep(120);
+                    ForceActivateWindow(targetHwnd);
+                    Thread.Sleep(140);
                 }
                 SendCtrlKey(VK_C);
                 Thread.Sleep(150);
@@ -124,12 +280,42 @@ namespace MpeNative
             }
             else if (cmd == "--PASTE-AND-SEND")
             {
-                Thread.Sleep(600);
+                bool autoSend = args.Length <= 1 || args[1] != "0";
+                Thread.Sleep(550);
                 SendCtrlKey(VK_V);
-                Thread.Sleep(450);
-                keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
-                Thread.Sleep(40);
-                keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                if (autoSend)
+                {
+                    Thread.Sleep(420);
+                    keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
+                    Thread.Sleep(40);
+                    keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                }
+                return;
+            }
+            else if (cmd == "--DELIVER-TO-SYSTEM" && args.Length > 1)
+            {
+                string targetQuery = args[1];
+                bool autoSend = args.Length <= 2 || args[2] != "0";
+
+                IntPtr targetHwnd = FindSystemWindow(targetQuery);
+                if (targetHwnd != IntPtr.Zero)
+                {
+                    ForceActivateWindow(targetHwnd);
+                    Thread.Sleep(380);
+                    SendCtrlKey(VK_V);
+                    if (autoSend)
+                    {
+                        Thread.Sleep(360);
+                        keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
+                        Thread.Sleep(40);
+                        keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                    }
+                    Console.WriteLine("DELIVERED_TO_WINDOW|" + GetWindowTitle(targetHwnd));
+                }
+                else
+                {
+                    Console.WriteLine("WINDOW_NOT_FOUND");
+                }
                 return;
             }
         }
@@ -147,18 +333,6 @@ namespace MpeNative
                         Application.Exit();
                         break;
                     }
-                    else if (trimmed.StartsWith("COPY_FROM_LAST"))
-                    {
-                        if (_lastForegroundHwnd != IntPtr.Zero)
-                        {
-                            SetForegroundWindow(_lastForegroundHwnd);
-                            Thread.Sleep(120);
-                        }
-                        SendCtrlKey(VK_C);
-                        Thread.Sleep(120);
-                        Console.WriteLine("SELECTION_COPIED");
-                        Console.Out.Flush();
-                    }
                 }
             }
             catch
@@ -169,13 +343,12 @@ namespace MpeNative
 
         private static void SendCtrlKey(byte vKey)
         {
-            // Libera modificadores caso ainda estejam pressionados
             keybd_event((byte)VK_SHIFT, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
 
             keybd_event((byte)VK_CONTROL, 0, 0, UIntPtr.Zero);
             keybd_event(vKey, 0, 0, UIntPtr.Zero);
-            Thread.Sleep(35);
+            Thread.Sleep(40);
             keybd_event(vKey, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event((byte)VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
@@ -210,12 +383,27 @@ namespace MpeNative
                     {
                         MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
                         _lastForegroundHwnd = GetForegroundWindow();
+                        string winTitle = GetWindowTitle(_lastForegroundHwnd);
+
+                        RECT r;
+                        string rectStr = "0,0,0,0";
+                        if (GetWindowRect(_lastForegroundHwnd, out r))
+                        {
+                            rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
+                        }
+
                         _suppressNextRightUp = true;
 
-                        Console.WriteLine(string.Format("TRIGGER_HUD|{0}|{1}|{2}", hookStruct.pt.x, hookStruct.pt.y, _lastForegroundHwnd.ToInt64()));
+                        Console.WriteLine(string.Format(
+                            "TRIGGER_HUD|{0}|{1}|{2}|{3}|{4}",
+                            hookStruct.pt.x,
+                            hookStruct.pt.y,
+                            _lastForegroundHwnd.ToInt64(),
+                            rectStr,
+                            winTitle
+                        ));
                         Console.Out.Flush();
 
-                        // Suprime o clique direito padrão para não abrir o menu de contexto do Windows
                         return (IntPtr)1;
                     }
                 }

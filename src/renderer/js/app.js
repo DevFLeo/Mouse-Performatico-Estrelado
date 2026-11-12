@@ -1,10 +1,10 @@
 /**
- * Controlador Principal de Interface do M.P.E (Mouse Performático Estrelado)
+ * Controlador Principal de Interface do M.P.E (Mouse Performatico Estrelado)
  * Orquestra:
- *  - Sequência de Inicialização ("M . P . E Inicializando" -> "Bem-vindo, [Nome]")
- *  - Cadastro de Usuário e Persistência Híbrida (mpe.config.json + Máquina)
- *  - Alternância em tempo real entre Linguagem Amigável, Neutra (Interpessoal) e Profissional
- *  - Interação com o Motor 3D (Astrolabe3D), Forjador de Pontos, Seleção de Texto e Telegram
+ *  - Sequencia de Inicializacao ("M . P . E Inicializando" -> "Bem-vindo, [Nome]")
+ *  - Cadastro de Usuario e Persistencia Hibrida (mpe.config.json + Maquina)
+ *  - Alternancia em tempo real entre Linguagem Amigavel, Neutra (Interpessoal) e Profissional
+ *  - Integracao Direta Win32 entre Sistemas (Capturar em um sistema -> Enviar para outro sistema)
  */
 (function () {
   let currentConfig = null;
@@ -13,6 +13,7 @@
   let editingPointId = null;
   let inspectedPoint = null;
   let audioCtx = null;
+  let originSystemName = 'Windows Desktop';
 
   const THEME_PRESETS = {
     'gold-obsidian': {
@@ -57,7 +58,6 @@
     }
   };
 
-  // Sintetizador leve de áudio WebAudio (Zero arquivos pesados externos)
   function playUiSound(type = 'hover') {
     if (currentConfig && currentConfig.system && currentConfig.system.soundEffects === false) {
       return;
@@ -121,9 +121,12 @@
   function applyLanguageToneUI() {
     const dict = getToneDict();
     const userName =
-      (currentConfig && currentConfig.profile && currentConfig.profile.userName) || 'Operador(a)';
+      (currentConfig && currentConfig.profile && currentConfig.profile.userName) || 'Operador';
 
-    document.getElementById('hud-status-text').textContent = dict.hudStatus(userName);
+    document.getElementById('hud-status-text').textContent = dict.hudStatus(
+      userName,
+      originSystemName
+    );
     document.getElementById('btn-add-star').textContent = dict.btnAddStar;
     document.getElementById('btn-settings').textContent = dict.btnSettings;
     document.getElementById('btn-recenter').textContent = dict.btnRecenter;
@@ -134,7 +137,6 @@
     document.getElementById('reg-user-name').placeholder = dict.registerPlaceholder;
     document.getElementById('btn-save-register').textContent = dict.registerBtn;
 
-    // Atualiza pílulas de tom de linguagem no topo
     const activeTone = dict.id;
     document.querySelectorAll('.tone-pill').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tone === activeTone);
@@ -150,16 +152,9 @@
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       toast.classList.add('hidden');
-    }, 3600);
+    }, 3800);
   }
 
-  /**
-   * Executa a sequência cinematográfica:
-   * 1) "M . P . E  Inicializando"
-   * 2) Se ainda não houver nome salvo no JSON, abre o Cadastro para definir o nome
-   * 3) Exibe "Bem-vindo, [nome definido no cadastro e salvo no JSON]"
-   * 4) Revela o Astrolábio 3D Interativo
-   */
   function runInitializationSequence() {
     const splash = document.getElementById('splash-screen');
     const phaseInit = document.getElementById('splash-phase-init');
@@ -194,7 +189,6 @@
       currentConfig.profile.userName.trim().length > 0;
 
     if (!hasName) {
-      // Abre modal de cadastro para o usuário definir seu nome e tom de linguagem
       document.getElementById('modal-register').classList.remove('hidden');
       document.getElementById('reg-user-name').focus();
     } else {
@@ -226,16 +220,11 @@
     }, 1550);
   }
 
-  // =========================================================================
-  // INTERAÇÃO COM PONTOS ESTELARES (HOVER, EXECUÇÃO E EDIÇÃO)
-  // =========================================================================
   function handlePointHover(point) {
     const defEl = document.getElementById('inspector-default');
     const detEl = document.getElementById('inspector-detail');
 
-    if (!point) {
-      return;
-    }
+    if (!point) return;
 
     playUiSound('hover');
     inspectedPoint = point;
@@ -245,7 +234,7 @@
     document.getElementById('insp-code').textContent = point.code || '00 1';
     document.getElementById('insp-title').textContent = point.title || 'Ponto Estelar';
     document.getElementById('insp-desc').textContent =
-      point.description || `Ação: ${point.actionType}`;
+      point.description || `Acao: ${point.actionType}`;
   }
 
   async function handlePointExecute(point) {
@@ -285,20 +274,34 @@
     showToast(res.message || dict.toastExecuted(point.title));
   }
 
-  // =========================================================================
-  // FORJADOR DE ESTRELAS (CRIAR / EDITAR / EXCLUIR PONTO NO JSON)
-  // =========================================================================
   function updatePointModalFields() {
     const type = document.getElementById('pt-action-type').value;
+    const grpScope = document.getElementById('group-capture-scope');
     const grpSave = document.getElementById('group-save-dir');
+    const grpTargetSys = document.getElementById('group-target-system');
     const grpTg = document.getElementById('group-telegram-target');
     const grpPath = document.getElementById('group-target-path');
     const grpUrl = document.getElementById('group-url');
     const grpCmd = document.getElementById('group-command');
 
+    grpScope.classList.toggle(
+      'hidden',
+      !['print', 'print_telegram', 'system_to_system_print'].includes(type)
+    );
     grpSave.classList.toggle(
       'hidden',
-      !['print', 'print_telegram', 'area_print', 'area_print_telegram'].includes(type)
+      ![
+        'print',
+        'print_telegram',
+        'system_to_system_print',
+        'area_print',
+        'area_print_telegram',
+        'area_print_system'
+      ].includes(type)
+    );
+    grpTargetSys.classList.toggle(
+      'hidden',
+      !['system_to_system_print', 'area_print_system', 'text_to_system'].includes(type)
     );
     grpTg.classList.toggle(
       'hidden',
@@ -313,6 +316,7 @@
     const modal = document.getElementById('modal-point');
     const delBtn = document.getElementById('btn-delete-point');
     const heading = document.getElementById('point-modal-heading');
+    document.getElementById('pt-open-windows-list').classList.add('hidden');
 
     if (point) {
       editingPointId = point.id;
@@ -321,7 +325,7 @@
 
       document.getElementById('pt-title').value = point.title || '';
       document.getElementById('pt-code').value = point.code || '10 7';
-      document.getElementById('pt-action-type').value = point.actionType || 'print_telegram';
+      document.getElementById('pt-action-type').value = point.actionType || 'system_to_system_print';
       document.getElementById('pt-desc').value = point.description || '';
       document.getElementById('pt-orbit').value = String(point.orbit || 3);
       document.getElementById('pt-angle').value = String(point.angle || 0);
@@ -330,10 +334,12 @@
       document.getElementById('pt-glyph').value = point.glyph || '';
 
       const p = point.params || {};
+      document.getElementById('pt-capture-scope').value = p.captureScope || 'active_window';
       document.getElementById('pt-save-dir').value =
         p.saveDir ||
         (currentConfig.telegram && currentConfig.telegram.savedScreenshotsFolder) ||
         './Capturas_MPE';
+      document.getElementById('pt-target-system').value = p.targetSystem || 'Telegram';
       document.getElementById('pt-telegram-target').value =
         p.telegramTarget ||
         (currentConfig.telegram && currentConfig.telegram.savedChatPath) ||
@@ -343,13 +349,14 @@
       document.getElementById('pt-command').value = p.command || '';
     } else {
       editingPointId = null;
-      heading.textContent = 'Salvar Novo Ponto Estelar no Círculo 3D';
+      heading.textContent = 'Salvar Novo Ponto Estelar no Circulo 3D';
       delBtn.classList.add('hidden');
 
       const nextNum = (currentConfig.points ? currentConfig.points.length : 9) + 1;
       document.getElementById('pt-title').value = '';
       document.getElementById('pt-code').value = `${String(nextNum).padStart(2, '0')} 7`;
-      document.getElementById('pt-action-type').value = 'print_telegram';
+      document.getElementById('pt-action-type').value = 'system_to_system_print';
+      document.getElementById('pt-capture-scope').value = 'active_window';
       document.getElementById('pt-desc').value = '';
       document.getElementById('pt-orbit').value = '3';
       document.getElementById('pt-angle').value = String((nextNum * 37) % 360);
@@ -360,6 +367,7 @@
       document.getElementById('pt-save-dir').value =
         (currentConfig.telegram && currentConfig.telegram.savedScreenshotsFolder) ||
         './Capturas_MPE';
+      document.getElementById('pt-target-system').value = 'Telegram';
       document.getElementById('pt-telegram-target').value =
         (currentConfig.telegram && currentConfig.telegram.savedChatPath) ||
         'tg://resolve?domain=me';
@@ -377,8 +385,7 @@
     const code = document.getElementById('pt-code').value.trim() || '10 7';
     const actionType = document.getElementById('pt-action-type').value;
     const description =
-      document.getElementById('pt-desc').value.trim() ||
-      `Atalho configurado para ${title}`;
+      document.getElementById('pt-desc').value.trim() || `Comando programado: ${title}`;
     const orbit = Number(document.getElementById('pt-orbit').value) || 3;
     const angle = Number(document.getElementById('pt-angle').value) || 0;
     const elevation = Number(document.getElementById('pt-elevation').value) || 0;
@@ -398,12 +405,15 @@
       glyph,
       hasArrow: vectorStyle === 'blue',
       params: {
+        captureScope: document.getElementById('pt-capture-scope').value || 'active_window',
         saveDir: document.getElementById('pt-save-dir').value.trim() || './Capturas_MPE',
+        targetSystem: document.getElementById('pt-target-system').value.trim() || 'Telegram',
         telegramTarget:
           document.getElementById('pt-telegram-target').value.trim() || 'tg://resolve?domain=me',
         targetPath: document.getElementById('pt-target-path').value.trim(),
         url: document.getElementById('pt-url').value.trim(),
-        command: document.getElementById('pt-command').value.trim()
+        command: document.getElementById('pt-command').value.trim(),
+        autoSendEnter: true
       }
     };
 
@@ -432,9 +442,6 @@
     showToast('Ponto removido do mapa estelar.');
   }
 
-  // =========================================================================
-  // MODAL DE CONFIGURAÇÕES DO SISTEMA & CORES (DEGRADÊ PRETO E DOURADO)
-  // =========================================================================
   function openSettingsModal() {
     const cfg = currentConfig;
     document.getElementById('cfg-user-name').value = (cfg.profile && cfg.profile.userName) || '';
@@ -471,7 +478,7 @@
 
   async function saveSettingsFromModal() {
     currentConfig.profile = Object.assign({}, currentConfig.profile, {
-      userName: document.getElementById('cfg-user-name').value.trim() || 'Operador(a)',
+      userName: document.getElementById('cfg-user-name').value.trim() || 'Operador',
       isRegistered: true,
       languageTone: document.getElementById('cfg-language-tone').value
     });
@@ -509,11 +516,12 @@
     showToast(getToneDict().toastSaved);
   }
 
-  // =========================================================================
-  // INICIALIZAÇÃO DE EVENTOS DOM E IPC
-  // =========================================================================
   async function init() {
     currentConfig = await window.mpeApi.getConfig();
+    if (currentConfig.originSystem && currentConfig.originSystem.windowTitle) {
+      originSystemName = currentConfig.originSystem.windowTitle;
+    }
+
     applyThemeVariables(currentConfig.theme);
     applyLanguageToneUI();
 
@@ -531,30 +539,30 @@
       async (croppedDataUrl, ctxData) => {
         const pt = (ctxData && ctxData.point) || {};
         const params = pt.params || {};
-        const sendToTelegram = ctxData && ctxData.nextAction === 'telegram';
+        const nextAction = (ctxData && ctxData.nextAction) || 'save_only';
         const res = await window.mpeApi.completeAreaCrop({
           dataUrl: croppedDataUrl,
           saveDir: params.saveDir,
-          sendToTelegram,
-          telegramTarget: params.telegramTarget
+          nextAction,
+          telegramTarget: params.telegramTarget,
+          targetSystem: params.targetSystem,
+          autoSendEnter: params.autoSendEnter !== false
         });
         if (res && res.message) {
           showToast(res.message);
         }
       },
       () => {
-        showToast('Seleção de área cancelada.');
+        showToast('Selecao de area cancelada.');
       }
     );
 
-    // Eventos da Barra Superior
     document.getElementById('btn-add-star').addEventListener('click', () => openPointModal(null));
     document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
     document.getElementById('btn-recenter').addEventListener('click', () => astrolabe.resetView());
     document.getElementById('btn-replay-intro').addEventListener('click', runInitializationSequence);
     document.getElementById('btn-hide-hud').addEventListener('click', () => window.mpeApi.hideHud());
 
-    // Alternância rápida de Tom de Linguagem na barra superior
     document.querySelectorAll('.tone-pill').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const tone = btn.dataset.tone;
@@ -565,7 +573,6 @@
       });
     });
 
-    // Eventos do Inspetor Inferior
     document.getElementById('btn-insp-exec').addEventListener('click', () => {
       if (inspectedPoint) handlePointExecute(inspectedPoint);
     });
@@ -573,7 +580,6 @@
       if (inspectedPoint) openPointModal(inspectedPoint);
     });
 
-    // Eventos do Modal de Cadastro Inicial
     document.querySelectorAll('.tone-card').forEach((card) => {
       card.addEventListener('click', () => {
         document.querySelectorAll('.tone-card').forEach((c) => c.classList.remove('selected'));
@@ -605,7 +611,6 @@
       showWelcomePhase(nameInput);
     });
 
-    // Eventos do Modal Forjador de Estrelas
     document.getElementById('pt-action-type').addEventListener('change', updatePointModalFields);
     document.getElementById('btn-cancel-point').addEventListener('click', () => {
       document.getElementById('modal-point').classList.add('hidden');
@@ -623,7 +628,26 @@
       if (file) document.getElementById('pt-target-path').value = file;
     });
 
-    // Eventos do Modal de Configurações e Cores
+    // Detector em tempo real de Sistemas/Janelas abertas no Windows
+    document.getElementById('btn-detect-systems').addEventListener('click', async () => {
+      const wins = await window.mpeApi.listOpenWindows();
+      const selectEl = document.getElementById('pt-open-windows-list');
+      selectEl.innerHTML = '<option value="">-- Selecione um Sistema Aberto Agora --</option>';
+      for (const w of wins) {
+        const opt = document.createElement('option');
+        opt.value = w.process || w.title;
+        opt.textContent = `[${w.process}] ${w.title}`;
+        selectEl.appendChild(opt);
+      }
+      selectEl.classList.remove('hidden');
+    });
+
+    document.getElementById('pt-open-windows-list').addEventListener('change', (e) => {
+      if (e.target.value) {
+        document.getElementById('pt-target-system').value = e.target.value;
+      }
+    });
+
     document.getElementById('btn-cancel-settings').addEventListener('click', () => {
       document.getElementById('modal-settings').classList.add('hidden');
     });
@@ -646,14 +670,25 @@
       });
     });
 
-    // Eventos do Modal de Seleção de Texto
     document.getElementById('btn-close-text-modal').addEventListener('click', () => {
       document.getElementById('modal-text-selection').classList.add('hidden');
     });
     document.getElementById('btn-copy-captured-text').addEventListener('click', async () => {
       const txt = document.getElementById('captured-text-area').value;
       await window.mpeApi.copyToClipboard(txt);
-      showToast('Texto copiado para a Área de Transferência!');
+      showToast('Texto copiado para a Area de Transferencia!');
+    });
+    document.getElementById('btn-send-captured-system').addEventListener('click', async () => {
+      const txt = document.getElementById('captured-text-area').value;
+      const targetSys =
+        document.getElementById('captured-target-system').value.trim() || 'Notepad';
+      await window.mpeApi.sendToTargetSystem({
+        text: txt,
+        targetSystem: targetSys,
+        autoSendEnter: true
+      });
+      document.getElementById('modal-text-selection').classList.add('hidden');
+      showToast(`Texto transferido para o sistema [${targetSys}]!`);
     });
     document.getElementById('btn-send-captured-telegram').addEventListener('click', async () => {
       const txt = document.getElementById('captured-text-area').value;
@@ -666,7 +701,6 @@
       showToast('Texto enviado para a conversa salva no Telegram!');
     });
 
-    // Teclas de atalho locais dentro do HUD (Setas giram o Círculo 3D, ESC oculta modais ou o HUD)
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (areaSelector && areaSelector.isActive) {
@@ -686,8 +720,10 @@
       }
     });
 
-    // Escuta quando o HUD é invocado via Shift+Ctrl+Alt+Botão Direito ou Executável
     window.mpeApi.onHudSummoned((payload) => {
+      if (payload && payload.originSystem && payload.originSystem.windowTitle) {
+        originSystemName = payload.originSystem.windowTitle;
+      }
       if (payload && payload.config) {
         currentConfig = payload.config;
         applyThemeVariables(currentConfig.theme);
@@ -702,7 +738,6 @@
       }
     });
 
-    // Dispara a animação de inicialização na abertura inicial do aplicativo
     runInitializationSequence();
   }
 

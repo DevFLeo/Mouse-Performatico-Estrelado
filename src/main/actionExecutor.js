@@ -5,14 +5,13 @@ const { exec } = require('child_process');
 const { desktopCapturer, screen, clipboard, nativeImage, shell } = require('electron');
 
 /**
- * Motor de Execução de Ações Estelares do M.P.E
+ * Motor de Execucao de Acoes Performaticas e Integracao Entre Sistemas (M.P.E)
  * Suporta:
- *  - Print de Tela Inteira (Salva em disco + Clipboard)
- *  - Print de Área Selecionada (Recorte interativo + Salva + Clipboard)
- *  - Print + Envio Automático para Conversa Salva no Telegram (Desktop tg:// e/ou Bot API)
- *  - Seleção de Texto Inteligente (Captura texto selecionado da janela anterior)
- *  - Texto Selecionado -> Telegram
- *  - Abertura de Pastas, Executáveis, Scripts e URLs
+ *  - Print de um Sistema de Origem e envio automatico para outro Sistema de Destino no Windows
+ *  - Print + Envio para Conversa Salva no Telegram (Desktop tg:// e/ou Bot API)
+ *  - Recorte de Area Interativo + Envio para Sistema de Destino ou Telegram
+ *  - Captura de Selecao de Texto no Sistema de Origem + Transferencia para Outro Sistema
+ *  - Abertura de Pastas, Executaveis, Scripts e URLs
  */
 class ActionExecutor {
   constructor(configManager, hookBridge) {
@@ -21,9 +20,9 @@ class ActionExecutor {
   }
 
   /**
-   * Captura a tela principal em alta resolução como NativeImage
+   * Captura a tela ou a janela exata do Sistema de Origem em alta resolucao
    */
-  async captureScreenImage() {
+  async captureScreenImage(cropToOriginWindow = false) {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.size;
     const scaleFactor = primaryDisplay.scaleFactor || 1;
@@ -37,17 +36,34 @@ class ActionExecutor {
     });
 
     if (!sources || sources.length === 0) {
-      throw new Error('Nenhuma fonte de vídeo encontrada para captura.');
+      throw new Error('Nenhuma fonte de video encontrada para captura.');
+    }
+
+    let finalImage = sources[0].thumbnail;
+
+    // Se solicitado capturar especificamente a janela do Sistema de Origem
+    if (cropToOriginWindow && this.hookBridge && this.hookBridge.lastWindowRect) {
+      const rect = this.hookBridge.lastWindowRect;
+      const cx = Math.max(0, Math.floor(rect.left * scaleFactor));
+      const cy = Math.max(0, Math.floor(rect.top * scaleFactor));
+      const cw = Math.min(thumbWidth - cx, Math.floor(rect.width * scaleFactor));
+      const ch = Math.min(thumbHeight - cy, Math.floor(rect.height * scaleFactor));
+
+      if (cw > 60 && ch > 60) {
+        try {
+          finalImage = finalImage.crop({ x: cx, y: cy, width: cw, height: ch });
+        } catch (_) {}
+      }
     }
 
     return {
-      image: sources[0].thumbnail,
+      image: finalImage,
       displaySize: { width, height, scaleFactor }
     };
   }
 
   /**
-   * Salva uma NativeImage em disco e copia para o Clipboard
+   * Salva uma NativeImage em disco e grava no Clipboard do Windows
    */
   saveAndCopyImage(img, customSaveDir, prefix = 'MPE_Print') {
     const cfg = this.configManager.get();
@@ -83,9 +99,69 @@ class ActionExecutor {
   }
 
   /**
+   * Transfere o conteudo (Print ou Texto ja no Clipboard) para qualquer outro Sistema no Windows
+   * (Ex: Telegram, WhatsApp, Discord, Slack, Teams, Word, Paint, Bloco de Notas, ERP, Browser)
+   */
+  async dispatchToTargetSystem({ targetSystem, autoSendEnter = true, isTelegram = false, pngBuffer, filePath, textMessage }) {
+    if (isTelegram) {
+      return await this.dispatchToTelegram({
+        pngBuffer,
+        filePath,
+        textMessage,
+        customTarget: targetSystem
+      });
+    }
+
+    const target = (targetSystem || '').trim();
+    if (!target) {
+      return { ok: false, message: 'Nenhum sistema de destino informado.' };
+    }
+
+    if (textMessage && !pngBuffer) {
+      clipboard.writeText(textMessage);
+    }
+
+    // 1. Tenta localizar a janela do sistema aberto no Windows pelo titulo ou nome do processo
+    if (this.hookBridge) {
+      const delivered = await this.hookBridge.deliverToSystem(target, autoSendEnter);
+      if (delivered && delivered.ok) {
+        return {
+          ok: true,
+          targetSystem: delivered.matchedTitle || target,
+          filePath: filePath || null
+        };
+      }
+    }
+
+    // 2. Se a janela ainda nao estava aberta, verifica se e protocolo (ex: tg://) ou executavel/caminho salvo
+    if (target.includes('://')) {
+      await shell.openExternal(target);
+      if (this.hookBridge) {
+        await this.hookBridge.pasteAndSendInActiveWindow(autoSendEnter);
+      }
+      return { ok: true, targetSystem: target, filePath: filePath || null };
+    }
+
+    const resolvedPath = this.configManager.resolvePath(target);
+    if (fs.existsSync(resolvedPath)) {
+      await shell.openPath(resolvedPath);
+      if (this.hookBridge) {
+        await this.hookBridge.pasteAndSendInActiveWindow(autoSendEnter);
+      }
+      return { ok: true, targetSystem: resolvedPath, filePath: filePath || null };
+    }
+
+    return {
+      ok: true,
+      targetSystem: `${target} (Conteudo pronto na Area de Transferencia)`,
+      filePath: filePath || null
+    };
+  }
+
+  /**
    * Envia imagem e/ou texto para o Telegram:
    * 1. Se houver Bot Token + Chat ID, envia silenciosamente via API HTTPS oficial do Telegram.
-   * 2. Abre o caminho/conversa salva no Telegram Desktop (tg:// ou caminho local) com a imagem já no Clipboard e dispara colagem.
+   * 2. Abre o caminho/conversa salva no Telegram Desktop (tg:// ou janela aberta) e cola/envia automaticamente.
    */
   async dispatchToTelegram({ pngBuffer, filePath, textMessage, customTarget }) {
     const cfg = this.configManager.get();
@@ -95,7 +171,7 @@ class ActionExecutor {
 
     const caption =
       textMessage ||
-      (tg.captionTemplate || '✨ [M.P.E] Captura enviada por {user} em {date}')
+      (tg.captionTemplate || '[M.P.E] Captura enviada por {user} em {date}')
         .replace('{user}', userName)
         .replace('{date}', dateStr);
 
@@ -109,7 +185,7 @@ class ActionExecutor {
         }
         botSent = true;
       } catch (err) {
-        console.warn('[M.P.E Telegram Bot] Erro no envio via API, usando fallback Desktop:', err.message);
+        console.warn('[M.P.E Telegram Bot] Erro no envio via API, usando integracao Desktop:', err.message);
       }
     }
 
@@ -117,7 +193,6 @@ class ActionExecutor {
 
     if (targetChat) {
       let deepLink = targetChat;
-      // Converte @usuario ou https://t.me/usuario automaticamente para o protocolo nativo tg://
       if (deepLink.startsWith('@')) {
         deepLink = `tg://resolve?domain=${deepLink.slice(1)}`;
       } else if (deepLink.startsWith('https://t.me/')) {
@@ -131,17 +206,20 @@ class ActionExecutor {
         const resolved = this.configManager.resolvePath(deepLink);
         if (fs.existsSync(resolved)) {
           await shell.openPath(resolved);
-        } else {
-          await shell.openExternal('tg://resolve?domain=me');
+        } else if (this.hookBridge) {
+          // Tenta focar diretamente na janela do Telegram ou sistema informado
+          const res = await this.hookBridge.deliverToSystem(targetChat, tg.autoSend !== false);
+          if (res && res.ok) {
+            return { ok: true, botSent, targetChat: res.matchedTitle, filePath: filePath || null };
+          }
         }
       }
 
-      // Se estamos enviando um print ou texto para o Telegram Desktop, cola automaticamente na conversa aberta
       if (this.hookBridge && (tg.autoSend !== false)) {
         if (!pngBuffer && textMessage) {
           clipboard.writeText(textMessage);
         }
-        await this.hookBridge.pasteAndSendInActiveWindow();
+        await this.hookBridge.pasteAndSendInActiveWindow(true);
       }
     }
 
@@ -239,36 +317,64 @@ class ActionExecutor {
   async executePoint(point, mainWindow) {
     const type = point.actionType || 'print';
     const params = point.params || {};
+    const originTitle = (this.hookBridge && this.hookBridge.lastWindowTitle) || 'Sistema Atual';
 
     switch (type) {
       case 'print': {
         if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(0);
-          await new Promise((r) => setTimeout(r, 140));
+          mainWindow.hide();
+          await new Promise((r) => setTimeout(r, 150));
         }
-        const { image } = await this.captureScreenImage();
-        if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(1);
-        }
+        const cropWin = params.captureScope === 'active_window';
+        const { image } = await this.captureScreenImage(cropWin);
         const saved = this.saveAndCopyImage(image, params.saveDir, 'MPE_Print');
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
         return {
           ok: true,
           type: 'print',
-          message: `Print salvo em ${saved.fileName} e copiado para a Área de Transferência!`,
-          filePath: saved.filePath,
-          previewDataUrl: image.resize({ width: 480 }).toDataURL()
+          message: `Print capturado de [${originTitle}], salvo em ${saved.fileName} e copiado para o Clipboard.`,
+          filePath: saved.filePath
+        };
+      }
+
+      case 'system_to_system_print': {
+        if (mainWindow && mainWindow.isVisible()) {
+          mainWindow.hide();
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        const cropWin = params.captureScope === 'active_window';
+        const { image } = await this.captureScreenImage(cropWin);
+        const saved = this.saveAndCopyImage(image, params.saveDir, 'MPE_CrossSystem');
+
+        const targetSys = params.targetSystem || params.telegramTarget || 'Telegram';
+        const autoSend = params.autoSendEnter !== false;
+
+        const delivery = await this.dispatchToTargetSystem({
+          targetSystem: targetSys,
+          autoSendEnter: autoSend,
+          isTelegram: targetSys.toLowerCase().includes('tg://') || targetSys.startsWith('@'),
+          pngBuffer: saved.pngBuffer,
+          filePath: saved.filePath
+        });
+
+        return {
+          ok: true,
+          type: 'system_to_system_print',
+          message: `Print de [${originTitle}] transferido para [${delivery.targetSystem || targetSys}] (${saved.fileName}).`,
+          filePath: saved.filePath
         };
       }
 
       case 'print_telegram': {
         if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(0);
-          await new Promise((r) => setTimeout(r, 140));
+          mainWindow.hide();
+          await new Promise((r) => setTimeout(r, 150));
         }
-        const { image } = await this.captureScreenImage();
-        if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(1);
-        }
+        const cropWin = params.captureScope === 'active_window';
+        const { image } = await this.captureScreenImage(cropWin);
         const saved = this.saveAndCopyImage(image, params.saveDir, 'MPE_Telegram');
         const tgResult = await this.dispatchToTelegram({
           pngBuffer: saved.pngBuffer,
@@ -278,26 +384,32 @@ class ActionExecutor {
         return {
           ok: true,
           type: 'print_telegram',
-          message: `Print salvo (${saved.fileName}) e enviado para o Telegram (${tgResult.targetChat})!`,
-          filePath: saved.filePath,
-          previewDataUrl: image.resize({ width: 480 }).toDataURL()
+          message: `Print de [${originTitle}] salvo (${saved.fileName}) e enviado para o Telegram (${tgResult.targetChat}).`,
+          filePath: saved.filePath
         };
       }
 
       case 'area_print':
-      case 'area_print_telegram': {
+      case 'area_print_telegram':
+      case 'area_print_system': {
         if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(0);
-          await new Promise((r) => setTimeout(r, 140));
+          mainWindow.hide();
+          await new Promise((r) => setTimeout(r, 150));
         }
-        const { image, displaySize } = await this.captureScreenImage();
-        if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.setOpacity(1);
+        const { image, displaySize } = await this.captureScreenImage(false);
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
         }
         return {
           ok: true,
           type: 'request_area_crop',
-          nextAction: type === 'area_print_telegram' ? 'telegram' : 'save_only',
+          nextAction:
+            type === 'area_print_telegram'
+              ? 'telegram'
+              : type === 'area_print_system'
+              ? 'system'
+              : 'save_only',
           point,
           fullScreenDataUrl: image.toDataURL(),
           displaySize
@@ -307,7 +419,7 @@ class ActionExecutor {
       case 'text_selection': {
         if (mainWindow && mainWindow.isVisible()) {
           mainWindow.hide();
-          await new Promise((r) => setTimeout(r, 100));
+          await new Promise((r) => setTimeout(r, 120));
         }
         if (this.hookBridge) {
           await this.hookBridge.copySelectionFromLastWindow();
@@ -322,30 +434,46 @@ class ActionExecutor {
           type: 'text_selection',
           selectedText,
           message: selectedText
-            ? 'Texto selecionado capturado com sucesso!'
-            : 'Área de transferência lida (selecione um texto antes de acionar ou digite abaixo).'
+            ? `Texto capturado do sistema [${originTitle}].`
+            : 'Area de transferencia lida (selecione um texto no sistema de origem ou digite abaixo).'
         };
       }
 
-      case 'text_telegram': {
+      case 'text_telegram':
+      case 'text_to_system': {
         if (mainWindow && mainWindow.isVisible()) {
           mainWindow.hide();
-          await new Promise((r) => setTimeout(r, 100));
+          await new Promise((r) => setTimeout(r, 120));
         }
         if (this.hookBridge) {
           await this.hookBridge.copySelectionFromLastWindow();
         }
-        const selectedText = clipboard.readText() || '✨ Mensagem rápida enviada via M.P.E';
-        await this.dispatchToTelegram({
-          textMessage: selectedText,
-          customTarget: params.telegramTarget
-        });
-        return {
-          ok: true,
-          type: 'text_telegram',
-          selectedText,
-          message: 'Texto selecionado enviado para a conversa salva no Telegram!'
-        };
+        const selectedText = clipboard.readText() || '[M.P.E] Mensagem rapida';
+        if (type === 'text_to_system' && params.targetSystem) {
+          const delivery = await this.dispatchToTargetSystem({
+            targetSystem: params.targetSystem,
+            autoSendEnter: params.autoSendEnter !== false,
+            isTelegram: false,
+            textMessage: selectedText
+          });
+          return {
+            ok: true,
+            type: 'text_to_system',
+            selectedText,
+            message: `Texto de [${originTitle}] enviado para [${delivery.targetSystem}].`
+          };
+        } else {
+          await this.dispatchToTelegram({
+            textMessage: selectedText,
+            customTarget: params.telegramTarget
+          });
+          return {
+            ok: true,
+            type: 'text_telegram',
+            selectedText,
+            message: `Texto de [${originTitle}] enviado para a conversa salva no Telegram.`
+          };
+        }
       }
 
       case 'open_path': {
@@ -357,7 +485,7 @@ class ActionExecutor {
         return {
           ok: true,
           type: 'open_path',
-          message: `Diretório/Arquivo aberto: ${target}`
+          message: `Diretorio/Arquivo aberto: ${target}`
         };
       }
 
@@ -385,30 +513,33 @@ class ActionExecutor {
         return {
           ok: true,
           type: 'open_settings',
-          message: 'Abrindo Forjador de Estrelas e Configurações...'
+          message: 'Abrindo Forjador de Estrelas e Configuracoes...'
         };
       }
 
       default:
         return {
           ok: false,
-          message: `Tipo de ação desconhecido: ${type}`
+          message: `Tipo de acao desconhecido: ${type}`
         };
     }
   }
 
   /**
-   * Finaliza o recorte de área (Area Crop) e opcionalmente envia para o Telegram
+   * Finaliza o recorte de area (Area Crop) e transfere para o Sistema de Destino ou Telegram
    */
-  async completeAreaCrop({ dataUrl, saveDir, sendToTelegram, telegramTarget }) {
+  async completeAreaCrop({ dataUrl, saveDir, nextAction, telegramTarget, targetSystem, autoSendEnter, mainWindow }) {
     const img = nativeImage.createFromDataURL(dataUrl);
     const saved = this.saveAndCopyImage(
       img,
       saveDir,
-      sendToTelegram ? 'MPE_Recorte_TG' : 'MPE_Recorte'
+      nextAction === 'telegram' || nextAction === 'system' ? 'MPE_Recorte_Transfer' : 'MPE_Recorte'
     );
 
-    if (sendToTelegram) {
+    if (nextAction === 'telegram') {
+      if (mainWindow && mainWindow.isVisible()) {
+        mainWindow.hide();
+      }
       const tgResult = await this.dispatchToTelegram({
         pngBuffer: saved.pngBuffer,
         filePath: saved.filePath,
@@ -417,14 +548,32 @@ class ActionExecutor {
       return {
         ok: true,
         filePath: saved.filePath,
-        message: `Recorte salvo (${saved.fileName}) e enviado para o Telegram (${tgResult.targetChat})!`
+        message: `Recorte salvo (${saved.fileName}) e enviado para o Telegram (${tgResult.targetChat}).`
+      };
+    }
+
+    if (nextAction === 'system') {
+      if (mainWindow && mainWindow.isVisible()) {
+        mainWindow.hide();
+      }
+      const delivery = await this.dispatchToTargetSystem({
+        targetSystem: targetSystem || telegramTarget || 'Telegram',
+        autoSendEnter: autoSendEnter !== false,
+        isTelegram: false,
+        pngBuffer: saved.pngBuffer,
+        filePath: saved.filePath
+      });
+      return {
+        ok: true,
+        filePath: saved.filePath,
+        message: `Recorte salvo (${saved.fileName}) e transferido para [${delivery.targetSystem}].`
       };
     }
 
     return {
       ok: true,
       filePath: saved.filePath,
-      message: `Recorte salvo em ${saved.fileName} e copiado para a Área de Transferência!`
+      message: `Recorte salvo em ${saved.fileName} e copiado para a Area de Transferencia.`
     };
   }
 }

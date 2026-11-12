@@ -6,7 +6,7 @@
     "userName": "",
     "isRegistered": false,
     "languageTone": "amigavel",
-    "lastUpdated": "2026-11-12T00:39:52.704Z"
+    "lastUpdated": "2026-11-12T00:59:55.369Z"
   },
   "theme": {
     "preset": "gold-obsidian",
@@ -23,7 +23,7 @@
     "startWithWindows": false,
     "triggerShortcut": "Shift + Ctrl + Alt + Botão Direito",
     "fallbackKeyboardShortcut": "CommandOrControl+Shift+Alt+M",
-    " sensitivity3D": 1,
+    "sensitivity3D": 1,
     "autoOrbit": true,
     "closeOnExecute": true,
     "soundEffects": true
@@ -34,14 +34,14 @@
     "savedScreenshotsFolder": "./Capturas_MPE",
     "botToken": "",
     "chatId": "",
-    "captionTemplate": "✨ [M.P.E] Captura enviada por {user} em {date}"
+    "captionTemplate": "[M.P.E] Captura enviada por {user} em {date}"
   },
   "points": [
     {
       "id": "star-08-7",
       "code": "08 7",
       "title": "Print + Telegram",
-      "description": "Captura a tela, salva na pasta configurada e envia direto para a conversa salva no Telegram.",
+      "description": "Captura a tela do sistema atual, salva na pasta configurada e envia direto para a conversa salva no Telegram.",
       "actionType": "print_telegram",
       "orbit": 3,
       "angle": 324,
@@ -50,7 +50,7 @@
       "glyph": "Π",
       "hasArrow": false,
       "params": {
-        "captureMode": "fullscreen",
+        "captureScope": "fullscreen",
         "saveDir": "./Capturas_MPE",
         "telegramTarget": "tg://resolve?domain=me",
         "copyToClipboard": true
@@ -59,9 +59,9 @@
     {
       "id": "star-04-7",
       "code": "04 7",
-      "title": "Print Instantâneo",
-      "description": "Captura a tela inteira em alta definição, copia para a área de transferência e salva em disco.",
-      "actionType": "print",
+      "title": "Print Sistema -> Sistema",
+      "description": "Captura o print do sistema atual e transfere automaticamente (Foco + Colagem + Disparo) para outro sistema aberto no Windows.",
+      "actionType": "system_to_system_print",
       "orbit": 2,
       "angle": 358,
       "elevation": -14,
@@ -69,16 +69,17 @@
       "glyph": "",
       "hasArrow": true,
       "params": {
-        "captureMode": "fullscreen",
+        "captureScope": "active_window",
         "saveDir": "./Capturas_MPE",
-        "copyToClipboard": true
+        "targetSystem": "Telegram",
+        "autoSendEnter": true
       }
     },
     {
       "id": "star-08-1",
       "code": "08 1",
       "title": "Seleção de Texto",
-      "description": "Captura automaticamente o texto selecionado na janela ativa anterior e abre ações rápidas.",
+      "description": "Captura automaticamente o texto selecionado no sistema ativo anterior e abre transferencia entre sistemas.",
       "actionType": "text_selection",
       "orbit": 2,
       "angle": 24,
@@ -95,7 +96,7 @@
       "id": "star-09-7",
       "code": "09 7",
       "title": "Recorte + Telegram",
-      "description": "Permite selecionar uma área específica da tela, salva o recorte e envia para o Telegram.",
+      "description": "Permite selecionar uma area especifica sobre qualquer sistema, salva o recorte e envia para o Telegram.",
       "actionType": "area_print_telegram",
       "orbit": 2,
       "angle": 42,
@@ -104,7 +105,7 @@
       "glyph": "",
       "hasArrow": true,
       "params": {
-        "captureMode": "area",
+        "captureScope": "area",
         "saveDir": "./Capturas_MPE",
         "telegramTarget": "tg://resolve?domain=me"
       }
@@ -112,8 +113,8 @@
     {
       "id": "star-07-7",
       "code": "07 7",
-      "title": "Texto → Telegram",
-      "description": "Captura o texto selecionado na janela atual e envia instantaneamente para o chat salvo do Telegram.",
+      "title": "Texto -> Outro Sistema",
+      "description": "Captura o texto selecionado no sistema atual e envia instantaneamente para o Telegram ou sistema configurado.",
       "actionType": "text_telegram",
       "orbit": 2,
       "angle": 103,
@@ -122,14 +123,15 @@
       "glyph": "",
       "hasArrow": false,
       "params": {
-        "telegramTarget": "tg://resolve?domain=me"
+        "telegramTarget": "tg://resolve?domain=me",
+        "targetSystem": "Telegram"
       }
     },
     {
       "id": "star-06-7",
       "code": "06 7",
       "title": "Pasta de Capturas",
-      "description": "Abre imediatamente o diretório onde os seus Prints e arquivos do M.P.E estão salvos.",
+      "description": "Abre imediatamente o diretorio onde os seus Prints e arquivos do M.P.E estao salvos.",
       "actionType": "open_path",
       "orbit": 3,
       "angle": 173,
@@ -144,9 +146,9 @@
     {
       "id": "star-05-7",
       "code": "05 7",
-      "title": "Repositório GitHub",
-      "description": "Abre o repositório oficial do Mouse Performático Estrelado no navegador padrão.",
-      "actionType": "open_url",
+      "title": "Print Instantâneo",
+      "description": "Captura o sistema ativo em alta definicao, salva na pasta configurada e copia para a Area de Transferencia.",
+      "actionType": "print",
       "orbit": 3,
       "angle": 232,
       "elevation": 12,
@@ -154,15 +156,16 @@
       "glyph": "",
       "hasArrow": false,
       "params": {
-        "url": "https://github.com/DevFLeo/Mouse-Performatico-Estrelado"
+        "captureScope": "fullscreen",
+        "saveDir": "./Capturas_MPE"
       }
     },
     {
       "id": "star-09-4",
       "code": "09 4",
-      "title": "Recorte de Tela",
-      "description": "Seleciona uma região retangular interativa da tela e salva na área de transferência e pasta.",
-      "actionType": "area_print",
+      "title": "Recorte -> Outro Sistema",
+      "description": "Recorta uma regiao de qualquer sistema e cola automaticamente no sistema de destino configurado.",
+      "actionType": "area_print_system",
       "orbit": 3,
       "angle": 274,
       "elevation": -18,
@@ -170,15 +173,17 @@
       "glyph": "h",
       "hasArrow": false,
       "params": {
-        "captureMode": "area",
-        "saveDir": "./Capturas_MPE"
+        "captureScope": "area",
+        "saveDir": "./Capturas_MPE",
+        "targetSystem": "Telegram",
+        "autoSendEnter": true
       }
     },
     {
       "id": "star-01-7",
       "code": "01 7",
       "title": "Novo Ponto / Config",
-      "description": "Abre o Forjador de Estrelas para cadastrar um novo ponto orbital ou customizar cores e ações.",
+      "description": "Abre o Forjador de Estrelas para cadastrar um novo ponto orbital ou configurar integracao entre sistemas.",
       "actionType": "open_settings",
       "orbit": 1,
       "angle": 292,
@@ -197,7 +202,7 @@
       "startWithWindows": false,
       "savedScreenshotsFolder": "./Capturas_MPE",
       "themePreset": "gold-obsidian",
-      "lastActive": "2026-11-12T00:39:52.704Z"
+      "lastActive": "2026-11-12T00:59:55.369Z"
     }
   }
 }

@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 /**
  * Ponte Segura de Contexto (Preload)
- * Conecta a interface gráfica 3D diretamente ao núcleo nativo do Windows via IPC,
+ * Conecta a interface grafica 3D diretamente ao nucleo nativo do Windows via IPC,
  * eliminando 100% a necessidade de servidor HTTP ou localhost.
  */
 contextBridge.exposeInMainWorld('mpeApi', {
@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('mpeApi', {
   executePoint: (point) => ipcRenderer.invoke('mpe:execute-point', point),
   completeAreaCrop: (payload) => ipcRenderer.invoke('mpe:complete-area-crop', payload),
   sendTextToTelegram: (payload) => ipcRenderer.invoke('mpe:send-text-telegram', payload),
+  sendToTargetSystem: (payload) => ipcRenderer.invoke('mpe:send-to-system', payload),
+  listOpenWindows: () => ipcRenderer.invoke('mpe:list-open-windows'),
   copyToClipboard: (text) => ipcRenderer.invoke('mpe:copy-text', text),
   openExternalPath: (targetPath) => ipcRenderer.invoke('mpe:open-path', targetPath),
   selectFolder: () => ipcRenderer.invoke('mpe:select-folder'),

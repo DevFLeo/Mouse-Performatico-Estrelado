@@ -21,7 +21,7 @@ const ActionExecutor = require('./actionExecutor');
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
 
-// Otimizações de GPU e memória para máxima fluidez do motor 3D WebGL/Canvas
+// Otimizacoes de GPU e memoria para maxima fluidez do motor 3D
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('disable-http-cache');
@@ -35,7 +35,6 @@ const startupManager = new StartupManager(ROOT_DIR);
 const hookBridge = new HookBridge(ROOT_DIR);
 const actionExecutor = new ActionExecutor(configManager, hookBridge);
 
-// Garante instância única do M.P.E
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -60,7 +59,6 @@ function createWindow() {
     transparent: true,
     resizable: false,
     movable: false,
-    fullscreen: true,
     alwaysOnTop: true,
     skipTaskbar: false,
     hasShadow: false,
@@ -76,12 +74,54 @@ function createWindow() {
     }
   });
 
-  // Carrega diretamente via protocolo de arquivo local (Zero localhost / Zero servidor web)
   const indexHtmlPath = path.join(__dirname, '..', 'renderer', 'index.html');
   mainWindow.loadFile(indexHtmlPath);
 
-  mainWindow.once('ready-to-show', () => {
-    summonHud({ playIntro: true, source: 'startup' });
+  mainWindow.webContents.once('did-finish-load', async () => {
+    const isSilentStartup = process.argv.includes('--startup');
+    if (!isSilentStartup) {
+      summonHud({ playIntro: true, source: 'startup' });
+    }
+
+    if (process.argv.includes('--self-test')) {
+      try {
+        const outDir = path.join(ROOT_DIR, 'Capturas_MPE');
+        if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+        await new Promise((r) => setTimeout(r, 450));
+        const imgInit = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_1_init.png'), imgInit.toPNG());
+
+        await mainWindow.webContents.executeJavaScript(`
+          document.getElementById('modal-register').classList.add('hidden');
+          document.getElementById('splash-phase-init').classList.add('hidden');
+          document.getElementById('splash-phase-welcome').classList.remove('hidden');
+          document.getElementById('splash-welcome-title').textContent = 'Bem-vindo, DevFLeo';
+          document.getElementById('splash-welcome-sub').textContent = 'Sistema M.P.E sincronizado e pronto para integracao entre sistemas.';
+        `);
+        await new Promise((r) => setTimeout(r, 350));
+        const imgWelcome = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_2_welcome.png'), imgWelcome.toPNG());
+
+        await mainWindow.webContents.executeJavaScript(`
+          document.getElementById('splash-screen').classList.add('hidden');
+          document.getElementById('modal-register').classList.add('hidden');
+        `);
+        await new Promise((r) => setTimeout(r, 900));
+        const imgAstrolabe = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_3_astrolabe3d.png'), imgAstrolabe.toPNG());
+
+        console.log('MPE_SELF_TEST_PASSED');
+        isQuitting = true;
+        hookBridge.stop();
+        app.quit();
+      } catch (err) {
+        console.error('MPE_SELF_TEST_FAILED:', err);
+        isQuitting = true;
+        hookBridge.stop();
+        app.exit(1);
+      }
+    }
   });
 
   mainWindow.on('close', (e) => {
@@ -111,34 +151,33 @@ function summonHud({ x, y, playIntro = false, source = 'shortcut' } = {}) {
     y: targetY - currentDisplay.bounds.y,
     playIntro,
     source,
+    originSystem: hookBridge.getOriginSystemInfo(),
     config: configManager.get()
   });
 }
 
 function createSystemTray() {
   const pngPath = path.join(ROOT_DIR, 'assets', 'icon.png');
-  const icoPath = path.join(ROOT_DIR, 'assets', 'icon.ico');
-  const iconFile = fs.existsSync(icoPath) ? icoPath : pngPath;
 
-  let trayIcon = fs.existsSync(iconFile)
-    ? nativeImage.createFromPath(iconFile)
+  let trayIcon = fs.existsSync(pngPath)
+    ? nativeImage.createFromPath(pngPath).resize({ width: 16, height: 16 })
     : nativeImage.createEmpty();
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('M.P.E - Mouse Performático Estrelado (Shift+Ctrl+Alt+Botão Direito)');
+  tray.setToolTip('M.P.E - Mouse Performatico Estrelado (Shift+Ctrl+Alt+Botao Direito)');
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '✨ Abrir Astrolábio 3D (M.P.E)',
+      label: 'Abrir Astrolabio 3D (M.P.E)',
       click: () => summonHud({ playIntro: false, source: 'tray' })
     },
     {
-      label: '🎬 Reproduzir Inicialização Cinematográfica',
+      label: 'Reproduzir Inicializacao Cinematografica',
       click: () => summonHud({ playIntro: true, source: 'tray-intro' })
     },
     { type: 'separator' },
     {
-      label: '📁 Abrir Pasta de Capturas',
+      label: 'Abrir Pasta de Capturas',
       click: () => {
         const cfg = configManager.get();
         const dir = configManager.resolvePath(
@@ -150,7 +189,7 @@ function createSystemTray() {
     },
     { type: 'separator' },
     {
-      label: '❌ Encerrar M.P.E Completamente',
+      label: 'Encerrar M.P.E Completamente',
       click: () => {
         isQuitting = true;
         hookBridge.stop();
@@ -170,18 +209,11 @@ function createSystemTray() {
 }
 
 function setupHooksAndShortcuts() {
-  // 1. Inicia o Hook Global Win32 (Shift + Ctrl + Alt + Botão Direito do Mouse)
   hookBridge.on('trigger', ({ x, y }) => {
-    if (mainWindow && mainWindow.isVisible()) {
-      // Se já estiver visível, reposiciona o centro ou alterna
-      summonHud({ x, y, playIntro: false, source: 'mouse-hook' });
-    } else {
-      summonHud({ x, y, playIntro: false, source: 'mouse-hook' });
-    }
+    summonHud({ x, y, playIntro: false, source: 'mouse-hook' });
   });
   hookBridge.start();
 
-  // 2. Registra também um atalho de teclado complementar (Ctrl+Shift+Alt+M)
   const cfg = configManager.get();
   const fallbackKey =
     (cfg.system && cfg.system.fallbackKeyboardShortcut) || 'CommandOrControl+Shift+Alt+M';
@@ -190,7 +222,7 @@ function setupHooksAndShortcuts() {
       summonHud({ playIntro: false, source: 'keyboard-shortcut' });
     });
   } catch (err) {
-    console.warn('[M.P.E Shortcut] Atalho complementar não pôde ser registrado:', err.message);
+    console.warn('[M.P.E Shortcut] Atalho complementar nao pode ser registrado:', err.message);
   }
 }
 
@@ -199,6 +231,7 @@ function setupIpcHandlers() {
     const cfg = configManager.get();
     const isStartupEnabled = await startupManager.checkStartup();
     cfg.system.startWithWindows = isStartupEnabled;
+    cfg.originSystem = hookBridge.getOriginSystemInfo();
     return cfg;
   });
 
@@ -218,14 +251,35 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('mpe:complete-area-crop', async (_event, payload) => {
-    return await actionExecutor.completeAreaCrop(payload);
+    return await actionExecutor.completeAreaCrop(
+      Object.assign({}, payload, { mainWindow })
+    );
   });
 
   ipcMain.handle('mpe:send-text-telegram', async (_event, { text, target }) => {
+    if (mainWindow && mainWindow.isVisible()) {
+      mainWindow.hide();
+    }
     return await actionExecutor.dispatchToTelegram({
       textMessage: text,
       customTarget: target
     });
+  });
+
+  ipcMain.handle('mpe:send-to-system', async (_event, { text, targetSystem, autoSendEnter }) => {
+    if (mainWindow && mainWindow.isVisible()) {
+      mainWindow.hide();
+    }
+    return await actionExecutor.dispatchToTargetSystem({
+      targetSystem,
+      autoSendEnter: autoSendEnter !== false,
+      isTelegram: false,
+      textMessage: text
+    });
+  });
+
+  ipcMain.handle('mpe:list-open-windows', async () => {
+    return await hookBridge.listOpenWindows();
   });
 
   ipcMain.handle('mpe:copy-text', (_event, text) => {
@@ -250,7 +304,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle('mpe:select-file', async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Selecionar Arquivo ou Executável (M.P.E)',
+      title: 'Selecionar Arquivo ou Executavel (M.P.E)',
       properties: ['openFile']
     });
     if (res.canceled || !res.filePaths.length) return null;
