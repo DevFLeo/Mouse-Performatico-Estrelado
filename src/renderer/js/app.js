@@ -701,18 +701,23 @@
       showToast('Texto enviado para a conversa salva no Telegram!');
     });
 
+    function handleEscapeKey() {
+      if (areaSelector && areaSelector.isActive) {
+        areaSelector.cancel();
+        return;
+      }
+      const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
+      if (openModals.length > 0) {
+        openModals.forEach((m) => m.classList.add('hidden'));
+      }
+      // Minimiza a janela do HUD para segundo plano sem fechar o projeto
+      window.mpeApi.hideHud();
+    }
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (areaSelector && areaSelector.isActive) {
-          areaSelector.cancel();
-          return;
-        }
-        const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
-        if (openModals.length > 0) {
-          openModals.forEach((m) => m.classList.add('hidden'));
-          return;
-        }
-        window.mpeApi.hideHud();
+        e.preventDefault();
+        handleEscapeKey();
       } else if (e.key === 'ArrowLeft') {
         astrolabe.wheelVelocity -= 0.012;
       } else if (e.key === 'ArrowRight') {
@@ -728,6 +733,12 @@
         }
       }
     });
+
+    if (window.mpeApi.onEscapePressed) {
+      window.mpeApi.onEscapePressed(() => {
+        handleEscapeKey();
+      });
+    }
 
     window.mpeApi.onHudSummoned((payload) => {
       if (payload && payload.originSystem && payload.originSystem.windowTitle) {

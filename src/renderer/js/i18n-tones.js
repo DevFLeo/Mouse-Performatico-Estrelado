@@ -21,7 +21,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Salvar Novo Ponto',
     btnSettings: 'Configurar Cores e Sistema',
     btnRecenter: 'Centralizar 3D',
-    btnHide: 'Ocultar HUD',
+    btnHide: 'Minimizar (ESC)',
     toastExecuted: (title) => `Ponto "${title}" acionado com sucesso!`,
     toastSaved: 'Suas configuracoes e pontos foram salvos no JSON!'
   },
@@ -41,7 +41,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Adicionar Ponto Orbital',
     btnSettings: 'Preferencias e Cores',
     btnRecenter: 'Restaurar Eixo 3D',
-    btnHide: 'Minimizar para Segundo Plano',
+    btnHide: 'Minimizar (ESC)',
     toastExecuted: (title) => `Ponto "${title}" executado com exito.`,
     toastSaved: 'Configuracoes atualizadas e sincronizadas no arquivo mpe.config.json.'
   },
@@ -61,7 +61,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Registrar Novo Vetor',
     btnSettings: 'Parametros do Sistema',
     btnRecenter: 'Resetar Giroscopio 3D',
-    btnHide: 'Suspender HUD',
+    btnHide: 'Minimizar (ESC)',
     toastExecuted: (title) => `Operacao "${title}" concluida com sucesso.`,
     toastSaved: 'Parametros gravados em mpe.config.json e sincronizados com o registro da maquina.'
   }

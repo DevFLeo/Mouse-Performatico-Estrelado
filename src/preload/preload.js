@@ -25,5 +25,8 @@ contextBridge.exposeInMainWorld('mpeApi', {
   },
   onConfigUpdated: (callback) => {
     ipcRenderer.on('mpe:config-updated', (_event, data) => callback(data));
+  },
+  onEscapePressed: (callback) => {
+    ipcRenderer.on('mpe:escape-pressed', () => callback());
   }
 });

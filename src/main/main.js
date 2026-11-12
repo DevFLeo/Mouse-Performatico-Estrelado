@@ -130,6 +130,13 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+
+  // Garante em nivel nativo que a tecla ESC sempre minimize/oculte o HUD sem encerrar o projeto
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') {
+      mainWindow.webContents.send('mpe:escape-pressed');
+    }
+  });
 }
 
 function summonHud({ x, y, playIntro = false, source = 'shortcut' } = {}) {

@@ -1,11 +1,12 @@
 /**
- * Motor Gráfico 3D Interativo do Astrolábio M.P.E
- * Renderiza fielmente a geometria estelar da imagem de referência em um espaço 3D real:
- *  - Anel graduado externo com marcadores de telemetria e barras sci-fi
- *  - Anéis orbitais excêntricos inclinados em planos 3D (Eixos X, Y, Z)
- *  - Nexus de Origem (anel branco + halo carmesim + órbitas douradas)
- *  - Vetores de trajetória (Dourados e Azul-Celeste) com setas direcionais (▲) e glifos (Π, Δ, h, C)
- *  - Rotação circular interativa para os lados (arrastar mouse, scroll wheel ou teclado) com física inercial
+ * Motor Grafico 3D Interativo do Astrolabio M.P.E
+ * Baseado na geometria do Astrolabio Dourado com:
+ *  - Profundidade 3D expandida (Coroa cilindrica 3D no anel graduado, arcos meridianos 3D,
+ *    hastes de elevacao Z entre o plano orbital e cada astro, escala e iluminacao por profundidade Z)
+ *  - Movimento lento e organico entre os "astros" como uma constelacao viva (deriva orbital
+ *    harmonica independente por astro, filamentos de constelacao dinamicos e particulas de luz
+ *    fluindo lentamente entre os astros)
+ *  - Rotacao circular interativa para os lados e inclinacao 3D em todos os eixos
  */
 class Astrolabe3D {
   constructor(canvas, callbacks = {}) {
@@ -17,13 +18,13 @@ class Astrolabe3D {
     this.height = window.innerHeight;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // Estado de rotação 3D e giro circular para os lados
-    this.wheelRotation = 0;        // Giro circular principal (movimento para os lados)
-    this.wheelVelocity = 0.0018;   // Velocidade inercial do círculo
-    this.tiltX = 0.22;             // Inclinação 3D no eixo X (perspectiva)
-    this.tiltY = -0.18;            // Inclinação 3D no eixo Y
-    this.targetTiltX = 0.22;
-    this.targetTiltY = -0.18;
+    // Estado de rotacao 3D e giro circular para os lados
+    this.wheelRotation = 0;
+    this.wheelVelocity = 0.0009;
+    this.tiltX = 0.34;
+    this.tiltY = -0.24;
+    this.targetTiltX = 0.34;
+    this.targetTiltY = -0.24;
     this.zoom = 1.0;
     this.targetZoom = 1.0;
 
@@ -35,16 +36,15 @@ class Astrolabe3D {
     this.lastMouseX = 0;
     this.lastMouseY = 0;
 
-    // Animação de inicialização (0 -> 1)
+    // Tempo continuo para o movimento lento de constelacao entre os astros
+    this.constellationTime = 0;
     this.introProgress = 1;
-    this.pulseTime = 0;
     this.activePulsePointId = null;
     this.activePulseProgress = 0;
 
     // Dados e Tema
     this.points = [];
     this.hoveredPoint = null;
-    this.selectedPoint = null;
     this.projectedPoints = [];
     this.autoOrbit = true;
     this.sensitivity = 1.0;
@@ -60,9 +60,9 @@ class Astrolabe3D {
       glowIntensity: 0.85
     };
 
-    // Partículas de poeira estelar ao fundo em 3D
+    // Poeira estelar 3D em multiplas camadas de profundidade
     this.stars = [];
-    this.initStarfield(140);
+    this.initStarfield(180);
 
     this.bindEvents();
     this.resize();
@@ -74,12 +74,14 @@ class Astrolabe3D {
     this.stars = [];
     for (let i = 0; i < count; i++) {
       this.stars.push({
-        x: (Math.random() - 0.5) * 2.4,
-        y: (Math.random() - 0.5) * 2.4,
-        z: (Math.random() - 0.5) * 1.5,
-        size: Math.random() * 1.8 + 0.4,
+        x: (Math.random() - 0.5) * 2.5,
+        y: (Math.random() - 0.5) * 2.5,
+        z: (Math.random() - 0.5) * 1.8,
+        vx: (Math.random() - 0.5) * 0.00035,
+        vy: (Math.random() - 0.5) * 0.00035,
+        size: Math.random() * 1.9 + 0.4,
         alpha: Math.random() * 0.65 + 0.15,
-        twinkleSpeed: Math.random() * 0.03 + 0.01
+        phase: Math.random() * Math.PI * 2
       });
     }
   }
@@ -100,17 +102,17 @@ class Astrolabe3D {
 
   triggerIntroAnimation() {
     this.introProgress = 0;
-    this.wheelVelocity = 0.045;
-    this.tiltX = 0.68;
-    this.tiltY = -0.52;
-    this.targetTiltX = 0.20;
-    this.targetTiltY = -0.15;
+    this.wheelVelocity = 0.032;
+    this.tiltX = 0.72;
+    this.tiltY = -0.55;
+    this.targetTiltX = 0.34;
+    this.targetTiltY = -0.24;
   }
 
   resetView() {
-    this.targetTiltX = 0.18;
-    this.targetTiltY = -0.14;
-    this.wheelVelocity = 0.012;
+    this.targetTiltX = 0.34;
+    this.targetTiltY = -0.24;
+    this.wheelVelocity = 0.008;
     this.targetZoom = 1.0;
   }
 
@@ -138,22 +140,22 @@ class Astrolabe3D {
         const dy = e.clientY - this.lastMouseY;
         this.dragMoved += Math.abs(dx) + Math.abs(dy);
 
-        // Movimentar para os lados gira o círculo 3D + inclina a perspectiva
-        const deltaWheel = (dx * 0.0055) * this.sensitivity;
+        // Movimentar para os lados gira o circulo 3D e expande a inclinacao 3D
+        const deltaWheel = dx * 0.0052 * this.sensitivity;
         this.wheelRotation += deltaWheel;
-        this.wheelVelocity = deltaWheel * 0.85;
+        this.wheelVelocity = deltaWheel * 0.82;
 
-        this.targetTiltY = Math.max(-0.85, Math.min(0.85, this.targetTiltY + dx * 0.0028 * this.sensitivity));
-        this.targetTiltX = Math.max(-0.85, Math.min(0.85, this.targetTiltX + dy * 0.0028 * this.sensitivity));
+        this.targetTiltY = Math.max(-0.95, Math.min(0.95, this.targetTiltY + dx * 0.0032 * this.sensitivity));
+        this.targetTiltX = Math.max(-0.95, Math.min(0.95, this.targetTiltX + dy * 0.0032 * this.sensitivity));
 
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
       } else {
-        // Parallax suave conforme posição do mouse na tela
+        // Parallax 3D responsivo ao movimento do cursor
         const normX = (mx / this.width - 0.5) * 2;
         const normY = (my / this.height - 0.5) * 2;
-        this.targetTiltY = normX * 0.32 * this.sensitivity;
-        this.targetTiltX = 0.18 + normY * 0.28 * this.sensitivity;
+        this.targetTiltY = -0.12 + normX * 0.38 * this.sensitivity;
+        this.targetTiltX = 0.28 + normY * 0.34 * this.sensitivity;
 
         this.updateHover(mx, my);
       }
@@ -163,7 +165,6 @@ class Astrolabe3D {
       if (!this.isDragging) return;
       this.isDragging = false;
 
-      // Se foi um clique rápido (sem arrastar), verifica se clicou em uma Estrela Salva
       if (this.dragMoved < 8) {
         const rect = this.canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -172,12 +173,10 @@ class Astrolabe3D {
 
         if (this.hoveredPoint) {
           if (e.button === 2) {
-            // Botão direito sobre um ponto abre edição direta daquele ponto
             if (this.callbacks.onPointEdit) {
               this.callbacks.onPointEdit(this.hoveredPoint);
             }
           } else {
-            // Clique esquerdo dispara a ação da estrela com pulso energético
             this.activePulsePointId = this.hoveredPoint.id;
             this.activePulseProgress = 0;
             if (this.callbacks.onPointClick) {
@@ -188,7 +187,6 @@ class Astrolabe3D {
       }
     });
 
-    // Scroll do mouse gira o círculo 3D para os lados ou dá zoom se Ctrl estiver pressionado
     this.canvas.addEventListener(
       'wheel',
       (e) => {
@@ -215,28 +213,27 @@ class Astrolabe3D {
   }
 
   /**
-   * Projeta uma coordenada 3D (x, y, z) no espaço do Astrolábio para (screenX, screenY, scale)
+   * Projeta uma coordenada 3D (x, y, z) no espaco do Astrolabio para (screenX, screenY, scale)
    */
   project3D(x, y, z, radiusBase) {
-    // Rotação no eixo X (inclinação vertical) e eixo Y (inclinação lateral)
     const cosX = Math.cos(this.tiltX);
     const sinX = Math.sin(this.tiltX);
     const cosY = Math.cos(this.tiltY);
     const sinY = Math.sin(this.tiltY);
 
-    // 1. Rotaciona em Y
+    // 1. Rotacao em Y
     const x1 = x * cosY - z * sinY;
     const z1 = z * cosY + x * sinY;
     const y1 = y;
 
-    // 2. Rotaciona em X
+    // 2. Rotacao em X
     const y2 = y1 * cosX - z1 * sinX;
     const z2 = z1 * cosX + y1 * sinX;
     const x2 = x1;
 
-    // Projeção perspectiva
-    const fov = 2.9;
-    const perspective = fov / (fov + z2 * 0.55);
+    // Projecao perspectiva 3D abrangente
+    const fov = 2.45;
+    const perspective = fov / Math.max(0.4, fov + z2 * 0.68);
 
     const cx = this.width / 2;
     const cy = this.height / 2;
@@ -250,10 +247,14 @@ class Astrolabe3D {
   }
 
   /**
-   * Desenha um anel 3D no espaço com deslocamento excêntrico (ox, oy, oz) e inclinação própria
+   * Desenha um anel 3D no espaco com deslocamento excentrico (ox, oy, oz) e inclinacao propria
    */
-  draw3DRing(ctx, radiusNorm, offsetX, offsetY, offsetZ, ringTiltX, ringTiltY, strokeStyle, lineWidth, segments = 120) {
+  draw3DRing(ctx, radiusNorm, offsetX, offsetY, offsetZ, ringTiltX, ringTiltY, strokeStyle, lineWidth, segments = 128, dashed = false) {
     const baseR = Math.min(this.width, this.height) * 0.41 * this.introProgress;
+    ctx.save();
+    if (dashed) {
+      ctx.setLineDash([5, 7]);
+    }
     ctx.beginPath();
 
     const cRX = Math.cos(ringTiltX);
@@ -263,11 +264,10 @@ class Astrolabe3D {
 
     for (let i = 0; i <= segments; i++) {
       const theta = (i / segments) * Math.PI * 2 + this.wheelRotation;
-      let lx = Math.cos(theta) * radiusNorm;
-      let ly = Math.sin(theta) * radiusNorm;
-      let lz = 0;
+      const lx = Math.cos(theta) * radiusNorm;
+      const ly = Math.sin(theta) * radiusNorm;
+      const lz = 0;
 
-      // Inclinação intrínseca da órbita
       const ty = ly * cRX - lz * sRX;
       const tz = lz * cRX + ly * sRX;
       const tx = lx * cRY - tz * sRY;
@@ -281,11 +281,12 @@ class Astrolabe3D {
     ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
+    ctx.restore();
   }
 
   updateHover(mx, my) {
     let closest = null;
-    let minDist = 34;
+    let minDist = 36;
 
     for (const item of this.projectedPoints) {
       const dx = mx - item.screen.x;
@@ -307,17 +308,18 @@ class Astrolabe3D {
   }
 
   animate() {
-    this.pulseTime += 0.025;
+    // Quando o mouse esta sobre um astro, desacelera suavemente o movimento de constelacao para facilitar o clique
+    const timeStep = this.hoveredPoint ? 0.0025 : 0.0095;
+    this.constellationTime += timeStep;
 
-    // Evolução suave da animação de entrada
     if (this.introProgress < 1) {
       this.introProgress = Math.min(1, this.introProgress + 0.022);
     }
 
-    // Física de rotação circular lateral com inércia
     if (!this.isDragging) {
       if (this.autoOrbit) {
-        this.wheelVelocity += (0.0012 - this.wheelVelocity) * 0.04;
+        const targetVel = this.hoveredPoint ? 0.00015 : 0.00075;
+        this.wheelVelocity += (targetVel - this.wheelVelocity) * 0.04;
       } else {
         this.wheelVelocity *= 0.94;
       }
@@ -361,38 +363,48 @@ class Astrolabe3D {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Halo Dourado sutil ao redor do Astrolábio
-    const auraGrad = ctx.createRadialGradient(cx, cy, baseR * 0.65, cx, cy, baseR * 1.25);
-    auraGrad.addColorStop(0, 'rgba(229, 184, 75, 0.07)');
-    auraGrad.addColorStop(0.5, 'rgba(229, 184, 75, 0.03)');
+    // Halo Dourado volumétrico 3D
+    const auraGrad = ctx.createRadialGradient(cx, cy, baseR * 0.55, cx, cy, baseR * 1.28);
+    auraGrad.addColorStop(0, 'rgba(229, 184, 75, 0.08)');
+    auraGrad.addColorStop(0.5, 'rgba(229, 184, 75, 0.035)');
     auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = auraGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // 2. Poeira Estelar 3D ao Fundo
+    // 2. Poeira Estelar 3D com deriva lenta de constelacao ao fundo
     for (const s of this.stars) {
+      s.x += s.vx;
+      s.y += s.vy;
+      if (s.x > 1.3) s.x = -1.3;
+      if (s.x < -1.3) s.x = 1.3;
+      if (s.y > 1.3) s.y = -1.3;
+      if (s.y < -1.3) s.y = 1.3;
+
       const sp = this.project3D(
-        s.x * Math.cos(this.wheelRotation * 0.25) - s.y * Math.sin(this.wheelRotation * 0.25),
-        s.x * Math.sin(this.wheelRotation * 0.25) + s.y * Math.cos(this.wheelRotation * 0.25),
+        s.x * Math.cos(this.wheelRotation * 0.2) - s.y * Math.sin(this.wheelRotation * 0.2),
+        s.x * Math.sin(this.wheelRotation * 0.2) + s.y * Math.cos(this.wheelRotation * 0.2),
         s.z,
         baseR
       );
-      const twinkle = Math.sin(this.pulseTime * 2 + s.x * 10) * 0.25 + 0.75;
+      const twinkle = Math.sin(this.constellationTime * 2.2 + s.phase) * 0.28 + 0.72;
       ctx.fillStyle = `rgba(255, 224, 138, ${s.alpha * twinkle})`;
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, s.size * sp.scale, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Configura brilho dourado
     ctx.shadowColor = this.theme.goldPrimary;
     ctx.shadowBlur = 10 * (this.theme.glowIntensity || 0.8);
 
-    // 3. ANEL EXTERNO DUPLO GRADUADO (Fiel à imagem de referência)
+    // 3. ESTRUTURA 3D EXPANDIDA DO ANEL EXTERNO (Coroa cilindrica 3D com anel de base em Z = -0.07)
+    this.draw3DRing(ctx, 1.0, 0, 0, -0.075, 0, 0, 'rgba(229, 184, 75, 0.28)', 1.1, 128);
+    this.draw3DRing(ctx, 0.895, 0, 0, 0.045, 0, 0, 'rgba(229, 184, 75, 0.24)', 1.0, 128, true);
+
+    // Anel Principal Duplo Graduado
     this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.3, 160);
     this.draw3DRing(ctx, 0.895, 0, 0, 0, 0, 0, this.theme.goldPrimary, 1.6, 160);
 
-    // Marcações de Graus (Ticks) e Barras Equalizadoras Sci-Fi a cada 30°
+    // Pilares 3D axiais conectando o anel frontal (Z=0) ao anel de profundidade (Z=-0.075) + Ticks de Grau
     const numTicks = 72;
     for (let i = 0; i < numTicks; i++) {
       const deg = i * (360 / numTicks);
@@ -400,7 +412,18 @@ class Astrolabe3D {
       const cosA = Math.cos(rad);
       const sinA = Math.sin(rad);
 
-      // Tick interno (entre 0.905 e 0.922)
+      // Conector de profundidade 3D a cada 15 graus na coroa externa
+      if (i % 3 === 0) {
+        const pFront = this.project3D(cosA * 1.0, sinA * 1.0, 0, baseR);
+        const pDepth = this.project3D(cosA * 1.0, sinA * 1.0, -0.075, baseR);
+        ctx.beginPath();
+        ctx.moveTo(pFront.x, pFront.y);
+        ctx.lineTo(pDepth.x, pDepth.y);
+        ctx.strokeStyle = 'rgba(229, 184, 75, 0.32)';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+      }
+
       const pInner = this.project3D(cosA * 0.912, sinA * 0.912, 0, baseR);
       const pOuter = this.project3D(cosA * 0.932, sinA * 0.932, 0, baseR);
       ctx.beginPath();
@@ -410,7 +433,6 @@ class Astrolabe3D {
       ctx.lineWidth = i % 6 === 0 ? 2.0 : 1.1;
       ctx.stroke();
 
-      // A cada 30 graus (i % 6 === 0): desenha o cluster de barras graduadas igual à imagem
       if (i % 6 === 0) {
         const barHeights = [0.036, 0.032, 0.025, 0.016, 0.012];
         for (let b = 0; b < barHeights.length; b++) {
@@ -435,7 +457,6 @@ class Astrolabe3D {
           ctx.stroke();
         }
       } else if (i % 3 === 0) {
-        // Pontos quádruplos (....) intermediários na borda externa
         for (let d = -1.5; d <= 1.5; d += 1) {
           const dotAngle = rad + d * 0.009;
           const dp = this.project3D(Math.cos(dotAngle) * 0.982, Math.sin(dotAngle) * 0.982, 0, baseR);
@@ -445,29 +466,37 @@ class Astrolabe3D {
       }
     }
 
-    // 4. ANÉIS ORBITAIS INTERNOS EXCÊNTRICOS EM 3D (Idênticos à geometria da imagem)
-    // Órbita Grande Excêntrica 1
-    this.draw3DRing(ctx, 0.78, -0.02, -0.01, 0.06, 0.14, -0.08, this.theme.goldPrimary, 1.75, 140);
-    // Órbita Excêntrica 2 (deslocada para cima/esquerda como na imagem)
-    this.draw3DRing(ctx, 0.68, -0.03, -0.06, -0.07, -0.16, 0.12, this.theme.goldPrimary, 1.65, 140);
+    // 4. ANEIS ORBITAIS INTERNOS EXCENTRICOS EM 3D (Com precessao lenta de constelacao)
+    const slowPrecession = Math.sin(this.constellationTime * 0.45) * 0.06;
+    const slowNutation = Math.cos(this.constellationTime * 0.35) * 0.05;
 
-    // Posição 3D do Nexus de Origem (deslocado para baixo/direita como na imagem de referência)
-    const nexusLocalAngle = 0.92 + this.wheelRotation * 0.35;
+    // Orbita Grande Excentrica 1 + Anel Gemeo de Profundidade 3D
+    this.draw3DRing(ctx, 0.78, -0.02, -0.01, 0.08, 0.22 + slowPrecession, -0.14, this.theme.goldPrimary, 1.75, 140);
+    this.draw3DRing(ctx, 0.78, -0.02, -0.01, -0.06, 0.22 + slowPrecession, -0.14, 'rgba(229, 184, 75, 0.20)', 0.9, 110, true);
+
+    // Orbita Excentrica 2 (inclinada em plano 3D oposto)
+    this.draw3DRing(ctx, 0.68, -0.03, -0.06, -0.09, -0.24 + slowNutation, 0.18, this.theme.goldPrimary, 1.65, 140);
+
+    // Arco Gimbal Equatorial 3D (abrange a profundidade esferica da constelacao)
+    this.draw3DRing(ctx, 0.54, 0, 0, 0.02, 0.48 + slowPrecession, 0.32 - slowNutation, 'rgba(92, 115, 184, 0.30)', 1.1, 120, true);
+
+    // Posicao 3D do Nexus de Origem (com respiracao orbital lenta)
+    const nexusLocalAngle = 0.92 + this.wheelRotation * 0.35 + Math.sin(this.constellationTime * 0.3) * 0.08;
     const nexus3D = {
       x: 0.31 * Math.cos(nexusLocalAngle),
       y: 0.31 * Math.sin(nexusLocalAngle),
-      z: 0.08 * Math.sin(this.pulseTime * 0.7)
+      z: 0.09 * Math.sin(this.constellationTime * 0.6)
     };
 
-    // Anéis concêntricos/excêntricos ao redor do Nexus (como na imagem)
+    // Aneis ao redor do Nexus em planos 3D
     this.draw3DRing(
       ctx,
       0.31,
       nexus3D.x * 0.48,
       nexus3D.y * 0.25,
       nexus3D.z * 0.5,
-      0.22,
-      0.18,
+      0.26 - slowNutation,
+      0.22 + slowPrecession,
       this.theme.goldPrimary,
       1.6,
       110
@@ -478,13 +507,12 @@ class Astrolabe3D {
       nexus3D.x,
       nexus3D.y,
       nexus3D.z,
-      -0.12,
-      0.15,
+      -0.18 + slowPrecession,
+      0.19,
       this.theme.goldPrimary,
       1.5,
       90
     );
-    // Anel fino carmesim/vermelho ao redor do Nexus (presente na imagem de referência!)
     this.draw3DRing(
       ctx,
       0.062,
@@ -500,7 +528,7 @@ class Astrolabe3D {
 
     const nexusScreen = this.project3D(nexus3D.x, nexus3D.y, nexus3D.z, baseR);
 
-    // 5. CALCULAR E RENDERIZAR VETORES E PONTOS ESTELARES SALVOS
+    // 5. CALCULAR POSICOES 3D DOS "ASTROS" COM MOVIMENTO LENTO DE CONSTELACAO
     this.projectedPoints = [];
     const orbitRadii = {
       1: 0.31,
@@ -508,35 +536,111 @@ class Astrolabe3D {
       3: 0.895
     };
 
+    // Cada astro possui uma velocidade kepleriana sutil e oscilacao harmonica propria,
+    // gerando movimento relativo lento entre os astros como uma constelacao viva
     for (let idx = 0; idx < this.points.length; idx++) {
       const pt = this.points[idx];
-      const orbitR = orbitRadii[pt.orbit] || 0.76;
-      const rad = ((Number(pt.angle) || 0) * Math.PI) / 180 + this.wheelRotation;
-      const elevZ = ((Number(pt.elevation) || 0) / 100) * 0.65;
+      const orbitNum = Number(pt.orbit) || 3;
+      const baseOrbitR = orbitRadii[orbitNum] || 0.76;
 
-      // Posição 3D do ponto estelar
+      // Velocidades diferenciais suaves por orbita e indice para movimento entre os astros
+      const keplerFactor = orbitNum === 1 ? 0.22 : orbitNum === 2 ? -0.15 : 0.11;
+      const individualDrift =
+        this.constellationTime * keplerFactor +
+        Math.sin(this.constellationTime * 0.55 + idx * 1.37) * 0.095;
+
+      // Respiracao radial e oscilacao lenta em profundidade Z (3D)
+      const radialBreathing = Math.cos(this.constellationTime * 0.42 + idx * 2.1) * 0.022;
+      const orbitR = baseOrbitR + radialBreathing;
+
+      const rad = ((Number(pt.angle) || 0) * Math.PI) / 180 + this.wheelRotation + individualDrift;
+      const baseElevZ = ((Number(pt.elevation) || 0) / 100) * 0.75;
+      const harmonicZ = Math.sin(this.constellationTime * 0.65 + idx * 1.15) * 0.085;
+      const pz = baseElevZ + harmonicZ;
+
       const px = Math.cos(rad) * orbitR;
       const py = Math.sin(rad) * orbitR;
-      const pz = elevZ;
 
       const screenPt = this.project3D(px, py, pz, baseR);
+      const planePt = this.project3D(px, py, 0, baseR);
+
       this.projectedPoints.push({
         point: pt,
+        idx,
         world: { x: px, y: py, z: pz },
+        planeScreen: planePt,
         screen: screenPt
       });
     }
 
-    // Ordena por profundidade Z (Back-to-Front painter's algorithm)
+    // 6. FILAMENTOS DE CONSTELACAO ENTRE OS ASTROS + PARTICULAS LENTAS DE LUZ
+    ctx.save();
+    for (let i = 0; i < this.projectedPoints.length; i++) {
+      for (let j = i + 1; j < this.projectedPoints.length; j++) {
+        const a = this.projectedPoints[i];
+        const b = this.projectedPoints[j];
+        const dx = a.world.x - b.world.x;
+        const dy = a.world.y - b.world.y;
+        const dz = a.world.z - b.world.z;
+        const dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        // Conecta astros vizinhos no espaco 3D formando uma malha de constelacao viva
+        if (dist3D < 0.88) {
+          const alpha = (1 - dist3D / 0.88) * 0.34;
+          ctx.beginPath();
+          ctx.moveTo(a.screen.x, a.screen.y);
+          ctx.lineTo(b.screen.x, b.screen.y);
+          ctx.strokeStyle = `rgba(229, 184, 75, ${alpha.toFixed(3)})`;
+          ctx.lineWidth = 0.95;
+          ctx.setLineDash([3, 6]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Particula estelar viajando lentamente pelo filamento entre os dois astros
+          const flowT = (this.constellationTime * 0.18 + (i * 0.31 + j * 0.17)) % 1;
+          const fx = a.screen.x + (b.screen.x - a.screen.x) * flowT;
+          const fy = a.screen.y + (b.screen.y - a.screen.y) * flowT;
+          ctx.beginPath();
+          ctx.arc(fx, fy, 1.9, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 224, 138, ${(alpha * 2.2).toFixed(3)})`;
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+
+    // Ordena por profundidade Z para renderizacao 3D correta
     this.projectedPoints.sort((a, b) => b.screen.z - a.screen.z);
 
-    // 6. Desenha as linhas vetoriais do Nexus até cada Estrela Salva
+    // 7. HASTES DE ELEVACAO 3D (Conectam cada Astro a sua projecao no plano orbital Z=0) + VETORES DO NEXUS
     for (const item of this.projectedPoints) {
-      const { point, screen: sp } = item;
+      const { point, screen: sp, planeScreen: pp } = item;
       const isHovered = this.hoveredPoint && this.hoveredPoint.id === point.id;
       const isGoldVector = point.vectorStyle === 'gold';
 
       ctx.save();
+
+      // Haste de Profundidade 3D (mostra visualmente o quanto o astro flutua em 3D acima/abaixo do plano)
+      const elevDist = Math.hypot(sp.x - pp.x, sp.y - pp.y);
+      if (elevDist > 3) {
+        ctx.beginPath();
+        ctx.moveTo(pp.x, pp.y);
+        ctx.lineTo(sp.x, sp.y);
+        ctx.strokeStyle = 'rgba(255, 224, 138, 0.38)';
+        ctx.lineWidth = 1.1;
+        ctx.setLineDash([2, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Pequeno anel de ancoragem no plano orbital Z=0
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, 3.2 * pp.scale, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(229, 184, 75, 0.55)';
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+      }
+
+      // Linha vetorial do Nexus ate o Astro
       ctx.beginPath();
       ctx.moveTo(nexusScreen.x, nexusScreen.y);
       ctx.lineTo(sp.x, sp.y);
@@ -557,9 +661,9 @@ class Astrolabe3D {
       }
       ctx.stroke();
 
-      // Se o vetor possui seta direcional intermediária (▲) como na imagem de referência
+      // Seta direcional no vetor (com deslize harmonico suave)
       if (point.hasArrow) {
-        const t = 0.42;
+        const t = 0.40 + Math.sin(this.constellationTime * 0.8 + item.idx) * 0.04;
         const ax = nexusScreen.x + (sp.x - nexusScreen.x) * t;
         const ay = nexusScreen.y + (sp.y - nexusScreen.y) * t;
         const angle = Math.atan2(sp.y - nexusScreen.y, sp.x - nexusScreen.x);
@@ -578,7 +682,7 @@ class Astrolabe3D {
         ctx.restore();
       }
 
-      // Se o vetor possui glifo geométrico (Π, Δ, h, C) igual à imagem de referência
+      // Glifo geometrico (Π, Δ, h, C)
       if (point.glyph) {
         const gt = 0.62;
         const gx = nexusScreen.x + (sp.x - nexusScreen.x) * gt - 18;
@@ -588,7 +692,7 @@ class Astrolabe3D {
         ctx.fillText(point.glyph, gx, gy);
       }
 
-      // Se esta estrela acabou de ser clicada, renderiza o pulso energético ao longo do vetor
+      // Pulso energetico ao acionar o astro
       if (this.activePulsePointId === point.id) {
         const px = nexusScreen.x + (sp.x - nexusScreen.x) * this.activePulseProgress;
         const py = nexusScreen.y + (sp.y - nexusScreen.y) * this.activePulseProgress;
@@ -603,7 +707,7 @@ class Astrolabe3D {
       ctx.restore();
     }
 
-    // 7. Desenha o Nó Central Nexus (Anel Branco Brilhante)
+    // 8. Desenha o No Central Nexus
     ctx.save();
     ctx.beginPath();
     ctx.arc(nexusScreen.x, nexusScreen.y, 10.5 * nexusScreen.scale, 0, Math.PI * 2);
@@ -615,7 +719,6 @@ class Astrolabe3D {
     ctx.shadowBlur = 12;
     ctx.stroke();
 
-    // Linha interna diagonal do Nexus (igual à imagem)
     ctx.beginPath();
     ctx.moveTo(nexusScreen.x - 5 * nexusScreen.scale, nexusScreen.y + 4 * nexusScreen.scale);
     ctx.lineTo(nexusScreen.x + 5 * nexusScreen.scale, nexusScreen.y - 4 * nexusScreen.scale);
@@ -624,15 +727,14 @@ class Astrolabe3D {
     ctx.stroke();
     ctx.restore();
 
-    // 8. Desenha cada Ponto Estelar Salvo (Círculo Dourado + Seta Interna + Código Sci-Fi + Nome do Atalho)
+    // 9. Desenha cada Astro Salvo (Com Halo 3D, Seta Direcional, Codigo e Titulo)
     for (const item of this.projectedPoints) {
       const { point, screen: sp } = item;
       const isHovered = this.hoveredPoint && this.hoveredPoint.id === point.id;
-      const nodeR = (isHovered ? 14.5 : 11.5) * sp.scale;
+      const nodeR = (isHovered ? 14.8 : 11.5) * sp.scale;
 
       ctx.save();
 
-      // Halo grande externo (presente nos nós de ouro como 08 7, 09 4 e 01 7 da imagem)
       if (point.vectorStyle === 'gold' || isHovered) {
         ctx.beginPath();
         ctx.arc(sp.x, sp.y, nodeR * 2.55, 0, Math.PI * 2);
@@ -641,7 +743,6 @@ class Astrolabe3D {
         ctx.stroke();
       }
 
-      // Corpo do Nó Estelar (Anel Dourado espesso igual à imagem)
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, nodeR, 0, Math.PI * 2);
       ctx.fillStyle = '#07070A';
@@ -652,7 +753,6 @@ class Astrolabe3D {
       ctx.shadowBlur = isHovered ? 22 : 10;
       ctx.stroke();
 
-      // Triângulo/Seta direcional dentro do nó apontando na direção do vetor
       const vecAngle = Math.atan2(sp.y - nexusScreen.y, sp.x - nexusScreen.x);
       ctx.save();
       ctx.translate(sp.x, sp.y);
@@ -667,7 +767,6 @@ class Astrolabe3D {
       ctx.fill();
       ctx.restore();
 
-      // Rótulo de Coordenada Sci-Fi acima do ponto (ex: "08 7", "04 7") + Nome do Ponto Salvo
       const codeText = point.code || '00 1';
       ctx.font = `700 ${Math.round(12.5 * sp.scale)}px "Consolas", "Orbitron", "Segoe UI", monospace`;
       ctx.fillStyle = isHovered ? '#FFFFFF' : '#EBF0FF';
@@ -676,10 +775,9 @@ class Astrolabe3D {
       ctx.shadowBlur = 6;
       ctx.fillText(`${codeText} ϟ`, sp.x + 4, sp.y - nodeR - 9 * sp.scale);
 
-      // Etiqueta do Atalho Salvo pelo Usuário
       if (point.title) {
         ctx.font = `${isHovered ? '700' : '500'} ${Math.round((isHovered ? 12.5 : 10.5) * sp.scale)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = isHovered ? this.theme.goldSecondary : 'rgba(229, 184, 75, 0.86)';
+        ctx.fillStyle = isHovered ? this.theme.goldSecondary : 'rgba(229, 184, 75, 0.88)';
         ctx.fillText(point.title.toUpperCase(), sp.x, sp.y + nodeR + 16 * sp.scale);
       }
 
