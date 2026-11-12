@@ -6,7 +6,7 @@
     "userName": "Leonardo",
     "isRegistered": true,
     "languageTone": "amigavel",
-    "lastUpdated": "2026-11-12T16:53:23.715Z"
+    "lastUpdated": "2026-11-12T17:49:34.389Z"
   },
   "theme": {
     "preset": "gold-obsidian",
@@ -218,10 +218,10 @@
       "title": "Novo Atalho Estelar",
       "description": "Comando programado: Novo Atalho Estelar",
       "actionType": "system_to_system_print",
-      "orbit": 1,
-      "angle": 184,
+      "orbit": 2,
+      "angle": 344,
       "elevation": -90,
-      "customRadius": 0.291,
+      "customRadius": 0.38,
       "vectorStyle": "gold",
       "glyph": "Π",
       "hasArrow": false,
@@ -303,7 +303,7 @@
       "startWithWindows": true,
       "savedScreenshotsFolder": "./prints",
       "themePreset": "gold-obsidian",
-      "lastActive": "2026-11-12T16:53:23.715Z"
+      "lastActive": "2026-11-12T17:49:34.389Z"
     }
   },
   "originSystem": {
@@ -321,7 +321,8 @@
     "provider": "auto",
     "port": 18080,
     "modelsDir": "./codigo/models",
-    "contextSize": 4096
+    "contextSize": 4096,
+    "boostMode": "balanced"
   },
   "organizer": {
     "criterion": "type",

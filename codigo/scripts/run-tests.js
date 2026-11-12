@@ -203,6 +203,35 @@ async function main() {
     }
   });
 
+  await runCase('I.A Local (llamafile)', 'AI-07', 'Calculo de memoria/velocidade, kits minimos e comando /boost', async () => {
+    const tmpRoot = makeTempDir('mpe-boost-');
+    const tmpCode = path.join(tmpRoot, 'codigo');
+    fs.mkdirSync(tmpCode, { recursive: true });
+    const cm = new ConfigManager(tmpRoot, tmpCode);
+    cm.load();
+    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
+    try {
+      const kitsRes = await svc.chat({ message: '/kits' });
+      assert.ok(kitsRes.ok && kitsRes.source === 'command');
+      assert.ok(kitsRes.text.includes('CALCULO DE MEMORIA RAM') && kitsRes.text.includes('KITS MINIMOS'));
+
+      const ecoProf = await svc.setBoostMode('eco', { restartIfOnline: false });
+      assert.strictEqual(ecoProf.boostMode, 'eco');
+      assert.strictEqual(ecoProf.tuning.contextSize, 2048);
+
+      const turboRes = await svc.chat({ message: '/boost turbo' });
+      assert.ok(turboRes.ok && turboRes.text.includes('Turbo (/boost)'));
+      const turboProf = svc.getPerformanceProfile();
+      assert.strictEqual(turboProf.boostMode, 'turbo');
+      assert.strictEqual(turboProf.speed.lastLoadMs, 0);
+      assert.ok(Array.isArray(turboProf.kits) && turboProf.kits.length === 4);
+      assert.strictEqual(typeof svc.engine.stopAsync, 'function');
+      return `eco(ctx=${ecoProf.tuning.contextSize}), turbo(threads=${turboProf.tuning.threads}/${turboProf.tuning.threadsBatch}), kits=${turboProf.kits.length}, RAM=${turboProf.hardware.totalRamGb}GB`;
+    } finally {
+      rmSafe(tmpRoot);
+    }
+  });
+
   // =========================================================================
   // SUITE C: Organizador de Arquivos (FileOrganizer)
   // =========================================================================
@@ -365,24 +394,33 @@ async function main() {
     return `${files.length} arquivos auditados com 0 emojis`;
   });
 
-  await runCase('Integridade & AGENTS.md', 'SYS-03', 'AppUserModelId sincrono no topo do main.js e binarios Win32 presentes', () => {
+  await runCase('Integridade & AGENTS.md', 'SYS-03', 'AppUserModelId, setAppDetails e binarios Win32 presentes', () => {
     const mainJs = fs.readFileSync(path.join(CODE_DIR, 'src', 'main', 'main.js'), 'utf8');
+    const launcherCs = fs.readFileSync(path.join(CODE_DIR, 'src', 'native', 'MpeLauncher.cs'), 'utf8');
     const hasAumidConst = mainJs.includes("'DevFLeo.MousePerformaticoEstrelado'");
     const aumidIdx = mainJs.indexOf('app.setAppUserModelId(');
     const winIdx = mainJs.indexOf('new BrowserWindow');
     assert.ok(hasAumidConst && aumidIdx > 0 && aumidIdx < winIdx, 'AUMID deve vir antes de createWindow/BrowserWindow');
+    assert.ok(mainJs.includes('mainWindow.setAppDetails(') && mainJs.includes('relaunchCommand'), 'setAppDetails com relaunchCommand obrigatorio para Fixar na Barra de Tarefas');
+    assert.ok(launcherCs.includes('IPropertyStore') && launcherCs.includes('DevFLeo.MousePerformaticoEstrelado'), 'MpeLauncher.cs deve gravar PKEY_AppUserModel_ID no .lnk');
     assert.ok(fs.existsSync(path.join(CODE_DIR, 'src', 'native', 'bin', 'MpeHook.exe')), 'MpeHook.exe ausente');
     assert.ok(fs.existsSync(path.join(ROOT_DIR, 'MPE.exe')), 'MPE.exe ausente');
     assert.ok(fs.existsSync(path.join(CODE_DIR, 'assets', 'icon.ico')), 'icon.ico ausente');
-    return 'AUMID DevFLeo.MousePerformaticoEstrelado sincrono antes de BrowserWindow; MPE.exe, MpeHook.exe e icon.ico presentes';
+    return 'AUMID + setAppDetails + IPropertyStore .lnk configurados; MPE.exe, MpeHook.exe e icon.ico presentes';
   });
 
-  await runCase('Integridade & AGENTS.md', 'SYS-04', 'DOM completo do assistente interativo, topbar e IDs do Astrolabio', () => {
+  await runCase('Integridade & AGENTS.md', 'SYS-04', 'DOM completo do assistente interativo, topbar, guia /boost e IDs do Astrolabio', () => {
     const html = fs.readFileSync(path.join(CODE_DIR, 'src', 'renderer', 'index.html'), 'utf8');
     const requiredIds = [
       'btn-tab-astrolabe',
       'btn-tab-organizer',
       'btn-dock-organizer',
+      'btn-dock-kataros',
+      'btn-open-guide',
+      'btn-guide-open-chat',
+      'btn-guide-repair-shortcut',
+      'modal-guide',
+      'cfg-ai-boost',
       'btn-org-back-astrolabe',
       'btn-add-star',
       'btn-dock-add-point',
@@ -401,7 +439,7 @@ async function main() {
     for (const id of requiredIds) {
       assert.ok(html.includes(`id="${id}"`), `ID obrigatorio ausente no HTML: ${id}`);
     }
-    return `Todos os ${requiredIds.length} IDs estruturais e do assistente guiado presentes`;
+    return `Todos os ${requiredIds.length} IDs estruturais, guia /boost e assistente presentes`;
   });
 
   const passed = results.filter((r) => r.status === 'PASS').length;

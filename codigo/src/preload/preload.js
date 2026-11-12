@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('mpeApi', {
   removeDocument: (payload) => ipcRenderer.invoke('mpe:ai-remove-document', payload || {}),
   aiChat: (payload) => ipcRenderer.invoke('mpe:ai-chat', payload),
   aiStatus: (payload) => ipcRenderer.invoke('mpe:ai-status', payload || {}),
+  getPerfProfile: () => ipcRenderer.invoke('mpe:get-perf-profile'),
+  setBoostMode: (mode) => ipcRenderer.invoke('mpe:set-boost-mode', mode),
+  openMiniAssistant: (opts) => ipcRenderer.invoke('mpe:open-mini-assistant', opts || {}),
+  ensureShortcuts: () => ipcRenderer.invoke('mpe:ensure-shortcuts'),
   onAiChatChunk: (callback) => {
     ipcRenderer.on('mpe:ai-chat-chunk', (_event, data) => callback(data));
   },

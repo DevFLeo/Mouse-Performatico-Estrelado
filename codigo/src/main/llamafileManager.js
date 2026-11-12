@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const net = require('net');
+const os = require('os');
 const { spawn } = require('child_process');
 
 /**
@@ -23,7 +24,250 @@ class LlamafileManager {
     this.port = this.defaultPort;
     this.activePort = null;
     this.startPromise = null;
+    this.lastLoadMs = 0;
+    this.lastMetrics = null;
     this.logPath = path.join(this.codeDir, 'logs', 'llamafile.log');
+  }
+
+  getBoostTuning(aiCfg = {}) {
+    const cpus = os.cpus() || [];
+    const logicalCores = cpus.length || 4;
+    const mode = ['eco', 'balanced', 'turbo'].includes(aiCfg.boostMode) ? aiCfg.boostMode : 'balanced';
+    const configuredCtx = parseInt(aiCfg.contextSize, 10) || 4096;
+
+    if (mode === 'eco') {
+      return {
+        mode: 'eco',
+        label: 'Eco (Baixa RAM)',
+        contextSize: Math.min(configuredCtx, 2048),
+        threads: aiCfg.threads || Math.max(2, Math.min(4, Math.floor(logicalCores * 0.3))),
+        threadsBatch: Math.max(2, Math.min(6, Math.floor(logicalCores * 0.45))),
+        batchSize: 512,
+        kvType: 'q8_0',
+        flashAttn: 'on',
+        priority: 'normal'
+      };
+    }
+
+    if (mode === 'turbo') {
+      return {
+        mode: 'turbo',
+        label: 'Turbo (/boost)',
+        contextSize: configuredCtx,
+        threads: aiCfg.threads || Math.max(4, Math.min(8, Math.round(logicalCores * 0.375))),
+        threadsBatch: Math.max(4, Math.min(12, Math.floor(logicalCores * 0.75))),
+        batchSize: 2048,
+        kvType: 'q8_0',
+        flashAttn: 'on',
+        priority: 'above_normal'
+      };
+    }
+
+    return {
+      mode: 'balanced',
+      label: 'Balanceado',
+      contextSize: configuredCtx,
+      threads: aiCfg.threads || Math.max(4, Math.min(8, Math.round(logicalCores * 0.375))),
+      threadsBatch: Math.max(4, Math.min(10, Math.floor(logicalCores * 0.65))),
+      batchSize: 1024,
+      kvType: 'q8_0',
+      flashAttn: 'on',
+      priority: 'normal'
+    };
+  }
+
+  recordMetrics(metrics = {}) {
+    this.lastMetrics = Object.assign(
+      {
+        updatedAt: new Date().toISOString()
+      },
+      this.lastMetrics || {},
+      metrics
+    );
+  }
+
+  measureElectronMemoryMb() {
+    const mainRssMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+    try {
+      if (process.versions && process.versions.electron) {
+        const { app } = require('electron');
+        if (app && typeof app.getAppMetrics === 'function') {
+          const metrics = app.getAppMetrics() || [];
+          if (metrics.length > 0) {
+            let wsKb = 0;
+            let privKb = 0;
+            for (const m of metrics) {
+              if (m && m.memory) {
+                wsKb += m.memory.workingSetSize || 0;
+                privKb += m.memory.privateBytes || 0;
+              }
+            }
+            if (wsKb > 0) {
+              return {
+                measured: true,
+                processCount: metrics.length,
+                workingSetMb: Math.round(wsKb / 1024),
+                privateMb: Math.round(privKb / 1024),
+                mainRssMb
+              };
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return {
+      measured: false,
+      processCount: 5,
+      workingSetMb: 440,
+      privateMb: 325,
+      mainRssMb
+    };
+  }
+
+  getPerformanceProfile(aiCfg = {}) {
+    const totalRamBytes = os.totalmem();
+    const freeRamBytes = os.freemem();
+    const totalRamGb = Number((totalRamBytes / (1024 ** 3)).toFixed(2));
+    const freeRamGb = Number((freeRamBytes / (1024 ** 3)).toFixed(2));
+    const cpus = os.cpus() || [];
+    const cpuModel = (cpus[0] && cpus[0].model ? cpus[0].model.trim() : 'CPU x64');
+    const logicalCores = cpus.length || 4;
+    const tuning = this.getBoostTuning(aiCfg);
+
+    const model = this.findModel(aiCfg);
+    let ggufBytes = 0;
+    let runnerBytes = 0;
+    try {
+      if (model && model.gguf && fs.existsSync(model.gguf)) ggufBytes = fs.statSync(model.gguf).size;
+      if (model && model.exe && fs.existsSync(model.exe)) runnerBytes = fs.statSync(model.exe).size;
+    } catch (_) {}
+
+    const ggufGb = Number((ggufBytes / (1024 ** 3)).toFixed(2));
+    const ggufMb = Math.round(ggufBytes / (1024 * 1024));
+    const runnerMb = Math.round(runnerBytes / (1024 * 1024));
+    const diskModelsGb = Number(((ggufBytes + runnerBytes) / (1024 ** 3)).toFixed(2));
+
+    const electronMem = this.measureElectronMemoryMb();
+    const electronSuiteMb = electronMem.workingSetMb;
+    const hookMb = 28;
+    const kvCacheMb = ggufBytes > 0
+      ? Math.round((tuning.contextSize / 4096) * (tuning.kvType === 'q8_0' ? 280 : 560))
+      : 0;
+    const computeBufMb = ggufBytes > 0 ? 180 : 0;
+    const llmEstimatedMb = ggufBytes > 0 ? ggufMb + kvCacheMb + computeBufMb : 0;
+    const totalMpeWithLlmGb = Number(((electronSuiteMb + hookMb + llmEstimatedMb) / 1024).toFixed(2));
+    const windowsBaseGb = 4.0;
+    const totalSystemWithLlmGb = Number((windowsBaseGb + totalMpeWithLlmGb).toFixed(1));
+
+    const estGenTokSec = ggufGb <= 0
+      ? 0
+      : ggufGb <= 1.4
+      ? 24.0
+      : ggufGb <= 2.6
+      ? 13.5
+      : ggufGb <= 5.5
+      ? (tuning.mode === 'turbo' ? 5.2 : tuning.mode === 'eco' ? 4.0 : 4.7)
+      : 2.5;
+    const estPromptTokSec = ggufGb <= 0
+      ? 0
+      : ggufGb <= 1.4
+      ? 95.0
+      : ggufGb <= 2.6
+      ? 52.0
+      : ggufGb <= 5.5
+      ? (tuning.mode === 'turbo' ? 29.0 : tuning.mode === 'eco' ? 21.5 : 26.0)
+      : 12.0;
+
+    const kits = [
+      {
+        id: 'kit-minimo',
+        name: 'Kit Mínimo (HUD 2D/3D + Motor Kataros Instantâneo)',
+        cpu: 'Dual-Core x64 (2+ threads)',
+        ram: '4 GB RAM (M.P.E base ~350-480 MB)',
+        disk: '500 MB livres',
+        gpu: 'Integrada (Canvas 2D/3D)',
+        speed: '~2 ms por revisão/ação (sem modelo GGUF)'
+      },
+      {
+        id: 'kit-entrada',
+        name: 'Kit Entrada I.A Offline (Modelo 1.5B Q4_K_M)',
+        cpu: 'Quad-Core AVX2 (4+ threads)',
+        ram: '8 GB RAM (LLM ~1,5 GB + SO + HUD)',
+        disk: '2 GB livres',
+        gpu: 'Integrada ou Dedicada',
+        speed: '18-30 tok/s em CPU (~1,5 s carga)'
+      },
+      {
+        id: 'kit-recomendado',
+        name: 'Kit Recomendado (Modelo 3B-7B Q4_K_M + /boost)',
+        cpu: '6+ Núcleos / 12+ Threads AVX2',
+        ram: '16 GB RAM (7B usa ~4,5 GB + 0,47 GB HUD)',
+        disk: '6 GB livres (SSD NVMe)',
+        gpu: 'Integrada ou RTX',
+        speed: '22-33 tok/s prompt | 4,0-5,5 tok/s geração (7B CPU)'
+      },
+      {
+        id: 'kit-ultra',
+        name: 'Kit Ultra GPU (7B-14B em VRAM Dedicada)',
+        cpu: '8+ Núcleos AVX2',
+        ram: '16-32 GB RAM + GPU 6-8 GB VRAM',
+        disk: '10 GB livres (SSD NVMe)',
+        gpu: 'NVIDIA RTX 6-8 GB VRAM (runner CUDA/Vulkan)',
+        speed: '45-90+ tok/s em VRAM (~1,5 s carga)'
+      }
+    ];
+
+    const recommendedKit =
+      totalRamGb < 7
+        ? kits[0]
+        : totalRamGb < 12
+        ? kits[1]
+        : kits[2];
+
+    return {
+      boostMode: tuning.mode,
+      boostLabel: tuning.label,
+      tuning,
+      hardware: {
+        cpuModel,
+        logicalCores,
+        totalRamGb,
+        freeRamGb
+      },
+      model: {
+        found: Boolean(model),
+        name: model ? model.name : 'Nenhum GGUF detectado',
+        ggufGb,
+        ggufMb,
+        runnerMb,
+        diskModelsGb,
+        engineState: this.state
+      },
+      memory: {
+        nodeMainRssMb: electronMem.mainRssMb,
+        electronSuiteMb,
+        electronPrivateMb: electronMem.privateMb,
+        electronMeasured: electronMem.measured,
+        electronProcesses: electronMem.processCount,
+        hookMb,
+        kvCacheMb,
+        kvCacheSavedMb: tuning.kvType === 'q8_0' && ggufBytes > 0 ? kvCacheMb : 0,
+        llmEstimatedMb,
+        totalMpeBaseMb: electronSuiteMb + hookMb,
+        totalMpeWithLlmGb,
+        totalSystemWithLlmGb,
+        fitsInRam: freeRamGb + 1.5 >= totalMpeWithLlmGb
+      },
+      speed: {
+        builtinMs: 2,
+        lastLoadMs: model ? (this.lastLoadMs || 0) : 0,
+        promptTokPerSec: (this.lastMetrics && this.lastMetrics.promptTokPerSec) || estPromptTokSec,
+        genTokPerSec: (this.lastMetrics && this.lastMetrics.genTokPerSec) || estGenTokSec,
+        measured: Boolean(this.lastMetrics && this.lastMetrics.genTokPerSec)
+      },
+      kits,
+      recommendedKit
+    };
   }
 
   resolve(p) {
@@ -272,11 +516,17 @@ class LlamafileManager {
       }
     }
 
+    const tuning = this.getBoostTuning(aiCfg);
     const args = [];
     if (model.gguf) args.push('-m', model.gguf);
     args.push('--server', '--nologo', '--no-webui', '--host', '127.0.0.1', '--port', String(this.port));
     args.push('-np', String(parseInt(aiCfg.parallelSlots, 10) || 1));
-    args.push('-c', String(parseInt(aiCfg.contextSize, 10) || 4096));
+    args.push('-c', String(tuning.contextSize));
+    args.push('-b', String(tuning.batchSize));
+    args.push('-fa', tuning.flashAttn);
+    args.push('-ctk', tuning.kvType, '-ctv', tuning.kvType);
+    args.push('-t', String(tuning.threads));
+    args.push('-tb', String(tuning.threadsBatch));
 
     const gpuMode = aiCfg.gpuMode || 'auto';
     args.push('--gpu', gpuMode);
@@ -287,22 +537,27 @@ class LlamafileManager {
       args.push('-ngl', 'auto');
     }
 
-    if (aiCfg.threads) args.push('-t', String(aiCfg.threads));
-
     try {
       fs.mkdirSync(path.dirname(this.logPath), { recursive: true });
-      fs.writeFileSync(this.logPath, `[${new Date().toISOString()}] ${model.exe} ${args.join(' ')}\n`);
+      fs.writeFileSync(this.logPath, `[${new Date().toISOString()}] [${tuning.mode}] ${model.exe} ${args.join(' ')}\n`);
     } catch (_) {}
 
     this.state = 'starting';
     this.modelName = model.name;
 
+    let spawnedChild = null;
     try {
-      this.child = spawn(model.exe, args, {
+      spawnedChild = spawn(model.exe, args, {
         cwd: path.dirname(model.exe),
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe']
       });
+      this.child = spawnedChild;
+      if (tuning.priority === 'above_normal' && spawnedChild && spawnedChild.pid) {
+        try {
+          os.setPriority(spawnedChild.pid, os.constants.priority.PRIORITY_ABOVE_NORMAL);
+        } catch (_) {}
+      }
     } catch (err) {
       this.state = 'error';
       this.activePort = null;
@@ -311,19 +566,22 @@ class LlamafileManager {
     }
 
     const appendLog = (buf) => {
+      if (this.child !== spawnedChild) return;
       try {
         fs.appendFileSync(this.logPath, buf);
       } catch (_) {}
     };
-    this.child.stdout.on('data', appendLog);
-    this.child.stderr.on('data', appendLog);
-    this.child.on('error', (err) => {
+    spawnedChild.stdout.on('data', appendLog);
+    spawnedChild.stderr.on('data', appendLog);
+    spawnedChild.on('error', (err) => {
+      if (this.child !== spawnedChild) return;
       this.state = 'error';
       this.activePort = null;
       this.lastError = `Erro no processo llamafile: ${err.message}`;
       this.child = null;
     });
-    this.child.on('exit', (code) => {
+    spawnedChild.on('exit', (code) => {
+      if (this.child !== spawnedChild) return;
       if (this.state !== 'offline') {
         this.state = code === 0 ? 'offline' : 'error';
         if (code) this.lastError = `llamafile encerrou (codigo ${code}). Veja codigo/logs/llamafile.log`;
@@ -335,9 +593,11 @@ class LlamafileManager {
     const timeoutMs = parseInt(aiCfg.startupTimeoutMs, 10) || 240000;
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
-      if (!this.child) return false;
+      if (this.child !== spawnedChild) return false;
       const p = await this.ping(this.port);
+      if (this.child !== spawnedChild) return false;
       if (p === 'ok') {
+        this.lastLoadMs = Date.now() - t0;
         this.state = 'online';
         this.activePort = this.port;
         return true;
@@ -352,14 +612,58 @@ class LlamafileManager {
   }
 
   stop() {
-    if (this.child) {
-      try {
-        this.child.kill();
-      } catch (_) {}
-      this.child = null;
-    }
+    const oldChild = this.child;
+    this.child = null;
     this.activePort = null;
     this.state = 'offline';
+    if (oldChild) {
+      try {
+        oldChild.kill();
+      } catch (_) {}
+    }
+  }
+
+  async stopAsync(timeoutMs = 5000) {
+    const oldChild = this.child;
+    const oldPort = this.activePort || this.port;
+    this.child = null;
+    this.activePort = null;
+    this.state = 'offline';
+
+    if (oldChild) {
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (!done) {
+            done = true;
+            resolve();
+          }
+        };
+        oldChild.once('exit', finish);
+        try {
+          oldChild.kill();
+        } catch (_) {
+          finish();
+        }
+        setTimeout(() => {
+          if (!done && oldChild.pid && process.platform === 'win32') {
+            try {
+              const { execFileSync } = require('child_process');
+              execFileSync('taskkill', ['/PID', String(oldChild.pid), '/T', '/F'], { windowsHide: true });
+            } catch (_) {}
+          }
+          setTimeout(finish, 200);
+        }, Math.min(1800, timeoutMs));
+      });
+    }
+
+    if (oldPort) {
+      const deadline = Date.now() + 2000;
+      while (Date.now() < deadline) {
+        if (await this.isPortAvailable(oldPort)) break;
+        await new Promise((r) => setTimeout(r, 120));
+      }
+    }
   }
 }
 

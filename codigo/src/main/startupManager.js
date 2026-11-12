@@ -79,35 +79,47 @@ class StartupManager {
   }
 
   createAppShortcuts() {
-    if (process.platform !== 'win32') return;
-    try {
-      const programsFolder = path.join(
-        os.homedir(),
-        'AppData',
-        'Roaming',
-        'Microsoft',
-        'Windows',
-        'Start Menu',
-        'Programs'
-      );
-      const startMenuLnk = path.join(programsFolder, 'M.P.E - Mouse Performatico Estrelado.lnk');
-      const icoPath = fs.existsSync(path.join(this.codeDir, 'assets', 'icon.ico'))
-        ? path.join(this.codeDir, 'assets', 'icon.ico')
-        : path.join(this.rootDir, 'assets', 'icon.ico');
+    if (process.platform !== 'win32') return Promise.resolve({ ok: false });
+    return new Promise((resolve) => {
+      try {
+        if (fs.existsSync(this.launcherExe)) {
+          execFile(this.launcherExe, ['--ensure-shortcuts'], { windowsHide: true }, (err) => {
+            resolve({ ok: !err });
+          });
+          return;
+        }
 
-      if (fs.existsSync(this.launcherExe)) {
+        const programsFolder = path.join(
+          os.homedir(),
+          'AppData',
+          'Roaming',
+          'Microsoft',
+          'Windows',
+          'Start Menu',
+          'Programs'
+        );
+        const startMenuLnk = path.join(programsFolder, 'M.P.E - Mouse Performatico Estrelado.lnk');
+        const icoPath = fs.existsSync(path.join(this.codeDir, 'assets', 'icon.ico'))
+          ? path.join(this.codeDir, 'assets', 'icon.ico')
+          : path.join(this.rootDir, 'assets', 'icon.ico');
+
         const psScript = `
           $ws = New-Object -ComObject WScript.Shell
           $sc = $ws.CreateShortcut('${startMenuLnk.replace(/'/g, "''")}')
-          $sc.TargetPath = '${this.launcherExe.replace(/'/g, "''")}'
-          $sc.WorkingDirectory = '${this.rootDir.replace(/'/g, "''")}'
+          $sc.TargetPath = '${process.execPath.replace(/'/g, "''")}'
+          $sc.Arguments = '"${this.codeDir.replace(/'/g, "''")}" --launch-ui'
+          $sc.WorkingDirectory = '${this.codeDir.replace(/'/g, "''")}'
           $sc.IconLocation = '${icoPath.replace(/'/g, "''")}'
           $sc.Description = 'M.P.E - Mouse Performatico Estrelado'
           $sc.Save()
         `;
-        execFile('powershell.exe', ['-NoProfile', '-Command', psScript], { windowsHide: true }, () => {});
+        execFile('powershell.exe', ['-NoProfile', '-Command', psScript], { windowsHide: true }, (err) => {
+          resolve({ ok: !err });
+        });
+      } catch (_) {
+        resolve({ ok: false });
       }
-    } catch (_) {}
+    });
   }
 }
 

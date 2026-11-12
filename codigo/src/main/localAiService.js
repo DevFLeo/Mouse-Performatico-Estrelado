@@ -50,8 +50,11 @@ const HELP_TEXT = [
   '/persona <texto>        Define comportamento fixo',
   '/vault <caminho>        Define a pasta do cofre do Obsidian',
   '',
-  'MOTOR',
-  '/status   /iniciar   /parar'
+  'MOTOR & PERFORMANCE',
+  '/status                 Estado do motor, Obsidian e memoria',
+  '/boost [turbo|eco|balanced|status]  Otimiza RAM/velocidade e exibe calculo + kits minimos',
+  '/kits                   Exibe calculo de memoria, velocidade e kits minimos',
+  '/iniciar   /parar       Inicia ou encerra o servidor llamafile'
 ].join('\n');
 
 class LocalAiService {
@@ -197,8 +200,66 @@ class LocalAiService {
       facts: mem.facts.length,
       examples: mem.examples.length,
       documents: docs.length,
-      documentsDir: this.documents.getDocumentsFolder()
+      documentsDir: this.documents.getDocumentsFolder(),
+      boostMode: aiCfg.boostMode || 'balanced'
     };
+  }
+
+  getPerformanceProfile() {
+    const aiCfg = this.getAiConfig();
+    return this.engine.getPerformanceProfile(aiCfg);
+  }
+
+  async setBoostMode(mode = 'turbo', { restartIfOnline = true } = {}) {
+    const valid = ['eco', 'balanced', 'turbo'].includes(mode) ? mode : 'turbo';
+    const cfg = this.getFullConfig();
+    const nextAi = Object.assign({}, cfg.ai || {}, { boostMode: valid });
+    if (this.configManager && typeof this.configManager.save === 'function') {
+      this.configManager.save({ ai: nextAi });
+    }
+    const wasActive = this.engine.state === 'online' || this.engine.state === 'starting';
+    if (restartIfOnline && wasActive) {
+      await this.engine.stopAsync();
+      this.engine.startPromise = null;
+      await this.engine.ensureStarted(this.getAiConfig());
+    }
+    return this.getPerformanceProfile();
+  }
+
+  formatBoostReport(profile, changedToMode) {
+    const p = profile || this.getPerformanceProfile();
+    const lines = [];
+    if (changedToMode) {
+      lines.push(`Modo /boost ajustado para: ${p.boostLabel}`);
+    } else {
+      lines.push(`TELEMETRIA DE MEMORIA, VELOCIDADE E KITS (${p.boostLabel})`);
+    }
+    const loadInfo = p.speed.lastLoadMs > 0
+      ? `carga ${(p.speed.lastLoadMs / 1000).toFixed(2)} s`
+      : 'servidor ainda nao iniciado nesta sessao';
+    const speedTag = p.speed.measured ? 'medido' : 'estimado';
+    lines.push(
+      `Hardware detectado: ${p.hardware.cpuModel} (${p.hardware.logicalCores} threads) | RAM: ${p.hardware.freeRamGb} GB livres / ${p.hardware.totalRamGb} GB totais`,
+      `Modelo ativo: ${p.model.name} (${p.model.ggufGb} GB GGUF, disco modelos ${p.model.diskModelsGb} GB, estado: ${p.model.engineState})`,
+      '',
+      'CALCULO DE MEMORIA RAM:',
+      `- HUD Electron (${p.memory.electronProcesses} processos): ~${p.memory.electronSuiteMb} MB WS / ~${p.memory.electronPrivateMb} MB priv. (0% CPU quando minimizado)`,
+      `- Hook Win32 (MpeHook.exe): ~${p.memory.hookMb} MB`,
+      `- Motor LLM (GGUF + KV ${p.tuning.kvType.toUpperCase()} ctx ${p.tuning.contextSize} + buffer): ~${p.memory.llmEstimatedMb} MB (economia KV: ~${p.memory.kvCacheSavedMb} MB)`,
+      `- Total M.P.E + LLM: ~${p.memory.totalMpeWithLlmGb} GB | Total c/ Windows: ~${p.memory.totalSystemWithLlmGb} GB`,
+      '',
+      'VELOCIDADE:',
+      `- Motor Embutido Kataros (revisao/comandos): ~${p.speed.builtinMs} ms`,
+      `- LLM Local (${p.tuning.threads} threads gen / ${p.tuning.threadsBatch} batch, Flash-Attn ${p.tuning.flashAttn}, ${speedTag}): ~${p.speed.promptTokPerSec} tok/s prompt | ~${p.speed.genTokPerSec} tok/s resposta (${loadInfo})`,
+      '',
+      `KIT RECOMENDADO P/ ESTE PC: ${p.recommendedKit.name}`,
+      'KITS MINIMOS DE REFERENCIA:'
+    );
+    p.kits.forEach((k) => {
+      lines.push(`- ${k.name}: ${k.ram} | ${k.cpu} | ${k.disk} | ${k.speed}`);
+    });
+    lines.push('', 'Uso: /boost turbo | /boost eco | /boost balanced | /kits');
+    return lines.join('\n');
   }
 
   saveDocumentFile(payload) {
@@ -297,6 +358,12 @@ class LocalAiService {
               if (data === '[DONE]') continue;
               try {
                 const j = JSON.parse(data);
+                if (j && j.timings) {
+                  this.engine.recordMetrics({
+                    promptTokPerSec: Number((j.timings.prompt_per_second || 0).toFixed(2)),
+                    genTokPerSec: Number((j.timings.predicted_per_second || 0).toFixed(2))
+                  });
+                }
                 const delta =
                   (j.choices && j.choices[0] && ((j.choices[0].delta && j.choices[0].delta.content) || j.choices[0].text)) || '';
                 if (delta) {
@@ -310,6 +377,12 @@ class LocalAiService {
             if (!stream) {
               try {
                 const j = JSON.parse(full);
+                if (j && j.timings) {
+                  this.engine.recordMetrics({
+                    promptTokPerSec: Number((j.timings.prompt_per_second || 0).toFixed(2)),
+                    genTokPerSec: Number((j.timings.predicted_per_second || 0).toFixed(2))
+                  });
+                }
                 return resolve(
                   (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ''
                 );
@@ -780,11 +853,13 @@ class LocalAiService {
 
       case 'status': {
         const s = await this.getStatus();
+        const perf = this.getPerformanceProfile();
         return reply(
           [
-            `Motor: ${s.engine}${s.modelName ? ` (${s.modelName})` : ''}`,
+            `Motor: ${s.engine}${s.modelName ? ` (${s.modelName})` : ''} | Modo: ${perf.boostLabel}`,
             `Provedor: ${s.provider}`,
             `Modelo encontrado: ${s.modelFound ? 'sim' : 'nao'}`,
+            `RAM estimada: HUD ~${perf.memory.totalMpeBaseMb} MB | Total c/ LLM ~${perf.memory.totalMpeWithLlmGb} GB`,
             `Cofre Obsidian: ${s.vaultPath} ${s.vaultExists ? `(${this.obsidian.count(s.vaultPath)} notas)` : '(nao existe)'}`,
             `Documentos na I.A Local: ${s.documents} arquivos (${s.documentsDir})`,
             `Memoria: ${s.facts} fatos, ${s.examples} exemplos`,
@@ -794,6 +869,33 @@ class LocalAiService {
             .join('\n')
         );
       }
+
+      case 'boost': {
+        const sub = (arg || '').trim().toLowerCase();
+        if (!sub || sub === 'on' || sub === 'turbo' || sub === 'max') {
+          if (ctx.onStatus) ctx.onStatus('Aplicando modo /boost Turbo...');
+          const profile = await this.setBoostMode('turbo', { restartIfOnline: true });
+          if (ctx.onStatus) ctx.onStatus('');
+          return reply(this.formatBoostReport(profile, 'turbo'));
+        }
+        if (sub === 'eco' || sub === 'lite' || sub === 'minimo') {
+          if (ctx.onStatus) ctx.onStatus('Aplicando modo Eco (baixa RAM)...');
+          const profile = await this.setBoostMode('eco', { restartIfOnline: true });
+          if (ctx.onStatus) ctx.onStatus('');
+          return reply(this.formatBoostReport(profile, 'eco'));
+        }
+        if (sub === 'balanced' || sub === 'balanceado' || sub === 'normal' || sub === 'auto') {
+          if (ctx.onStatus) ctx.onStatus('Aplicando modo Balanceado...');
+          const profile = await this.setBoostMode('balanced', { restartIfOnline: true });
+          if (ctx.onStatus) ctx.onStatus('');
+          return reply(this.formatBoostReport(profile, 'balanced'));
+        }
+        return reply(this.formatBoostReport(this.getPerformanceProfile(), null));
+      }
+
+      case 'kits':
+      case 'desempenho':
+        return reply(this.formatBoostReport(this.getPerformanceProfile(), null));
 
       case 'iniciar': {
         if (ctx.onStatus) ctx.onStatus('Carregando modelo local na memoria...');

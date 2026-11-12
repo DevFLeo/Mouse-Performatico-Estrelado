@@ -186,7 +186,7 @@ class ConfigManager {
       );
     }
     if (!rootData.ai) {
-      rootData.ai = { provider: 'auto', port: 18080, modelsDir: './codigo/models', contextSize: 4096 };
+      rootData.ai = { provider: 'auto', port: 18080, modelsDir: './codigo/models', contextSize: 4096, boostMode: 'balanced' };
     } else {
       if (!rootData.ai.provider || rootData.ai.provider === 'builtin') {
         rootData.ai.provider = 'auto';
@@ -199,6 +199,9 @@ class ConfigManager {
       }
       if (!rootData.ai.contextSize) {
         rootData.ai.contextSize = 4096;
+      }
+      if (!['eco', 'balanced', 'turbo'].includes(rootData.ai.boostMode)) {
+        rootData.ai.boostMode = 'balanced';
       }
     }
 

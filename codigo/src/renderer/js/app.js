@@ -322,8 +322,11 @@
     defEl.classList.add('hidden');
     detEl.classList.remove('hidden');
 
+    const pts = (currentConfig && Array.isArray(currentConfig.points)) ? currentConfig.points : [];
+    const hotkeyIdx = pts.findIndex((p) => p && p.id === point.id);
+    const hotkeyTag = hotkeyIdx >= 0 && hotkeyIdx < 9 ? ` [Tecla ${hotkeyIdx + 1}]` : '';
     document.getElementById('insp-code').textContent = point.code || '00 1';
-    document.getElementById('insp-title').textContent = point.title || 'Ponto Estelar';
+    document.getElementById('insp-title').textContent = `${point.title || 'Ponto Estelar'}${hotkeyTag}`;
     document.getElementById('insp-desc').textContent =
       point.description || `Acao: ${point.actionType}`;
   }
@@ -1013,6 +1016,20 @@
 
   async function savePointFromModal() {
     const pointObj = buildPointPayloadFromForm();
+    if (pointObj.actionType === 'open_url' && !(pointObj.params && pointObj.params.url)) {
+      showToast('Informe o endereco do site (URL) antes de salvar.');
+      setWizardStep(2);
+      const urlEl = document.getElementById('pt-url');
+      if (urlEl) urlEl.focus();
+      return;
+    }
+    if (pointObj.actionType === 'open_path' && !(pointObj.params && pointObj.params.targetPath)) {
+      showToast('Escolha uma pasta ou programa antes de salvar.');
+      setWizardStep(2);
+      const pathEl = document.getElementById('pt-target-path');
+      if (pathEl) pathEl.focus();
+      return;
+    }
 
     const points = Array.isArray(currentConfig.points) ? [...currentConfig.points] : [];
     const existingIdx = points.findIndex((p) => p.id === pointObj.id);
@@ -1087,6 +1104,8 @@
 
     const ai = cfg.ai || {};
     document.getElementById('cfg-ai-provider').value = ai.provider || 'auto';
+    const boostEl = document.getElementById('cfg-ai-boost');
+    if (boostEl) boostEl.value = ai.boostMode || 'balanced';
 
     const th = cfg.theme || {};
     document.getElementById('clr-gold-primary').value = th.goldPrimary || '#E5B84B';
@@ -1098,6 +1117,14 @@
 
     document.getElementById('info-machine-name').textContent =
       (cfg.currentMachine && cfg.currentMachine.hostname) || 'LOCAL-PC';
+
+    const perfSummaryEl = document.getElementById('info-perf-summary');
+    if (perfSummaryEl && window.mpeApi.getPerfProfile) {
+      window.mpeApi.getPerfProfile().then((p) => {
+        if (!p) return;
+        perfSummaryEl.textContent = `RAM Livre: ${p.hardware.freeRamGb}/${p.hardware.totalRamGb} GB | HUD ~${p.memory.totalMpeBaseMb} MB | LLM ~${p.memory.totalMpeWithLlmGb} GB | ${p.speed.genTokPerSec} tok/s`;
+      }).catch(() => {});
+    }
 
     document.getElementById('modal-settings').classList.remove('hidden');
   }
@@ -1149,8 +1176,12 @@
       rememberWindowState: document.getElementById('cfg-org-remember-state') ? document.getElementById('cfg-org-remember-state').checked : false
     });
 
+    const prevBoostMode = (currentConfig.ai && currentConfig.ai.boostMode) || 'balanced';
+    const boostSel = document.getElementById('cfg-ai-boost');
+    const nextBoostMode = boostSel ? boostSel.value : prevBoostMode;
     currentConfig.ai = Object.assign({}, currentConfig.ai, {
-      provider: document.getElementById('cfg-ai-provider').value
+      provider: document.getElementById('cfg-ai-provider').value,
+      boostMode: nextBoostMode
     });
 
     currentConfig.theme = Object.assign({}, currentConfig.theme, {
@@ -1163,6 +1194,9 @@
     });
 
     currentConfig = await window.mpeApi.saveConfig(currentConfig);
+    if (nextBoostMode !== prevBoostMode && window.mpeApi.setBoostMode) {
+      await window.mpeApi.setBoostMode(nextBoostMode);
+    }
     applyThemeVariables(currentConfig.theme);
     applyLanguageToneUI();
     astrolabe.setConfig(currentConfig);
@@ -1257,13 +1291,106 @@
     astrolabe.setConfig(currentConfig);
     syncDimensionButtons(astrolabe.projectionMode);
 
-    // Adicionar Ponto (Dock + Topo), Mover Pontos e Organizar Arquivos
+    // Adicionar Ponto (Dock + Topo), AI Kataros, Guia /boost, Mover Pontos e Organizar Arquivos
     const dockOrgBtn = document.getElementById('btn-dock-organizer');
     if (dockOrgBtn) {
       dockOrgBtn.addEventListener('click', () => {
         if (organizerUI) organizerUI.setWorkspaceTab('organizer', false);
       });
     }
+    const dockKatarosBtn = document.getElementById('btn-dock-kataros');
+    if (dockKatarosBtn) {
+      dockKatarosBtn.addEventListener('click', () => {
+        if (window.mpeApi.openMiniAssistant) window.mpeApi.openMiniAssistant();
+      });
+    }
+
+    function renderGuidePerf(profile) {
+      if (!profile) return;
+      document.querySelectorAll('.boost-pill').forEach((b) => {
+        b.classList.toggle('active', b.dataset.boost === profile.boostMode);
+      });
+      const perfEl = document.getElementById('guide-perf-metrics');
+      if (perfEl) {
+        const speedTag = profile.speed.measured ? 'medido' : 'estimado';
+        const baseTag = profile.memory.electronMeasured ? 'medido' : 'est.';
+        perfEl.innerHTML =
+          `<div><strong>CPU:</strong> ${profile.hardware.cpuModel} (${profile.hardware.logicalCores} threads)</div>` +
+          `<div><strong>RAM:</strong> ${profile.hardware.freeRamGb} GB livres de ${profile.hardware.totalRamGb} GB | <strong>Disco I.A:</strong> ${profile.model.diskModelsGb || 0} GB</div>` +
+          `<div><strong>M.P.E Base (${baseTag}):</strong> ${profile.memory.totalMpeBaseMb} MB WS / ${profile.memory.electronPrivateMb + profile.memory.hookMb} MB priv. (0% CPU minimizado)</div>` +
+          `<div><strong>LLM (${profile.model.name}):</strong> ~${profile.memory.llmEstimatedMb} MB (${profile.tuning.threads} gen / ${profile.tuning.threadsBatch} batch, KV ${profile.tuning.kvType.toUpperCase()} ctx ${profile.tuning.contextSize})</div>` +
+          `<div><strong>Velocidade (${speedTag}):</strong> Regras ~${profile.speed.builtinMs} ms | LLM ~${profile.speed.promptTokPerSec} tok/s prompt / ~${profile.speed.genTokPerSec} tok/s resposta</div>`;
+      }
+      const kitsGrid = document.getElementById('guide-kits-grid');
+      if (kitsGrid && Array.isArray(profile.kits)) {
+        kitsGrid.innerHTML = profile.kits
+          .map((k) => {
+            const isRec = profile.recommendedKit && profile.recommendedKit.id === k.id;
+            return (
+              `<div class="kit-card${isRec ? ' recommended' : ''}">` +
+              `<div class="kit-card-title">${k.name}${isRec ? '<span class="kit-card-tag">IDEAL P/ ESTE PC</span>' : ''}</div>` +
+              `<div><strong>RAM:</strong> ${k.ram}</div>` +
+              `<div><strong>CPU/GPU:</strong> ${k.cpu} | ${k.gpu}</div>` +
+              `<div><strong>Disco/Vel.:</strong> ${k.disk} | ${k.speed}</div>` +
+              `</div>`
+            );
+          })
+          .join('');
+      }
+    }
+
+    async function openGuideModal() {
+      const modal = document.getElementById('modal-guide');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      if (window.mpeApi.getPerfProfile) {
+        try {
+          renderGuidePerf(await window.mpeApi.getPerfProfile());
+        } catch (_) {}
+      }
+    }
+
+    const btnOpenGuide = document.getElementById('btn-open-guide');
+    if (btnOpenGuide) btnOpenGuide.addEventListener('click', openGuideModal);
+    const btnCfgOpenGuide = document.getElementById('btn-cfg-open-guide');
+    if (btnCfgOpenGuide) {
+      btnCfgOpenGuide.addEventListener('click', () => {
+        document.getElementById('modal-settings').classList.add('hidden');
+        openGuideModal();
+      });
+    }
+    const btnCloseGuide = document.getElementById('btn-close-guide');
+    if (btnCloseGuide) {
+      btnCloseGuide.addEventListener('click', () => {
+        document.getElementById('modal-guide').classList.add('hidden');
+      });
+    }
+    const btnGuideOpenChat = document.getElementById('btn-guide-open-chat');
+    if (btnGuideOpenChat) {
+      btnGuideOpenChat.addEventListener('click', () => {
+        document.getElementById('modal-guide').classList.add('hidden');
+        if (window.mpeApi.openMiniAssistant) window.mpeApi.openMiniAssistant({ openChat: true });
+      });
+    }
+    const btnGuideRepairShortcut = document.getElementById('btn-guide-repair-shortcut');
+    if (btnGuideRepairShortcut) {
+      btnGuideRepairShortcut.addEventListener('click', async () => {
+        if (window.mpeApi.ensureShortcuts) {
+          await window.mpeApi.ensureShortcuts();
+          showToast('Atalho do Windows atualizado! Fixe o M.P.E pela Barra de Tarefas ou Menu Iniciar.');
+        }
+      });
+    }
+    document.querySelectorAll('.boost-pill').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const mode = btn.dataset.boost || 'balanced';
+        if (!window.mpeApi.setBoostMode) return;
+        showToast(`Aplicando perfil ${mode}...`);
+        const prof = await window.mpeApi.setBoostMode(mode);
+        renderGuidePerf(prof);
+        showToast(`Perfil ${prof.boostLabel} ativo!`);
+      });
+    });
     document.getElementById('btn-dock-add-point').addEventListener('click', startAddPointFlow);
     const toggleMove = () => {
       if (currentMode === 'hud-only') {
@@ -2444,6 +2571,18 @@
       }
 
       document.getElementById('btn-side-chat-send').addEventListener('click', sendSideChatMessage);
+      document.querySelectorAll('.side-cmd-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const inp = document.getElementById('side-chat-input');
+          if (!inp) return;
+          inp.value = chip.dataset.cmd || '';
+          if (chip.dataset.send === '1') {
+            sendSideChatMessage();
+          } else {
+            inp.focus();
+          }
+        });
+      });
       document.getElementById('side-chat-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -2590,14 +2729,18 @@
         const miniOverlay = document.getElementById('mini-assistant-overlay');
         if (miniOverlay) miniOverlay.classList.remove('hidden');
         const miniDrawer = document.getElementById('side-chat-drawer');
-        if (miniDrawer) miniDrawer.classList.add('hidden');
+        if (miniDrawer) {
+          miniDrawer.classList.toggle('hidden', !(payload && payload.openChat));
+        }
         if (katarosMascot) {
           katarosMascot.setProcessing(false);
           katarosMascot.resume();
         }
         requestAnimationFrame(() => syncMiniWindowSize());
 
-        const txtArea = document.getElementById('mini-ai-textarea');
+        const txtArea = (payload && payload.openChat)
+          ? document.getElementById('side-chat-input')
+          : document.getElementById('mini-ai-textarea');
         if (txtArea) {
           txtArea.focus();
         }

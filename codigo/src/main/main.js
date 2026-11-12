@@ -97,6 +97,7 @@ function createWindow() {
   const iconPath = path.join(CODE_DIR, 'assets', 'icon.ico');
 
   mainWindow = new BrowserWindow({
+    title: 'M.P.E - Mouse Performatico Estrelado',
     width,
     height,
     x: 0,
@@ -119,6 +120,20 @@ function createWindow() {
       backgroundThrottling: false
     }
   });
+
+  if (process.platform === 'win32' && typeof mainWindow.setAppDetails === 'function') {
+    const launcherExe = path.join(ROOT_DIR, 'MPE.exe');
+    const relaunchCmd = fs.existsSync(launcherExe)
+      ? `"${launcherExe}" --launch-ui`
+      : `"${process.execPath}" "${CODE_DIR}" --launch-ui`;
+    mainWindow.setAppDetails({
+      appId: APP_USER_MODEL_ID,
+      appIconPath: fs.existsSync(iconPath) ? iconPath : launcherExe,
+      appIconIndex: 0,
+      relaunchCommand: relaunchCmd,
+      relaunchDisplayName: 'M.P.E - Mouse Performatico Estrelado'
+    });
+  }
 
   const indexHtmlPath = path.join(__dirname, '..', 'renderer', 'index.html');
   mainWindow.loadFile(indexHtmlPath);
@@ -308,6 +323,27 @@ function createWindow() {
         const imgOrg = await mainWindow.webContents.capturePage();
         fs.writeFileSync(path.join(outDir, 'verify_10_organizer.png'), imgOrg.toPNG());
 
+        // Teste 11: Guia Rapido, /boost & Kits Minimos
+        const guideRes = await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            const backBtn = document.getElementById('btn-org-back-astrolabe');
+            if (backBtn) backBtn.click();
+            await new Promise(r => setTimeout(r, 200));
+            const openGuide = document.getElementById('btn-open-guide');
+            if (openGuide) openGuide.click();
+            await new Promise(r => setTimeout(r, 350));
+            return {
+              guideOpen: !document.getElementById('modal-guide').classList.contains('hidden'),
+              kitsCount: document.querySelectorAll('#guide-kits-grid .kit-card').length,
+              perfTextLen: (document.getElementById('guide-perf-metrics').textContent || '').length
+            };
+          })()
+        `);
+        console.log('MPE_GUIDE_BOOST_TEST:', JSON.stringify(guideRes));
+        await new Promise((r) => setTimeout(r, 250));
+        const imgGuide = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_11_guide_boost.png'), imgGuide.toPNG());
+
         console.log('MPE_SELF_TEST_PASSED');
         isQuitting = true;
         hookBridge.stop();
@@ -420,7 +456,7 @@ function resizeMiniWindow({ width, height } = {}) {
   mainWindow.setBounds({ x, y, width: w, height: h });
 }
 
-async function summonMiniAssistant({ x, y, source = 'mouse-hook' } = {}) {
+async function summonMiniAssistant({ x, y, source = 'mouse-hook', openChat = false } = {}) {
   if (!mainWindow) return;
 
   if (source !== 'mouse-hook' && (!hookBridge.lastHwnd || hookBridge.lastHwnd === '0')) {
@@ -453,6 +489,7 @@ async function summonMiniAssistant({ x, y, source = 'mouse-hook' } = {}) {
     x: targetX - winX,
     y: targetY - winY,
     source,
+    openChat: Boolean(openChat),
     originSystem: hookBridge.getOriginSystemInfo(),
     config: configManager.get()
   });
@@ -476,6 +513,10 @@ function createSystemTray() {
     {
       label: 'Abrir Circulo 3D Rapido (Modo Atalho)',
       click: () => summonHud({ playIntro: false, mode: 'hud-only', source: 'tray-hud' })
+    },
+    {
+      label: 'Abrir AI Kataros (Mini Assistente)',
+      click: () => summonMiniAssistant({ source: 'tray-mini' })
     },
     {
       label: 'Reproduzir Inicializacao Cinematografica',
@@ -698,6 +739,27 @@ function setupIpcHandlers() {
     return await localAiService.getStatus();
   });
 
+  ipcMain.handle('mpe:get-perf-profile', async () => {
+    return localAiService.getPerformanceProfile();
+  });
+
+  ipcMain.handle('mpe:set-boost-mode', async (_event, mode) => {
+    const profile = await localAiService.setBoostMode(mode, { restartIfOnline: true });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mpe:config-updated', configManager.get());
+    }
+    return profile;
+  });
+
+  ipcMain.handle('mpe:open-mini-assistant', async (_event, payload = {}) => {
+    await summonMiniAssistant({ source: 'ui-button', openChat: Boolean(payload && payload.openChat) });
+    return { ok: true };
+  });
+
+  ipcMain.handle('mpe:ensure-shortcuts', async () => {
+    return await startupManager.createAppShortcuts();
+  });
+
   ipcMain.handle('mpe:open-path', async (_event, targetPath) => {
     const resolved = configManager.resolvePath(targetPath);
     await shell.openPath(resolved);
@@ -823,10 +885,11 @@ app.whenReady().then(async () => {
   logDebug(`[APP WHEN-READY] Initializing subsystems`);
   fileOrganizer.ensureScopeDir('arquivos');
   fileOrganizer.ensureScopeDir('prints');
-  startupManager.createAppShortcuts();
   const cfg = configManager.load();
   if (cfg.system && cfg.system.startWithWindows) {
     await startupManager.setStartup(true);
+  } else {
+    await startupManager.createAppShortcuts();
   }
 
   setupIpcHandlers();

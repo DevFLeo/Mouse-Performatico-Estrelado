@@ -7,13 +7,13 @@ Ambiente verificado: Windows 11 x64 (`DESKTOP-LTO8K3P`), Node.js v24.16.0, Elect
 
 | Suite | Modulo Testado | Comando / Executor | Total | Aprovados | Reprovados | Tempo Total |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: |
-| Suite A | Configuracoes, Migracoes e Estado Padrao | `npm test` (`codigo/scripts/run-tests.js`) | 3 | 3 | 0 | 12 ms |
-| Suite B | Motor de I.A Local (`llamafile` + `LocalAiService`) | `npm test` (`codigo/scripts/run-tests.js`) | 6 | 6 | 0 | 19.137 ms |
-| Suite C | Organizador de Arquivos e Undo (`FileOrganizer`) | `npm test` (`codigo/scripts/run-tests.js`) | 3 | 3 | 0 | 45 ms |
+| Suite A | Configuracoes, Migracoes e Estado Padrao | `npm test` (`codigo/scripts/run-tests.js`) | 3 | 3 | 0 | 24 ms |
+| Suite B | Motor de I.A Local (`llamafile` + `LocalAiService` + `/boost`) | `npm test` (`codigo/scripts/run-tests.js`) | 7 | 7 | 0 | ~209,6 s |
+| Suite C | Organizador de Arquivos e Undo (`FileOrganizer`) | `npm test` (`codigo/scripts/run-tests.js`) | 3 | 3 | 0 | 134 ms |
 | Suite D | Motor de Execucao e Rotinas (`ActionExecutor`) | `npm test` (`codigo/scripts/run-tests.js`) | 2 | 2 | 0 | 379 ms |
-| Suite E | Integridade Estatica, Binarios e Regras `AGENTS.md` | `npm test` (`codigo/scripts/run-tests.js`) | 4 | 4 | 0 | 1.622 ms |
-| Suite F | Fluxo E2E Electron, Interface HUD, Mini Assistente e Chat | `npx electron . --self-test --user-data-dir=...` | 10 | 10 | 0 | ~8.200 ms |
-| **TOTAL** | **Cobertura Completa do Sistema M.P.E** | **`npm test` + Electron `--self-test`** | **28** | **28** | **0** | **~29,4 s** |
+| Suite E | Integridade Estatica, Binarios, AUMID e Regras `AGENTS.md` | `npm test` (`codigo/scripts/run-tests.js`) | 4 | 4 | 0 | 2.751 ms |
+| Suite F | Fluxo E2E Electron, HUD, Guia `/boost`, Chat e Organizador | `npx electron . --self-test --user-data-dir=...` | 11 | 11 | 0 | ~9.100 ms |
+| **TOTAL** | **Cobertura Completa do Sistema M.P.E** | **`npm test` + Electron `--self-test`** | **30** | **30** | **0** | **~222 s** |
 
 ---
 
@@ -29,7 +29,8 @@ Ambiente verificado: Windows 11 x64 (`DESKTOP-LTO8K3P`), Node.js v24.16.0, Elect
 | `AI-03` | I.A Local (`llamafile`) | `findFreePort()` ignora porta ocupada e escolhe porta livre | Evitar porta bloqueada e retornar porta disponivel verificada | `Ocupada=52651 -> Livre escolhida=18080` | 5 ms | PASS |
 | `AI-04` | I.A Local (`llamafile`) | `cleanModelOutput()` remove blocos `<think>...</think>` | Remover blocos de raciocinio mantendo resposta limpa | `Output limpo: "Resposta final objetiva."` | 0 ms | PASS |
 | `AI-05` | I.A Local (`llamafile`) | Comandos slash (`/ajuda`, `/status`), revisao offline e Obsidian | `/ajuda` retorna comandos; revisao < 50ms; pasta Obsidian classificada | `Help OK, Revisao="Este e um texto de teste sem ponto.", ObsidianFolder=Reunioes` | 2 ms | PASS |
-| `AI-06` | I.A Local (`llamafile`) | Inferencia LLM real em `/v1/chat/completions` (`Qwen2.5-7B-Instruct`) | Subir `llamafile.exe`, responder `"do que a agua e feita?"` com `source=llm` | `source=llm, modelo=Qwen2.5-7B-Instruct-Q4_K_M.gguf, resposta="A agua e feita de oxigenio e hidrogenio."` | 19.105 ms | PASS |
+| `AI-06` | I.A Local (`llamafile`) | Inferencia LLM real em `/v1/chat/completions` (`Qwen2.5-7B-Instruct`) | Subir `llamafile.exe`, responder `"do que a agua e feita?"` com `source=llm` | `source=llm, modelo=Qwen2.5-7B-Instruct-Q4_K_M.gguf, resposta="A agua e feita de oxigenio e hidrogenio."` | ~20 s / 209 s frio | PASS |
+| `AI-07` | I.A Local (`llamafile`) | Calculo de memoria/velocidade, 4 kits minimos e comando `/boost` | Validar modos `eco`/`balanced`/`turbo`, `stopAsync()`, RAM sistema e `lastLoadMs === 0` sem carga | `eco(ctx=2048), turbo(threads=6/12), kits=4, RAM=15.63GB` | 34 ms | PASS |
 | `ORG-01` | Organizador de Arquivos | Organizacao por Tipo (Extensao) e renomeacao de duplicatas | Separar `.pdf`, `.png`, `.js` em categorias e renomear conflito | `3 categorias ok, conflito renomeado para contrato (2).pdf` | 16 ms | PASS |
 | `ORG-02` | Organizador de Arquivos | Criterios Data, Nome (A-Z), Tamanho e busca textual em conteudo | Categorias corretas e busca encontrando termo dentro de `.txt` | `Criterios Date/Name/Size ok, searchScope encontrou 1 arquivo (matchType=content)` | 15 ms | PASS |
 | `ORG-03` | Organizador de Arquivos | Mover arquivos, Desfazer (`revertLastBatch`), anti-auto-organizacao e traversal | Bloquear `codigo/` e `../`, mover e restaurar `nota.md` no Undo | `Protecao codigo/ e traversal ativos, move+undo restaurou nota.md corretamente` | 14 ms | PASS |
@@ -37,8 +38,8 @@ Ambiente verificado: Windows 11 x64 (`DESKTOP-LTO8K3P`), Node.js v24.16.0, Elect
 | `EXE-02` | Motor de Acoes | Rotina sequencial `macro_sequence` e aliases amigaveis de `open_path` | Resolver alias `downloads`, ignorar recursao de macro e rodar etapas | `Alias downloads -> "C:\Users\ASUS\Downloads", macro executou 2 etapas validas sem loop` | 378 ms | PASS |
 | `SYS-01` | Integridade & `AGENTS.md` | Verificacao de sintaxe Node (`node -c`) em todos os JS | Zero erros de sintaxe em `codigo/src/**` | `18 arquivos JS validados com node -c` | 1.610 ms | PASS |
 | `SYS-02` | Integridade & `AGENTS.md` | Auditoria estrita de zero emojis no codigo e config | Zero caracteres `Extended_Pictographic` em 22 arquivos | `22 arquivos auditados com 0 emojis` | 10 ms | PASS |
-| `SYS-03` | Integridade & `AGENTS.md` | `AppUserModelId` sincrono no topo do `main.js` e binarios Win32 | `DevFLeo.MousePerformaticoEstrelado` antes de `BrowserWindow` + `.exe`/`.ico` | `AUMID sincrono antes de BrowserWindow; MPE.exe, MpeHook.exe e icon.ico presentes` | 1 ms | PASS |
-| `SYS-04` | Integridade & `AGENTS.md` | Integridade do DOM do assistente interativo, topbar e dock | Presenca de todos os 17 IDs obrigatorios em `index.html` | `Todos os 17 IDs estruturais e do assistente guiado presentes` | 1 ms | PASS |
+| `SYS-03` | Integridade & `AGENTS.md` | `AppUserModelId`, `setAppDetails`, `IPropertyStore` e binarios Win32 | `DevFLeo.MousePerformaticoEstrelado`, `RelaunchCommand`, `.lnk` com AUMID + `.exe`/`.ico` | `AUMID + setAppDetails + IPropertyStore .lnk configurados; MPE.exe, MpeHook.exe e icon.ico presentes` | 3 ms | PASS |
+| `SYS-04` | Integridade & `AGENTS.md` | Integridade do DOM do assistente interativo, topbar, guia `/boost` e dock | Presenca de todos os 23 IDs obrigatorios em `index.html` | `Todos os 23 IDs estruturais, guia /boost e assistente presentes` | 2 ms | PASS |
 
 ---
 
@@ -56,6 +57,19 @@ Ambiente verificado: Windows 11 x64 (`DESKTOP-LTO8K3P`), Node.js v24.16.0, Elect
 | `E2E-08` | Mini Assistente AI Kataros | Revisao local offline e envio de nota para o Obsidian com mascot 3D | `{"previewOpen":true,"reviewText":"Este e um texto de teste...","statusAfter":"AI KATAROS"}` | PASS |
 | `E2E-09` | Chat Lateral AI Kataros | Abertura do drawer e disparo de mensagem no chat | `statusDuring="PROCESSANDO"`, streaming iniciado (`verify_9_side_chat.png`) | PASS |
 | `E2E-10` | Painel Organizador & Retorno | Troca de aba para Organizador, troca de escopo `prints` e listagem | `{"workspaceVisible":true,"treeCount":7}` com botao `Voltar ao Astrolabio` (`verify_10_organizer.png`) | PASS |
+| `E2E-11` | Guia Rapido, `/boost` & Kits | Abertura de `#modal-guide`, medicao RAM `app.getAppMetrics()`, 4 kits e botoes UX | `{"guideOpen":true,"kitsCount":4,"perfTextLen":335}` (`verify_11_guide_boost.png`) | PASS |
+
+---
+
+## 4. Benchmark Real de Memoria & Velocidade (`/boost` ao Vivo)
+
+Medido em runtime com `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (4,36 GiB) + `llamafile.exe` (351 MB, porta `18080`, `i7-13620H`):
+
+| Perfil `/boost` | Threads / Batch | Contexto / KV | Carga Modelo | RAM `llamafile` (WS / Privado) | Velocidade Prompt | Velocidade Geracao |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: |
+| `eco` (Economia) | `4 / 6` | `2048` (`q8_0`) | 4.938 ms | 4.486 MB WS / 365 MB priv. | 23,99 tok/s | 3,93 tok/s |
+| `balanced` (Padrao) | `6 / 10` | `4096` (`q8_0`) | 4.239 ms | 4.555 MB WS / 463 MB priv. | 27,19 tok/s | 4,81 tok/s |
+| `turbo` (`/boost`) | `6 / 12` (acima do normal) | `4096` (`q8_0`) | 4.243 ms | 4.562 MB WS / 477 MB priv. | 25,91 tok/s | 4,60 tok/s |
 
 ---
 

@@ -57,6 +57,10 @@
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       <span>Organizar</span>
     </button>
+    <button id="btn-dock-kataros" class="dim-pill" title="Abrir Mini Assistente AI Kataros (Shift+Ctrl+Botao Direito)">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>AI Kataros</span>
+    </button>
     <button id="btn-toggle-move-points" class="dim-pill move-pts-btn" title="Arrastar botoes para mudar de lugar">
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
       <span>Mover Pontos</span>
@@ -146,6 +150,7 @@
       </div>
       <span class="topbar-divider" aria-hidden="true"></span>
       <div class="hud-btn-group compact">
+        <button id="btn-open-guide" class="hud-btn ghost" title="Atalhos, /boost e Kits Minimos">Guia &amp; /boost</button>
         <button id="btn-open-register" class="hud-btn ghost" title="Perfil e linguagem">Perfil</button>
         <button id="btn-settings" class="hud-btn ghost" title="Configuracoes gerais">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -163,7 +168,7 @@
     <div id="point-inspector" class="point-inspector">
       <div class="inspector-default" id="inspector-default">
         <span class="gold-dot"></span>
-        <span>Clique no ponto para executar • <kbd>ESC</kbd> Minimizar</span>
+        <span>Clique na estrela ou teclas <kbd>1-9</kbd> • <kbd>Tab</kbd> 2D/3D • <kbd>Shift+Ctrl+Botão Dir.</kbd> AI Kataros • <kbd>ESC</kbd> Minimizar</span>
       </div>
       <div class="inspector-detail hidden" id="inspector-detail">
         <div class="inspector-code" id="insp-code">08 7</div>
@@ -647,6 +652,13 @@
             <option value="ollama">Ollama Local (127.0.0.1:11434)</option>
             <option value="lmstudio">LM Studio Local (127.0.0.1:1234)</option>
           </select>
+
+          <label class="field-label">Perfil de Desempenho (/boost)</label>
+          <select id="cfg-ai-boost" class="field-input">
+            <option value="balanced">Balanceado (4096 ctx, KV Q8_0)</option>
+            <option value="turbo">Turbo /boost (Prioridade Alta + Max Threads)</option>
+            <option value="eco">Eco (2048 ctx, Menor Uso de RAM)</option>
+          </select>
         </div>
 
         <div>
@@ -734,6 +746,8 @@
           <div class="machine-info-box">
             <div><strong>Máquina:</strong> <span id="info-machine-name">-</span></div>
             <div><strong>Config:</strong> <code>./codigo/mpe.config.json</code></div>
+            <div id="info-perf-summary" style="margin-top:6px; color: var(--gold-secondary);">Calculando memória e velocidade...</div>
+            <button type="button" id="btn-cfg-open-guide" class="hud-btn small" style="margin-top:8px;">Ver Memória, Velocidade e Kits (/boost)</button>
           </div>
         </div>
       </div>
@@ -910,6 +924,14 @@
 
     <!-- Input e Acoes -->
     <div class="side-chat-input-bar">
+      <div class="side-quick-cmds">
+        <button type="button" class="side-cmd-chip" data-cmd="/boost" data-send="1">/boost</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/kits" data-send="1">/kits</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/status" data-send="1">/status</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/extrato " data-send="0">/extrato</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/saldo " data-send="0">/saldo</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/ajuda" data-send="1">/ajuda</button>
+      </div>
       <textarea id="side-chat-input" class="side-chat-textarea" rows="2" placeholder="Mensagem ou /ajuda (Enter envia, Shift+Enter quebra linha)"></textarea>
       <div class="side-chat-footer-actions">
         <button id="btn-side-chat-clear" class="side-action-btn subtle">Limpar</button>
@@ -1114,6 +1136,54 @@
       <div class="modal-footer between">
         <button type="button" id="btn-org-confirm-cancel" class="hud-btn subtle">Cancelar</button>
         <button type="button" id="btn-org-confirm-ok" class="hud-btn danger">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 16. MODAL GUIA RAPIDO, /BOOST E KITS MINIMOS -->
+  <div id="modal-guide" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2>Atalhos Rápidos, /boost &amp; Kits Mínimos</h2>
+        <p>Referência direta de uso, cálculo de memória RAM, velocidade e hardware recomendado.</p>
+      </div>
+      <div class="modal-body">
+        <div class="guide-grid">
+          <div class="guide-box">
+            <h3>Atalhos Globais (Qualquer Tela)</h3>
+            <ul class="guide-list">
+              <li><kbd>Shift + Ctrl + Alt + Botão Dir.</kbd> <span>Abre o Astrolábio 2D/3D</span></li>
+              <li><kbd>Shift + Ctrl + Botão Dir.</kbd> <span>Abre AI Kataros (Revisar / Chat / Obsidian)</span></li>
+              <li><span><kbd>1</kbd> a <kbd>9</kbd></span> <span>Executa direto a estrela correspondente</span></li>
+              <li><span><kbd>Tab</kbd> / <kbd>ESC</kbd></span> <span>Alterna 2D/3D ou minimiza p/ bandeja</span></li>
+            </ul>
+            <p class="machine-hint" style="margin-top:8px;">
+              Barra de Tarefas: fixe pelo atalho <strong>M.P.E - Mouse Performatico Estrelado</strong> ou diretamente pela janela aberta pelo <code>MPE.exe</code>.
+            </p>
+          </div>
+
+          <div class="guide-box">
+            <div class="guide-boost-head">
+              <h3>Desempenho &amp; Memória (/boost)</h3>
+              <div class="boost-pills">
+                <button type="button" class="boost-pill" data-boost="eco">Eco</button>
+                <button type="button" class="boost-pill" data-boost="balanced">Balanceado</button>
+                <button type="button" class="boost-pill" data-boost="turbo">Turbo /boost</button>
+              </div>
+            </div>
+            <div id="guide-perf-metrics" class="guide-perf-metrics">Carregando cálculo de hardware...</div>
+          </div>
+        </div>
+
+        <h3 class="section-subtitle" style="margin-top:16px;">Kits Mínimos e Estimativa de Velocidade</h3>
+        <div id="guide-kits-grid" class="guide-kits-grid"></div>
+      </div>
+      <div class="modal-footer between">
+        <div class="footer-right">
+          <button type="button" id="btn-guide-repair-shortcut" class="hud-btn small">Atualizar Atalho Windows</button>
+          <button type="button" id="btn-guide-open-chat" class="hud-btn small">Abrir Chat AI Kataros</button>
+        </div>
+        <button type="button" id="btn-close-guide" class="hud-btn primary">Entendi</button>
       </div>
     </div>
   </div>
