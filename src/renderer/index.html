@@ -21,8 +21,15 @@
       <div class="splash-tag">INTEGRACAO NATIVA WINDOWS • SISTEMA ORBITAL 3D</div>
       <h1 id="splash-init-title" class="splash-title">M . P . E &nbsp; Inicializando</h1>
       <p id="splash-init-sub" class="splash-subtitle">Alinhando suas estrelas e preparando a integracao com os seus sistemas...</p>
-      <div class="splash-progress-track">
-        <div id="splash-progress-bar" class="splash-progress-bar"></div>
+
+      <div class="splash-telemetry-box">
+        <div class="splash-percent-row">
+          <span id="splash-percent-value" class="splash-percent-value">0%</span>
+          <span id="splash-percent-remaining" class="splash-percent-remaining">Faltam 100% para ativar o M.P.E</span>
+        </div>
+        <div class="splash-progress-track">
+          <div id="splash-progress-bar" class="splash-progress-bar"></div>
+        </div>
       </div>
     </div>
 
@@ -55,6 +62,7 @@
 
     <div class="hud-actions">
       <button id="btn-add-star" class="hud-btn primary">+ Salvar Novo Ponto</button>
+      <button id="btn-open-register" class="hud-btn">Cadastro / Nome</button>
       <button id="btn-settings" class="hud-btn">Configurar Cores e Sistema</button>
       <button id="btn-recenter" class="hud-btn" title="Centralizar Eixo 3D">Centralizar 3D</button>
       <button id="btn-replay-intro" class="hud-btn" title="Ver Animacao de Boas-Vindas">Intro</button>

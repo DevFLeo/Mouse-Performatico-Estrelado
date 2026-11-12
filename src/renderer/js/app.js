@@ -173,8 +173,15 @@
   let initInterval = null;
   let welcomeTimeout = null;
   let welcomeHideTimeout = null;
+  let lastIntroStartTs = 0;
 
-  function runInitializationSequence() {
+  function runInitializationSequence(force = false) {
+    const now = Date.now();
+    if (!force && initInterval && now - lastIntroStartTs < 1500) {
+      return;
+    }
+    lastIntroStartTs = now;
+
     if (initInterval) clearInterval(initInterval);
     if (welcomeTimeout) clearTimeout(welcomeTimeout);
     if (welcomeHideTimeout) clearTimeout(welcomeHideTimeout);
@@ -183,6 +190,8 @@
     const phaseInit = document.getElementById('splash-phase-init');
     const phaseWelcome = document.getElementById('splash-phase-welcome');
     const progressBar = document.getElementById('splash-progress-bar');
+    const percentValEl = document.getElementById('splash-percent-value');
+    const percentRemEl = document.getElementById('splash-percent-remaining');
     const dict = getToneDict();
 
     splash.classList.remove('hidden', 'fade-out');
@@ -192,17 +201,31 @@
     document.getElementById('splash-init-title').textContent = dict.splashInit;
     document.getElementById('splash-init-sub').textContent = dict.splashSubInit;
     progressBar.style.width = '0%';
+    if (percentValEl) percentValEl.textContent = '0%';
+    if (percentRemEl) percentRemEl.textContent = 'Faltam 100% para ativar o M.P.E';
 
     let progress = 0;
     initInterval = setInterval(() => {
-      progress += 14;
-      progressBar.style.width = `${Math.min(100, progress)}%`;
+      progress = Math.min(100, progress + 5);
+      const remaining = Math.max(0, 100 - progress);
+
+      progressBar.style.width = `${progress}%`;
+      if (percentValEl) percentValEl.textContent = `${progress}%`;
+      if (percentRemEl) {
+        percentRemEl.textContent =
+          remaining > 0
+            ? `Faltam ${remaining}% para ativar o M.P.E`
+            : '100% Concluido • Ativando Sistema!';
+      }
+
       if (progress >= 100) {
         clearInterval(initInterval);
         initInterval = null;
-        onInitBarCompleted();
+        setTimeout(() => {
+          onInitBarCompleted();
+        }, 180);
       }
-    }, 95);
+    }, 55);
   }
 
   function onInitBarCompleted() {
@@ -602,9 +625,16 @@
     );
 
     document.getElementById('btn-add-star').addEventListener('click', () => openPointModal(null));
+    document.getElementById('btn-open-register').addEventListener('click', () => {
+      const regInput = document.getElementById('reg-user-name');
+      regInput.value =
+        (currentConfig && currentConfig.profile && currentConfig.profile.userName) || '';
+      document.getElementById('modal-register').classList.remove('hidden');
+      regInput.focus();
+    });
     document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
     document.getElementById('btn-recenter').addEventListener('click', () => astrolabe.resetView());
-    document.getElementById('btn-replay-intro').addEventListener('click', runInitializationSequence);
+    document.getElementById('btn-replay-intro').addEventListener('click', () => runInitializationSequence(true));
     document.getElementById('btn-hide-hud').addEventListener('click', () => window.mpeApi.hideHud());
 
     document.querySelectorAll('.tone-pill').forEach((btn) => {
