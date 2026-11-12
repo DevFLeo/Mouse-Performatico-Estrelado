@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "1.0.0",
+  "appName": "M.P.E - Mouse Performático Estrelado",
+  "repository": "https://github.com/DevFLeo/Mouse-Performatico-Estrelado",
+  "profile": {
+    "userName": "",
+    "isRegistered": false,
+    "languageTone": "amigavel",
+    "lastUpdated": "2026-11-12T00:39:52.704Z"
+  },
+  "theme": {
+    "preset": "gold-obsidian",
+    "bgPrimary": "#040406",
+    "bgSecondary": "#171206",
+    "goldPrimary": "#E5B84B",
+    "goldSecondary": "#FFE08A",
+    "goldDim": "#7A5B18",
+    "vectorAccent": "#5C73B8",
+    "nexusRed": "#9E2A2B",
+    "glowIntensity": 0.85
+  },
+  "system": {
+    "startWithWindows": false,
+    "triggerShortcut": "Shift + Ctrl + Alt + Botão Direito",
+    "fallbackKeyboardShortcut": "CommandOrControl+Shift+Alt+M",
+    " sensitivity3D": 1,
+    "autoOrbit": true,
+    "closeOnExecute": true,
+    "soundEffects": true
+  },
+  "telegram": {
+    "deliveryMode": "desktop_and_bot",
+    "savedChatPath": "tg://resolve?domain=me",
+    "savedScreenshotsFolder": "./Capturas_MPE",
+    "botToken": "",
+    "chatId": "",
+    "captionTemplate": "✨ [M.P.E] Captura enviada por {user} em {date}"
+  },
+  "points": [
+    {
+      "id": "star-08-7",
+      "code": "08 7",
+      "title": "Print + Telegram",
+      "description": "Captura a tela, salva na pasta configurada e envia direto para a conversa salva no Telegram.",
+      "actionType": "print_telegram",
+      "orbit": 3,
+      "angle": 324,
+      "elevation": 18,
+      "vectorStyle": "gold",
+      "glyph": "Π",
+      "hasArrow": false,
+      "params": {
+        "captureMode": "fullscreen",
+        "saveDir": "./Capturas_MPE",
+        "telegramTarget": "tg://resolve?domain=me",
+        "copyToClipboard": true
+      }
+    },
+    {
+      "id": "star-04-7",
+      "code": "04 7",
+      "title": "Print Instantâneo",
+      "description": "Captura a tela inteira em alta definição, copia para a área de transferência e salva em disco.",
+      "actionType": "print",
+      "orbit": 2,
+      "angle": 358,
+      "elevation": -14,
+      "vectorStyle": "blue",
+      "glyph": "",
+      "hasArrow": true,
+      "params": {
+        "captureMode": "fullscreen",
+        "saveDir": "./Capturas_MPE",
+        "copyToClipboard": true
+      }
+    },
+    {
+      "id": "star-08-1",
+      "code": "08 1",
+      "title": "Seleção de Texto",
+      "description": "Captura automaticamente o texto selecionado na janela ativa anterior e abre ações rápidas.",
+      "actionType": "text_selection",
+      "orbit": 2,
+      "angle": 24,
+      "elevation": 22,
+      "vectorStyle": "blue",
+      "glyph": "Δ",
+      "hasArrow": true,
+      "params": {
+        "autoCopy": true,
+        "saveHistory": true
+      }
+    },
+    {
+      "id": "star-09-7",
+      "code": "09 7",
+      "title": "Recorte + Telegram",
+      "description": "Permite selecionar uma área específica da tela, salva o recorte e envia para o Telegram.",
+      "actionType": "area_print_telegram",
+      "orbit": 2,
+      "angle": 42,
+      "elevation": -10,
+      "vectorStyle": "blue",
+      "glyph": "",
+      "hasArrow": true,
+      "params": {
+        "captureMode": "area",
+        "saveDir": "./Capturas_MPE",
+        "telegramTarget": "tg://resolve?domain=me"
+      }
+    },
+    {
+      "id": "star-07-7",
+      "code": "07 7",
+      "title": "Texto → Telegram",
+      "description": "Captura o texto selecionado na janela atual e envia instantaneamente para o chat salvo do Telegram.",
+      "actionType": "text_telegram",
+      "orbit": 2,
+      "angle": 103,
+      "elevation": 16,
+      "vectorStyle": "blue",
+      "glyph": "",
+      "hasArrow": false,
+      "params": {
+        "telegramTarget": "tg://resolve?domain=me"
+      }
+    },
+    {
+      "id": "star-06-7",
+      "code": "06 7",
+      "title": "Pasta de Capturas",
+      "description": "Abre imediatamente o diretório onde os seus Prints e arquivos do M.P.E estão salvos.",
+      "actionType": "open_path",
+      "orbit": 3,
+      "angle": 173,
+      "elevation": -20,
+      "vectorStyle": "blue",
+      "glyph": "C",
+      "hasArrow": true,
+      "params": {
+        "targetPath": "./Capturas_MPE"
+      }
+    },
+    {
+      "id": "star-05-7",
+      "code": "05 7",
+      "title": "Repositório GitHub",
+      "description": "Abre o repositório oficial do Mouse Performático Estrelado no navegador padrão.",
+      "actionType": "open_url",
+      "orbit": 3,
+      "angle": 232,
+      "elevation": 12,
+      "vectorStyle": "blue",
+      "glyph": "",
+      "hasArrow": false,
+      "params": {
+        "url": "https://github.com/DevFLeo/Mouse-Performatico-Estrelado"
+      }
+    },
+    {
+      "id": "star-09-4",
+      "code": "09 4",
+      "title": "Recorte de Tela",
+      "description": "Seleciona uma região retangular interativa da tela e salva na área de transferência e pasta.",
+      "actionType": "area_print",
+      "orbit": 3,
+      "angle": 274,
+      "elevation": -18,
+      "vectorStyle": "gold",
+      "glyph": "h",
+      "hasArrow": false,
+      "params": {
+        "captureMode": "area",
+        "saveDir": "./Capturas_MPE"
+      }
+    },
+    {
+      "id": "star-01-7",
+      "code": "01 7",
+      "title": "Novo Ponto / Config",
+      "description": "Abre o Forjador de Estrelas para cadastrar um novo ponto orbital ou customizar cores e ações.",
+      "actionType": "open_settings",
+      "orbit": 1,
+      "angle": 292,
+      "elevation": 26,
+      "vectorStyle": "gold",
+      "glyph": "Π",
+      "hasArrow": false,
+      "params": {}
+    }
+  ],
+  "machines": {
+    "DESKTOP-LTO8K3P": {
+      "hostname": "DESKTOP-LTO8K3P",
+      "platform": "win32",
+      "arch": "x64",
+      "startWithWindows": false,
+      "savedScreenshotsFolder": "./Capturas_MPE",
+      "themePreset": "gold-obsidian",
+      "lastActive": "2026-11-12T00:39:52.704Z"
+    }
+  }
+}
