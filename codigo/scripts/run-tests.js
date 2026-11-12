@@ -232,6 +232,138 @@ async function main() {
     }
   });
 
+  await runCase('I.A Local (llamafile)', 'AI-08', 'Roteador de comandos / (aliases, fuzzy, /status termo, /revise referencia doc e /organizar)', async () => {
+    const tmpRoot = makeTempDir('mpe-slash-');
+    const tmpCode = path.join(tmpRoot, 'codigo');
+    fs.mkdirSync(tmpCode, { recursive: true });
+    const cm = new ConfigManager(tmpRoot, tmpCode);
+    const cfg = cm.load();
+    cfg.ai.provider = 'offline';
+    cm.save(cfg);
+
+    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
+    try {
+      // Salva documento "bolo do jorge" simulando o cenario real
+      svc.saveDocumentFile({ title: 'bolo do jorge', category: 'Geral', text: 'quero uma ravisão de bolo' });
+
+      // 1. Fuzzy & prefixo
+      const rAjud = LocalAiService.resolveSlashCommand('ajud');
+      assert.strictEqual(rAjud.matched, 'ajuda');
+      assert.strictEqual(rAjud.autoCorrected, true);
+
+      const rTypo = LocalAiService.resolveSlashCommand('stauts');
+      assert.strictEqual(rTypo.matched, 'status');
+      assert.strictEqual(rTypo.autoCorrected, true);
+
+      // Comandos destrutivos nao devem rodar por fuzzy automatico
+      const rDest = LocalAiService.resolveSlashCommand('par');
+      assert.strictEqual(rDest.matched, null);
+
+      // 2. /status do bolo inclui busca rapida pelo termo
+      const stBolo = await svc.chat({ message: '/status do bolo' });
+      assert.ok(stBolo.ok && stBolo.text.includes('BUSCA RAPIDA PARA "do bolo"') && stBolo.text.includes('bolo do jorge'));
+
+      // 3. /revise o que foi enviado para o jorge encontra o documento e revisa o conteudo dele
+      const revJorge = await svc.chat({ message: '/revise o que foi enviado para o jorge' });
+      assert.ok(revJorge.ok, 'Falha em /revise referencial');
+      assert.ok(revJorge.text.includes('bolo do jorge'), 'Deveria informar origem do documento');
+      assert.ok(revJorge.text.includes('ravisão') || revJorge.text.includes('Quero uma'), 'Deveria revisar o texto do documento');
+
+      // 4. /buscar unificado e /organizar arquivos com acao
+      const buscar = await svc.chat({ message: '/buscar bolo' });
+      assert.ok(buscar.ok && buscar.text.includes('DOCUMENTOS') && buscar.text.includes('bolo do jorge'));
+
+      const orgCmd = await svc.chat({ message: '/organizar arquivos' });
+      assert.ok(orgCmd.ok && orgCmd.action && orgCmd.action.type === 'open-organizer');
+
+      // 5. /tom e /perfil
+      const tomRes = await svc.chat({ message: '/tom neutra' });
+      assert.ok(tomRes.ok && tomRes.action && tomRes.action.type === 'set-tone' && tomRes.action.tone === 'neutra');
+
+      const unkRes = await svc.chat({ message: '/revissarx algo' });
+      assert.ok(unkRes.ok && unkRes.text.includes('Voce quis dizer:'));
+
+      return 'Aliases, fuzzy (/ajud, /stauts), /status termo, /revise referencia doc, /buscar, /organizar e /tom validados';
+    } finally {
+      rmSafe(tmpRoot);
+    }
+  });
+
+  await runCase('I.A Local (llamafile)', 'AI-09', 'Parametros de resposta (top_p, repeat_penalty, /perfil) + retry HTTP 503 sem fallback indevido', async () => {
+    const tmpRoot = makeTempDir('mpe-params-');
+    const tmpCode = path.join(tmpRoot, 'codigo');
+    fs.mkdirSync(tmpCode, { recursive: true });
+    let hits = 0;
+    let lastPayload = null;
+
+    const srv = http.createServer((req, res) => {
+      if (req.url === '/v1/models') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ object: 'list', data: [{ id: 'mock-qwen' }] }));
+        return;
+      }
+      if (req.url === '/v1/chat/completions') {
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', () => {
+          hits++;
+          lastPayload = JSON.parse(body);
+          if (hits === 1) {
+            // Simula 503 transitorio (ex: slot ocupado apos /boost) na 1a tentativa
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: { message: 'Loading model' } }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              choices: [{ message: { content: 'Receita de bolo pronta para o Jorge com cobertura de chocolate.' } }]
+            })
+          );
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const port = srv.address().port;
+
+    const cm = new ConfigManager(tmpRoot, tmpCode);
+    const cfg = cm.load();
+    cfg.ai.provider = 'lmstudio';
+    cfg.ai.endpoint = `http://127.0.0.1:${port}/v1/chat/completions`;
+    cm.save(cfg);
+
+    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
+    try {
+      const pRes = await svc.chat({ message: '/param perfil criativo' });
+      assert.ok(pRes.ok && pRes.text.includes('Criativo'), 'Perfil criativo falhou');
+
+      const aliasRes = await svc.chat({ message: '/param repeticao 1.18' });
+      assert.ok(aliasRes.ok && aliasRes.text.includes('repeat_penalty = 1.18'), 'Alias repeticao falhou');
+
+      // Simula provider auto com retry transitorio mudando temporariamente para mock em porta local
+      svc.engine.ping = async () => 'ok';
+      cfg.ai.provider = 'auto';
+      cfg.ai.port = port;
+      cm.save(cfg);
+
+      const reply = await svc.chat({ message: 'pode adaptar', tone: 'neutra', mode: 'free' });
+      assert.strictEqual(reply.source, 'llm', `Esperado source=llm apos retry, obtido ${reply.source}`);
+      assert.strictEqual(hits, 2, `Esperado 2 tentativas (503 -> 200), obteve ${hits}`);
+      assert.strictEqual(lastPayload.repeat_penalty, 1.18);
+      assert.strictEqual(lastPayload.top_p, 0.95);
+      assert.strictEqual(lastPayload.max_tokens, 1400);
+      assert.ok(lastPayload.messages[0].content.includes('neutro, equilibrado'), 'Tone neutra ausente no system prompt');
+      return `Retry 503->200 OK, payload top_p=${lastPayload.top_p}, repeat_penalty=${lastPayload.repeat_penalty}, max_tokens=${lastPayload.max_tokens}`;
+    } finally {
+      srv.close();
+      rmSafe(tmpRoot);
+    }
+  });
+
   // =========================================================================
   // SUITE C: Organizador de Arquivos (FileOrganizer)
   // =========================================================================
@@ -434,6 +566,7 @@ async function main() {
       'pt-orbit',
       'pt-action-type',
       'side-chat-drawer',
+      'side-ai-preset',
       'mini-assistant-overlay'
     ];
     for (const id of requiredIds) {

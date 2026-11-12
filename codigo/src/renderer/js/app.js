@@ -2558,6 +2558,23 @@
               ? 'Comando'
               : 'AI Kataros';
           if (!res || !res.ok) astDiv.classList.add('error');
+
+          if (res && res.action) {
+            if (res.action.type === 'set-tone' && res.action.tone) {
+              const toneSel = document.getElementById('side-ai-tone');
+              if (toneSel) toneSel.value = res.action.tone;
+            } else if (res.action.type === 'set-preset' && res.action.preset) {
+              const presetSel = document.getElementById('side-ai-preset');
+              if (presetSel) presetSel.value = res.action.preset;
+            } else if (res.action.type === 'open-organizer' && organizerUI) {
+              const miniOverlay = document.getElementById('mini-assistant-overlay');
+              if (miniOverlay) miniOverlay.classList.add('hidden');
+              if (sideDrawer) sideDrawer.classList.add('hidden');
+              document.body.classList.remove('mode-mini-assistant');
+              setInterfaceMode('executable-editor');
+              organizerUI.setWorkspaceTab('organizer', true, res.action.scope || 'arquivos');
+            }
+          }
         } catch (err) {
           contentEl.textContent = 'Erro de conexao com o motor de I.A local.';
           astDiv.classList.add('error');
@@ -2568,6 +2585,17 @@
         msgs.scrollTop = msgs.scrollHeight;
         refreshAiStatus(false);
         input.focus();
+      }
+
+      const sidePresetSelect = document.getElementById('side-ai-preset');
+      if (sidePresetSelect) {
+        sidePresetSelect.addEventListener('change', async () => {
+          const val = sidePresetSelect.value;
+          try {
+            const res = await window.mpeApi.aiChat({ message: `/param perfil ${val}` });
+            if (res && res.text) showToast(res.text.split('\n')[0]);
+          } catch (_) {}
+        });
       }
 
       document.getElementById('btn-side-chat-send').addEventListener('click', sendSideChatMessage);
@@ -2749,6 +2777,11 @@
           currentConfig = payload.config;
           if (currentConfig.obsidian && currentConfig.obsidian.defaultFolder) {
             document.getElementById('mini-note-folder').value = currentConfig.obsidian.defaultFolder;
+          }
+          const sideToneEl = document.getElementById('side-ai-tone');
+          const cfgTone = currentConfig.profile && currentConfig.profile.languageTone;
+          if (sideToneEl && cfgTone && Array.from(sideToneEl.options).some((o) => o.value === cfgTone)) {
+            sideToneEl.value = cfgTone;
           }
         }
       });

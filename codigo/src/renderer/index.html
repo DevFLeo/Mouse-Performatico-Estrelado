@@ -895,7 +895,7 @@
     <!-- Parametros da IA -->
     <div class="side-chat-params">
       <div class="side-param-item">
-        <label>Modo</label>
+        <label for="side-ai-mode">Modo</label>
         <select id="side-ai-mode" class="side-select">
           <option value="free">Conversa</option>
           <option value="review">Revisar Texto</option>
@@ -905,11 +905,23 @@
         </select>
       </div>
       <div class="side-param-item">
-        <label>Tom</label>
+        <label for="side-ai-tone">Tom</label>
         <select id="side-ai-tone" class="side-select">
           <option value="amigavel">Amigavel</option>
+          <option value="neutra">Neutra</option>
           <option value="profissional">Profissional</option>
-          <option value="conciso">Conciso / Tecnico</option>
+          <option value="conciso">Conciso</option>
+          <option value="didatico">Didatico</option>
+        </select>
+      </div>
+      <div class="side-param-item">
+        <label for="side-ai-preset">Perfil</label>
+        <select id="side-ai-preset" class="side-select" title="Parametros de geracao (temperatura, top_p, tokens, detalhe)">
+          <option value="equilibrado">Equilibrado</option>
+          <option value="preciso">Preciso</option>
+          <option value="direto">Direto</option>
+          <option value="criativo">Criativo</option>
+          <option value="detalhado">Detalhado</option>
         </select>
       </div>
     </div>
@@ -918,18 +930,21 @@
     <div id="side-chat-messages" class="side-chat-messages">
       <div class="side-msg assistant">
         <div class="side-msg-header">AI KATAROS <span class="side-msg-time">Agora</span></div>
-        <div class="side-msg-content">AI Kataros pronta para conversar, revisar textos e redigir codigo com base na memoria e no Obsidian. Envie /ajuda para ver os comandos.</div>
+        <div class="side-msg-content">AI Kataros pronta para conversar, revisar textos, resumir documentos e redigir codigo com base na memoria e no Obsidian. Envie /ajuda para ver os comandos.</div>
       </div>
     </div>
 
     <!-- Input e Acoes -->
     <div class="side-chat-input-bar">
       <div class="side-quick-cmds">
+        <button type="button" class="side-cmd-chip" data-cmd="/revisar " data-send="0">/revisar</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/resumir " data-send="0">/resumir</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/buscar " data-send="0">/buscar</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/extrato " data-send="0">/extrato</button>
+        <button type="button" class="side-cmd-chip" data-cmd="/param" data-send="1">/param</button>
         <button type="button" class="side-cmd-chip" data-cmd="/boost" data-send="1">/boost</button>
         <button type="button" class="side-cmd-chip" data-cmd="/kits" data-send="1">/kits</button>
         <button type="button" class="side-cmd-chip" data-cmd="/status" data-send="1">/status</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/extrato " data-send="0">/extrato</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/saldo " data-send="0">/saldo</button>
         <button type="button" class="side-cmd-chip" data-cmd="/ajuda" data-send="1">/ajuda</button>
       </div>
       <textarea id="side-chat-input" class="side-chat-textarea" rows="2" placeholder="Mensagem ou /ajuda (Enter envia, Shift+Enter quebra linha)"></textarea>

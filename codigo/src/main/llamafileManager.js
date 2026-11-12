@@ -379,7 +379,7 @@ class LlamafileManager {
    * Verifica se ha um servidor llamafile/llama.cpp REAL respondendo na porta.
    * Nunca aceita 404 ou paginas HTML (como Apache/IIS) como servidor conectado.
    */
-  async ping(port, timeoutMs = 1500) {
+  async ping(port, timeoutMs = 2500) {
     const h = await this.httpGet(port, '/health', timeoutMs);
     if (!h) return 'fail';
 
@@ -478,13 +478,28 @@ class LlamafileManager {
     let targetPort = this.getPreferredPort(aiCfg);
     this.lastError = '';
 
-    // Se ja houver um servidor LLM valido rodando nessa porta, reutiliza
+    // Se ja houver um servidor LLM valido rodando nessa porta, reutiliza ou aguarda terminar de carregar
     const pre = await this.ping(targetPort);
     if (pre === 'ok') {
       this.port = targetPort;
       this.activePort = targetPort;
       this.state = this.child ? 'online' : 'external';
       return true;
+    }
+    if (pre === 'loading') {
+      this.port = targetPort;
+      this.activePort = targetPort;
+      this.state = 'starting';
+      const waitDeadline = Date.now() + (parseInt(aiCfg.startupTimeoutMs, 10) || 240000);
+      while (Date.now() < waitDeadline) {
+        const p = await this.ping(targetPort);
+        if (p === 'ok') {
+          this.state = this.child ? 'online' : 'external';
+          return true;
+        }
+        if (p === 'fail') break;
+        await new Promise((r) => setTimeout(r, 700));
+      }
     }
 
     // Se a porta estiver ocupada por outro programa (ex: httpd/Apache), escolhe porta livre
