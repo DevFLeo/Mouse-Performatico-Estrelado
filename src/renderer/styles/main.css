@@ -32,6 +32,14 @@ html, body {
   display: none !important;
 }
 
+/* Modo Performance Puro (Acionado por Shift + Ctrl + Alt + Botao Direito):
+   Oculta os menus de edicao, exibindo apenas o Circulo 3D interativo.
+   A edicao fica disponivel exclusivamente ao abrir pelo icone executavel MPE.exe */
+body.mode-hud-only .hud-topbar,
+body.mode-hud-only #btn-insp-edit {
+  display: none !important;
+}
+
 #astrolabe-canvas {
   position: fixed;
    inset: 0;

@@ -40,7 +40,8 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    summonHud({ playIntro: true, source: 'executable' });
+    // Quando o usuario clica novamente no icone executavel MPE.exe, abre no Modo Edicao Completo
+    summonHud({ playIntro: true, mode: 'executable-editor', source: 'executable' });
   });
 }
 
@@ -80,7 +81,8 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', async () => {
     const isSilentStartup = process.argv.includes('--startup');
     if (!isSilentStartup) {
-      summonHud({ playIntro: true, source: 'startup' });
+      // Ao abrir pelo executavel MPE.exe, inicia com Intro e Modo de Edicao habilitado
+      summonHud({ playIntro: true, mode: 'executable-editor', source: 'startup' });
     }
 
     if (process.argv.includes('--self-test')) {
@@ -139,7 +141,7 @@ function createWindow() {
   });
 }
 
-function summonHud({ x, y, playIntro = false, source = 'shortcut' } = {}) {
+function summonHud({ x, y, playIntro = false, mode = 'hud-only', source = 'shortcut' } = {}) {
   if (!mainWindow) return;
 
   const cursor = screen.getCursorScreenPoint();
@@ -157,6 +159,7 @@ function summonHud({ x, y, playIntro = false, source = 'shortcut' } = {}) {
     x: targetX - currentDisplay.bounds.x,
     y: targetY - currentDisplay.bounds.y,
     playIntro,
+    mode,
     source,
     originSystem: hookBridge.getOriginSystemInfo(),
     config: configManager.get()
@@ -175,12 +178,16 @@ function createSystemTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Abrir Astrolabio 3D (M.P.E)',
-      click: () => summonHud({ playIntro: false, source: 'tray' })
+      label: 'Abrir Modo Edicao e Configuracao (MPE.exe)',
+      click: () => summonHud({ playIntro: false, mode: 'executable-editor', source: 'tray-editor' })
+    },
+    {
+      label: 'Abrir Circulo 3D Rapido (Modo Atalho)',
+      click: () => summonHud({ playIntro: false, mode: 'hud-only', source: 'tray-hud' })
     },
     {
       label: 'Reproduzir Inicializacao Cinematografica',
-      click: () => summonHud({ playIntro: true, source: 'tray-intro' })
+      click: () => summonHud({ playIntro: true, mode: 'executable-editor', source: 'tray-intro' })
     },
     { type: 'separator' },
     {
@@ -207,17 +214,16 @@ function createSystemTray() {
 
   tray.setContextMenu(contextMenu);
   tray.on('click', () => {
-    if (mainWindow && mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      summonHud({ playIntro: false, source: 'tray-click' });
-    }
+    // Clicar no icone executavel na bandeja abre o Modo de Edicao
+    summonHud({ playIntro: false, mode: 'executable-editor', source: 'tray-click' });
   });
 }
 
 function setupHooksAndShortcuts() {
   hookBridge.on('trigger', ({ x, y }) => {
-    summonHud({ x, y, playIntro: false, source: 'mouse-hook' });
+    // Quando acionado via Shift + Ctrl + Alt + Botao Direito do Mouse:
+    // Abre exclusivamente o Circulo 3D limpo (sem menus de edicao) para alta performance
+    summonHud({ x, y, playIntro: false, mode: 'hud-only', source: 'mouse-hook' });
   });
   hookBridge.start();
 
@@ -226,7 +232,7 @@ function setupHooksAndShortcuts() {
     (cfg.system && cfg.system.fallbackKeyboardShortcut) || 'CommandOrControl+Shift+Alt+M';
   try {
     globalShortcut.register(fallbackKey, () => {
-      summonHud({ playIntro: false, source: 'keyboard-shortcut' });
+      summonHud({ playIntro: false, mode: 'hud-only', source: 'keyboard-shortcut' });
     });
   } catch (err) {
     console.warn('[M.P.E Shortcut] Atalho complementar nao pode ser registrado:', err.message);

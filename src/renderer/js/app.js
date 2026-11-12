@@ -14,6 +14,21 @@
   let inspectedPoint = null;
   let audioCtx = null;
   let originSystemName = 'Windows Desktop';
+  let currentMode = 'executable-editor'; // 'executable-editor' (via MPE.exe) ou 'hud-only' (via Shift+Ctrl+Alt+Clique Direito)
+
+  function setInterfaceMode(mode) {
+    currentMode = mode === 'hud-only' ? 'hud-only' : 'executable-editor';
+    if (currentMode === 'hud-only') {
+      document.body.classList.add('mode-hud-only');
+      document.body.classList.remove('mode-editor');
+      // Fecha quaisquer modais de edicao abertos ao entrar em modo performance puro
+      document.getElementById('modal-point').classList.add('hidden');
+      document.getElementById('modal-settings').classList.add('hidden');
+    } else {
+      document.body.classList.remove('mode-hud-only');
+      document.body.classList.add('mode-editor');
+    }
+  }
 
   const THEME_PRESETS = {
     'gold-obsidian': {
@@ -242,6 +257,10 @@
     playUiSound('execute');
 
     if (point.actionType === 'open_settings') {
+      if (currentMode === 'hud-only') {
+        showToast('Para editar ou criar pontos, entre pelo icone executavel MPE.exe.');
+        return;
+      }
       openPointModal(null);
       return;
     }
@@ -529,7 +548,13 @@
     astrolabe = new window.Astrolabe3D(canvas, {
       onPointHover: handlePointHover,
       onPointClick: handlePointExecute,
-      onPointEdit: (pt) => openPointModal(pt)
+      onPointEdit: (pt) => {
+        if (currentMode === 'hud-only') {
+          showToast('Modo Performance: Para editar pontos, abra pelo icone executavel MPE.exe.');
+          return;
+        }
+        openPointModal(pt);
+      }
     });
     astrolabe.setConfig(currentConfig);
 
@@ -741,6 +766,9 @@
     }
 
     window.mpeApi.onHudSummoned((payload) => {
+      if (payload && payload.mode) {
+        setInterfaceMode(payload.mode);
+      }
       if (payload && payload.originSystem && payload.originSystem.windowTitle) {
         originSystemName = payload.originSystem.windowTitle;
       }
