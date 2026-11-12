@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>M.P.E — Mouse Performatico Estrelado</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <!-- 1. TELA CINEMATOGRAFICA DE INICIALIZACAO ("M . P . E Inicializando" -> "Bem-vindo [Nome]") -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-rings">
+      <div class="splash-ring ring-outer"></div>
+      <div class="splash-ring ring-mid"></div>
+      <div class="splash-ring ring-inner"></div>
+      <div class="splash-core"></div>
+    </div>
+
+    <div id="splash-phase-init" class="splash-content">
+      <div class="splash-tag">SISTEMA ORBITAL 2D / 3D</div>
+      <h1 id="splash-init-title" class="splash-title">M . P . E</h1>
+      <p id="splash-init-sub" class="splash-subtitle">Sincronizando sistemas...</p>
+
+      <div class="splash-telemetry-box">
+        <div class="splash-percent-row">
+          <span id="splash-percent-value" class="splash-percent-value">0%</span>
+        </div>
+        <div class="splash-progress-track">
+          <div id="splash-progress-bar" class="splash-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="splash-phase-welcome" class="splash-content hidden">
+      <div class="splash-tag">SISTEMA PRONTO</div>
+      <h1 id="splash-welcome-title" class="splash-title gold-shimmer">Bem-vindo</h1>
+      <p id="splash-welcome-sub" class="splash-subtitle"></p>
+    </div>
+  </div>
+
+  <!-- 2. CANVAS 2D / 3D INTERATIVO DO ASTROLABIO ESTELAR -->
+  <canvas id="astrolabe-canvas"></canvas>
+
+  <!-- CONTROLE FLUTUANTE RAPIDO 2D / 3D, ORGANIZADOR E EDICAO DE PONTOS (Sempre acessivel) -->
+  <div id="floating-dimension-dock" class="floating-dimension-dock">
+    <div class="dock-segment">
+      <button id="btn-mode-2d" class="dim-pill" data-dim="2d" title="Modo 2D">2D</button>
+      <button id="btn-mode-3d" class="dim-pill active" data-dim="3d" title="Modo 3D">3D</button>
+    </div>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button id="btn-action-2d" class="dim-pill action-2d-btn" title="Executar Acao 2D">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>
+      <span>Ação 2D</span>
+    </button>
+    <button id="btn-dock-organizer" class="dim-pill org-dock-btn" title="Abrir Organizador de Arquivos">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Organizar</span>
+    </button>
+    <button id="btn-toggle-move-points" class="dim-pill move-pts-btn" title="Arrastar botoes para mudar de lugar">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+      <span>Mover Pontos</span>
+    </button>
+    <button id="btn-dock-add-point" class="dim-pill add-pt-btn" title="Criar nova automacao no Astrolabio">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Automação</span>
+    </button>
+  </div>
+
+  <!-- BANNER DE POSICIONAMENTO VISUAL NO CIRCULO -->
+  <div id="placement-banner" class="placement-banner hidden">
+    <span id="placement-banner-text">Clique no circulo para posicionar ou arraste uma estrela.</span>
+    <button id="btn-cancel-placement" class="hud-btn small">Concluir</button>
+  </div>
+
+  <!-- 3. BARRA SUPERIOR DO HUD -->
+  <header class="hud-topbar">
+    <div class="hud-topbar-left">
+      <div class="hud-brand">
+        <div class="brand-emblem" title="M.P.E - Mouse Performatico Estrelado">
+          <svg class="brand-emblem-svg" viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+              <radialGradient id="emb-bg" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#2A1F08" />
+                <stop offset="100%" stop-color="#050507" />
+              </radialGradient>
+            </defs>
+            <circle cx="32" cy="32" r="31" fill="url(#emb-bg)" />
+            <circle cx="32" cy="32" r="29" fill="none" stroke="#E5B84B" stroke-width="2.2" />
+            <circle cx="32" cy="32" r="25.5" fill="none" stroke="#E5B84B" stroke-width="1" stroke-dasharray="1.2 2.6" opacity="0.85" />
+            <g class="emb-orbit">
+              <circle cx="30" cy="30" r="19" fill="none" stroke="#E5B84B" stroke-width="1.3" />
+              <circle cx="36.5" cy="36.5" r="7.5" fill="none" stroke="#E5B84B" stroke-width="1.2" />
+            </g>
+            <line x1="40" y1="40" x2="17" y2="15" stroke="#E5B84B" stroke-width="1.2" />
+            <line x1="40" y1="40" x2="46" y2="14" stroke="#7F95E0" stroke-width="1.2" />
+            <line x1="40" y1="40" x2="12" y2="35" stroke="#E5B84B" stroke-width="1.1" />
+            <line x1="40" y1="40" x2="28" y2="55" stroke="#7F95E0" stroke-width="1.1" />
+            <circle cx="17" cy="15" r="2.6" fill="#050507" stroke="#FFE08A" stroke-width="1.5" />
+            <circle cx="46" cy="14" r="2.3" fill="#050507" stroke="#FFE08A" stroke-width="1.4" />
+            <circle cx="12" cy="35" r="2.3" fill="#050507" stroke="#FFE08A" stroke-width="1.4" />
+            <circle cx="28" cy="55" r="2.3" fill="#050507" stroke="#FFE08A" stroke-width="1.4" />
+            <circle cx="40" cy="40" r="3.6" fill="none" stroke="#9E2A2B" stroke-width="0.9" />
+            <circle cx="40" cy="40" r="2.4" fill="#050507" stroke="#FFFFFF" stroke-width="1.6" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">M . P . E <span id="hud-mode-badge" class="brand-badge">2D / 3D</span></div>
+        </div>
+      </div>
+
+      <!-- Alternador de Area (Astrolabio 2D/3D vs Organizador estilo Arquithon) -->
+      <div class="workspace-tabs" id="workspace-tabs">
+        <button id="btn-tab-astrolabe" class="workspace-tab active" data-tab="astrolabe">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Astrolábio</span>
+        </button>
+        <button id="btn-tab-organizer" class="workspace-tab" data-tab="organizer">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>Organizador</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Seletor Rapido de Tom de Linguagem -->
+    <div class="tone-switcher" title="Tom de Linguagem">
+      <button class="tone-pill active" data-tone="amigavel">Amigável</button>
+      <button class="tone-pill" data-tone="neutra">Neutra</button>
+      <button class="tone-pill" data-tone="profissional">Profissional</button>
+    </div>
+
+    <div class="hud-actions">
+      <div class="hud-btn-group">
+        <button id="btn-add-star" class="hud-btn primary" title="Criar novo botao no Astrolabio">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Novo Botão</span>
+        </button>
+        <button id="btn-named-print" class="hud-btn" title="Capturar tela, nomear e indexar na I.A">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Print Nomeado</span>
+        </button>
+        <button id="btn-move-stars-top" class="hud-btn" title="Arrastar estrelas no anel">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/></svg>
+          <span>Mover</span>
+        </button>
+      </div>
+      <span class="topbar-divider" aria-hidden="true"></span>
+      <div class="hud-btn-group compact">
+        <button id="btn-open-register" class="hud-btn ghost" title="Perfil e linguagem">Perfil</button>
+        <button id="btn-settings" class="hud-btn ghost" title="Configuracoes gerais">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Ajustes</span>
+        </button>
+        <button id="btn-recenter" class="hud-btn ghost" title="Centralizar Astrolabio">Centralizar</button>
+        <button id="btn-replay-intro" class="hud-btn ghost" title="Rever animacao inicial">Intro</button>
+      </div>
+      <button id="btn-hide-hud" class="hud-btn subtle close-hud-btn" title="Recolher para a bandeja (ESC)">Minimizar</button>
+    </div>
+  </header>
+
+  <!-- 4. PAINEL INFERIOR DE TELEMETRIA E CONTROLE 3D -->
+  <footer class="hud-bottombar">
+    <div id="point-inspector" class="point-inspector">
+      <div class="inspector-default" id="inspector-default">
+        <span class="gold-dot"></span>
+        <span>Clique no ponto para executar • <kbd>ESC</kbd> Minimizar</span>
+      </div>
+      <div class="inspector-detail hidden" id="inspector-detail">
+        <div class="inspector-code" id="insp-code">08 7</div>
+        <div class="inspector-info">
+          <div class="inspector-title" id="insp-title">Print + Telegram</div>
+          <div class="inspector-desc" id="insp-desc">Descricao</div>
+        </div>
+        <div class="inspector-buttons">
+          <button id="btn-insp-exec" class="hud-btn primary small">Executar</button>
+          <button id="btn-insp-edit" class="hud-btn small">Editar</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 5. MODAL DE CADASTRO INICIAL (Define Nome e Linguagem salvos no JSON) -->
+  <div id="modal-register" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="reg-modal-title">Boas-vindas ao M.P.E</h2>
+        <p id="reg-modal-subtitle">Como voce gostaria de ser chamado sempre que o sistema inicializar?</p>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Seu Nome ou Identificacao (Salvo no JSON Portatil)</label>
+        <input type="text" id="reg-user-name" class="field-input" placeholder="Ex: DevFLeo" maxlength="40" />
+
+        <label class="field-label">Escolha o Estilo de Linguagem do Sistema</label>
+        <div class="tone-cards">
+          <label class="tone-card selected" data-tone-card="amigavel">
+            <input type="radio" name="reg-tone" value="amigavel" checked />
+            <div class="tone-card-title">Linguagem Amigável</div>
+            <div class="tone-card-desc">Calorosa, receptiva e inspiradora para o seu dia a dia.</div>
+          </label>
+          <label class="tone-card" data-tone-card="neutra">
+            <input type="radio" name="reg-tone" value="neutra" />
+            <div class="tone-card-title">Linguagem Neutra (Interpessoal)</div>
+            <div class="tone-card-desc">Inclusiva, equilibrada e sem marcacao de genero.</div>
+          </label>
+          <label class="tone-card" data-tone-card="profissional">
+            <input type="radio" name="reg-tone" value="profissional" />
+            <div class="tone-card-title">Linguagem Profissional</div>
+            <div class="tone-card-desc">Executiva, tecnica, direta e focada em alta performance.</div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-register" class="hud-btn primary full-width">Salvar Cadastro e Iniciar M.P.E</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. MODAL ASSISTENTE INTERATIVO DE AUTOMACAO (Criar / Editar Botao no Astrolabio) -->
+  <div id="modal-point" class="modal-backdrop hidden">
+    <div class="modal-card wide wiz-modal">
+      <div class="modal-header wiz-header-row">
+        <div>
+          <h2 id="point-modal-heading">Criar Botão Automático no Astrolábio</h2>
+          <p id="point-modal-subtitle">Siga os 3 passos simples — sem precisar programar nada.</p>
+        </div>
+        <div class="wiz-steps-nav" role="tablist">
+          <button type="button" class="wiz-step-pill active" data-wiz-step="1">1. O que fazer</button>
+          <button type="button" class="wiz-step-pill" data-wiz-step="2">2. Configurar</button>
+          <button type="button" class="wiz-step-pill" data-wiz-step="3">3. Posição & Testar</button>
+        </div>
+      </div>
+
+      <!-- Resumo vivo em portugues simples -->
+      <div class="wiz-summary-banner">
+        <span class="wiz-summary-tag">RESUMO DO BOTÃO</span>
+        <span id="pt-live-summary">Ao clicar neste botão, o M.P.E captura a tela e envia para o Telegram.</span>
+      </div>
+
+      <div class="modal-body wiz-body">
+        <!-- PASSO 1: ESCOLHA VISUAL DA TAREFA + MODELOS PRONTOS -->
+        <div id="wiz-pane-1" class="wiz-pane">
+          <div class="wiz-section-title">Modelos Prontos (1 Clique — já vem tudo preenchido)</div>
+          <div class="wiz-presets-row">
+            <button type="button" class="wiz-preset-chip" data-preset="org_open">Organizar Arquivos</button>
+            <button type="button" class="wiz-preset-chip" data-preset="print_tg">Print para Telegram</button>
+            <button type="button" class="wiz-preset-chip" data-preset="print_wpp">Print para WhatsApp</button>
+            <button type="button" class="wiz-preset-chip" data-preset="crop_paint">Recortar e Abrir no Paint</button>
+            <button type="button" class="wiz-preset-chip" data-preset="named_ai">Print Nomeado p/ I.A</button>
+            <button type="button" class="wiz-preset-chip" data-preset="open_downloads">Abrir Pasta Downloads</button>
+            <button type="button" class="wiz-preset-chip" data-preset="toggle_3d">Alternar 2D / 3D</button>
+          </div>
+
+          <div class="wiz-section-title" style="margin-top:14px;">Ou escolha o tipo de tarefa:</div>
+          <div class="wiz-goal-grid">
+            <button type="button" class="wiz-goal-card selected" data-goal="print_app">
+              <div class="wiz-goal-title">Tirar Print e Enviar p/ App</div>
+              <div class="wiz-goal-desc">Fotografa a tela e já cola no WhatsApp, Telegram, Paint, Word...</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="area_crop">
+              <div class="wiz-goal-title">Recortar Pedaço da Tela</div>
+              <div class="wiz-goal-desc">Você risca um quadrado na tela e escolhe se salva ou envia.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="save_print">
+              <div class="wiz-goal-title">Salvar Print com Nome / I.A</div>
+              <div class="wiz-goal-desc">Salva organizado em pasta com opção de nomear e guardar na I.A.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="text_move">
+              <div class="wiz-goal-title">Pegar Texto e Transferir</div>
+              <div class="wiz-goal-desc">Copia o texto selecionado e leva direto para outro programa.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="organize">
+              <div class="wiz-goal-title">Organizar Meus Arquivos</div>
+              <div class="wiz-goal-desc">Abre o Organizador ou escolhe arquivos na hora para arrumar em pastas.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="open_thing">
+              <div class="wiz-goal-title">Abrir Pasta, Programa ou Site</div>
+              <div class="wiz-goal-desc">Atalho de 1 clique para pasta do PC, aplicativo instalado ou site.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="macro">
+              <div class="wiz-goal-title">Combinar 2 Ações (Rotina)</div>
+              <div class="wiz-goal-desc">Faz duas tarefas seguidas com um clique (ex: Print + Abrir Pasta).</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="hud_mode">
+              <div class="wiz-goal-title">Modo 2D / 3D do Astrolábio</div>
+              <div class="wiz-goal-desc">Alterna entre visualização 2D/3D ou executa a varredura rápida 2D.</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- PASSO 2: CONFIGURACAO INTERATIVA GUIADA -->
+        <div id="wiz-pane-2" class="wiz-pane hidden">
+          <div class="wiz-field-block">
+            <label class="field-label" for="pt-title">Nome fácil do botão (aparece no Astrolábio)</label>
+            <input type="text" id="pt-title" class="field-input" placeholder="Ex: Mandar print pro WhatsApp" />
+          </div>
+
+          <div id="group-capture-scope" class="wiz-field-block">
+            <label class="field-label">O que você quer capturar?</label>
+            <div class="wiz-choice-row" id="wiz-scope-choices">
+              <button type="button" class="wiz-choice-btn active" data-scope="active_window">Só a Janela Aberta</button>
+              <button type="button" class="wiz-choice-btn" data-scope="fullscreen">Tela Inteira</button>
+              <button type="button" class="wiz-choice-btn" data-scope="area">Recortar um Pedaço</button>
+            </div>
+            <select id="pt-capture-scope" class="field-input hidden">
+              <option value="active_window">Janela do Sistema Ativo</option>
+              <option value="fullscreen">Tela Inteira</option>
+              <option value="area">Selecionar Área (Recorte)</option>
+            </select>
+          </div>
+
+          <div id="group-target-system" class="wiz-field-block">
+            <label class="field-label">Para qual programa ou conversa enviar?</label>
+            <div class="target-system-pills" style="margin-bottom:8px;">
+              <button type="button" class="system-pill wiz-app-pill" data-app="Telegram">Telegram</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="WhatsApp">WhatsApp</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="Bloco de Notas">Bloco de Notas</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="Paint">Paint</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="Word">Word</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="Chrome">Chrome</button>
+              <button type="button" class="system-pill wiz-app-pill" data-app="Discord">Discord</button>
+            </div>
+            <div class="input-with-btn">
+              <input type="text" id="pt-target-system" class="field-input" placeholder="Ou digite o nome do aplicativo..." />
+              <button type="button" id="btn-detect-systems" class="hud-btn small">Ver Abertos Agora</button>
+            </div>
+            <select id="pt-open-windows-list" class="field-input hidden" style="margin-top:6px;">
+              <option value="">-- Escolha uma Janela Aberta Agora --</option>
+            </select>
+            <label class="checkbox-row" style="margin-top:6px;">
+              <input type="checkbox" id="pt-auto-enter" checked />
+              <span>Apertar <strong>ENTER</strong> automaticamente após colar (envia direto no chat)</span>
+            </label>
+          </div>
+
+          <div id="group-telegram-target" class="wiz-field-block">
+            <label class="field-label">Conversa ou @usuario no Telegram</label>
+            <input type="text" id="pt-telegram-target" class="field-input" placeholder="Eu | Você | Leonardo" />
+          </div>
+
+          <div id="group-save-dir" class="wiz-field-block">
+            <label class="field-label">Onde salvar a imagem no computador</label>
+            <div class="input-with-btn">
+              <input type="text" id="pt-save-dir" class="field-input" placeholder="./prints" />
+              <button type="button" id="btn-browse-save-dir" class="hud-btn small">Escolher Pasta...</button>
+            </div>
+          </div>
+
+          <div id="group-target-path" class="wiz-field-block hidden">
+            <label class="field-label">Qual pasta ou programa você quer abrir?</label>
+            <div class="target-system-pills" style="margin-bottom:8px;">
+              <button type="button" class="system-pill wiz-path-pill" data-path="downloads">Pasta Downloads</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="documentos">Meus Documentos</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="desktop">Área de Trabalho</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="./prints">Pasta de Prints</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="./arquivos">Pasta de Arquivos</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="notepad.exe">Bloco de Notas</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="calc.exe">Calculadora</button>
+              <button type="button" class="system-pill wiz-path-pill" data-path="mspaint.exe">Paint</button>
+            </div>
+            <div class="input-with-btn">
+              <input type="text" id="pt-target-path" class="field-input" placeholder="Escolha acima ou clique nos botões ao lado" />
+              <button type="button" id="btn-browse-open-folder" class="hud-btn small">Escolher Pasta...</button>
+              <button type="button" id="btn-browse-file" class="hud-btn small">Escolher Programa...</button>
+            </div>
+          </div>
+
+          <div id="group-url" class="wiz-field-block hidden">
+            <label class="field-label">Endereço do Site (URL)</label>
+            <div class="target-system-pills" style="margin-bottom:8px;">
+              <button type="button" class="system-pill wiz-url-pill" data-url="https://web.whatsapp.com">WhatsApp Web</button>
+              <button type="button" class="system-pill wiz-url-pill" data-url="https://www.google.com">Google</button>
+              <button type="button" class="system-pill wiz-url-pill" data-url="https://www.youtube.com">YouTube</button>
+              <button type="button" class="system-pill wiz-url-pill" data-url="https://chatgpt.com">ChatGPT</button>
+            </div>
+            <input type="text" id="pt-url" class="field-input" placeholder="https://www.google.com" />
+          </div>
+
+          <div id="group-organizer-opts" class="wiz-field-block hidden">
+            <label class="field-label">Como deseja organizar seus arquivos?</label>
+            <div class="wiz-choice-row" id="wiz-org-mode-choices">
+              <button type="button" class="wiz-choice-btn active" data-org-action="open_organizer">Abrir Painel Completo do Organizador</button>
+              <button type="button" class="wiz-choice-btn" data-org-action="organize_files_quick">Escolher Arquivos na Hora e Organizar</button>
+            </div>
+            <div class="subgrid-2" style="margin-top:8px;">
+              <div>
+                <label class="field-label" style="margin-top:0;">Pasta de destino</label>
+                <select id="pt-org-scope" class="field-input">
+                  <option value="arquivos">Arquivos Organizados (./arquivos)</option>
+                  <option value="prints">Prints Organizados (./prints)</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0;">Separar por</label>
+                <select id="pt-org-criterion" class="field-input">
+                  <option value="type">Tipo (Fotos, PDFs, Vídeos...)</option>
+                  <option value="date">Data (Ano e Mês)</option>
+                  <option value="name">Letra Inicial (A - Z)</option>
+                  <option value="size">Tamanho do Arquivo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="group-macro-steps" class="wiz-field-block hidden">
+            <label class="field-label">Escolha as 2 ações que vão rodar em sequência:</label>
+            <div class="subgrid-2">
+              <div>
+                <label class="field-label" style="margin-top:0;">Primeira Ação</label>
+                <select id="pt-macro-step1" class="field-input">
+                  <option value="print">Tirar Print e Salvar</option>
+                  <option value="print_telegram">Tirar Print e Enviar p/ Telegram</option>
+                  <option value="system_to_system_print">Tirar Print e Enviar p/ Outro App</option>
+                  <option value="text_selection">Capturar Texto Selecionado</option>
+                  <option value="open_path">Abrir uma Pasta / Programa</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0;">Segunda Ação (logo depois)</label>
+                <select id="pt-macro-step2" class="field-input">
+                  <option value="open_organizer">Abrir Organizador de Arquivos</option>
+                  <option value="open_path">Abrir Pasta de Prints / Destino</option>
+                  <option value="open_url">Abrir Site no Navegador</option>
+                  <option value="print_telegram">Enviar Também p/ Telegram</option>
+                  <option value="toggle_2d_3d">Alternar Modo 2D / 3D</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <details class="wiz-advanced">
+            <summary>Opções Avançadas / Técnicas (Opcional)</summary>
+            <div class="wiz-advanced-body">
+              <label class="field-label">Tipo Técnico da Ação</label>
+              <select id="pt-action-type" class="field-input">
+                <option value="system_to_system_print">Print do Sistema Atual -> Outro Sistema</option>
+                <option value="area_print_system">Recorte -> Outro Sistema</option>
+                <option value="print_telegram">Print -> Telegram</option>
+                <option value="area_print_telegram">Recorte -> Telegram</option>
+                <option value="print">Print Instantâneo (Pasta + Clipboard)</option>
+                <option value="named_print">Print Nomeado (Nome + Pasta + I.A)</option>
+                <option value="area_print">Recorte de Tela (Pasta + Clipboard)</option>
+                <option value="text_selection">Seleção de Texto (Captura Ativa)</option>
+                <option value="text_to_system">Seleção de Texto -> Outro Sistema</option>
+                <option value="text_telegram">Seleção de Texto -> Telegram</option>
+                <option value="open_organizer">Abrir Organizador de Arquivos</option>
+                <option value="organize_files_quick">Escolher e Organizar Arquivos Agora</option>
+                <option value="open_path">Abrir Pasta ou Aplicativo</option>
+                <option value="open_url">Abrir URL</option>
+                <option value="command">Executar Comando do Windows</option>
+                <option value="macro_sequence">Rotina Combinada (2 Ações)</option>
+                <option value="action_2d_scan">Ação 2D: Varredura + Captura</option>
+                <option value="toggle_2d_3d">Alternar Modo 2D / 3D</option>
+              </select>
+
+              <div id="group-command" class="hidden">
+                <label class="field-label">Comando Personalizado (Terminal / Windows)</label>
+                <input type="text" id="pt-command" class="field-input" placeholder="notepad.exe" />
+              </div>
+
+              <label class="field-label">Descrição do Botão</label>
+              <input type="text" id="pt-desc" class="field-input" placeholder="Gerado automaticamente pelo resumo" />
+            </div>
+          </details>
+        </div>
+
+        <!-- PASSO 3: POSICAO VISUAL NO CIRCULO & TESTE -->
+        <div id="wiz-pane-3" class="wiz-pane hidden">
+          <div class="position-picker-box" style="margin-top:0;">
+            <div class="position-picker-header">
+              <label class="field-label" style="margin:0;">Onde este botão deve ficar no Círculo?</label>
+              <button type="button" id="btn-pick-on-circle" class="hud-btn primary small">Clicar no Círculo Grande</button>
+            </div>
+            <div class="position-picker-body">
+              <canvas id="pt-minimap-canvas" width="140" height="140" title="Clique ou arraste para posicionar"></canvas>
+              <div class="position-picker-inputs">
+                <label class="field-label" style="margin-top:0;">Distância do Centro:</label>
+                <div class="wiz-choice-row" id="wiz-orbit-choices">
+                  <button type="button" class="wiz-choice-btn" data-orbit="1">Perto do Centro</button>
+                  <button type="button" class="wiz-choice-btn" data-orbit="2">Anel do Meio</button>
+                  <button type="button" class="wiz-choice-btn active" data-orbit="3">Borda Externa</button>
+                </div>
+                <p class="machine-hint" style="margin-top:8px;">
+                  Dica: clique em qualquer lugar do mini-círculo à esquerda ou arraste o ponto azul para escolher a posição ideal sem encostar em outros botões.
+                </p>
+                <div style="margin-top:12px;">
+                  <button type="button" id="btn-test-point" class="hud-btn">Testar Botão Agora</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <details class="wiz-advanced" style="margin-top:12px;">
+            <summary>Ajustes Visuais (Cor, Código, 3D — Opcional)</summary>
+            <div class="wiz-advanced-body">
+              <div class="subgrid-2">
+                <div>
+                  <label class="field-label">Órbita Numérica</label>
+                  <select id="pt-orbit" class="field-input">
+                    <option value="1">1 (Interna)</option>
+                    <option value="2">2 (Média)</option>
+                    <option value="3" selected>3 (Externa)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Código Estelar</label>
+                  <input type="text" id="pt-code" class="field-input" placeholder="Ex: 10 7" maxlength="8" />
+                </div>
+              </div>
+              <div class="subgrid-2">
+                <div>
+                  <label class="field-label">Ângulo (0-360)</label>
+                  <input type="number" id="pt-angle" class="field-input" min="0" max="360" value="45" />
+                </div>
+                <div>
+                  <label class="field-label">Profundidade 3D</label>
+                  <input type="number" id="pt-elevation" class="field-input" min="-45" max="45" value="15" />
+                </div>
+              </div>
+              <div class="subgrid-2">
+                <div>
+                  <label class="field-label">Cor do Vetor</label>
+                  <select id="pt-vector-style" class="field-input">
+                    <option value="gold">Dourado Imperial</option>
+                    <option value="blue">Azul Celestial</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Símbolo Geométrico</label>
+                  <select id="pt-glyph" class="field-input">
+                    <option value="Π">Π (Pi Estelar)</option>
+                    <option value="Δ">Δ (Delta)</option>
+                    <option value="h">h (Planck)</option>
+                    <option value="C">C (Orbital)</option>
+                    <option value="">Nenhum</option>
+                  </select>
+                </div>
+              </div>
+              <input type="hidden" id="pt-custom-radius" value="" />
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="modal-footer between">
+        <button id="btn-delete-point" class="hud-btn danger hidden">Excluir Botão</button>
+        <div class="footer-right">
+          <button type="button" id="btn-cancel-point" class="hud-btn subtle">Cancelar</button>
+          <button type="button" id="btn-wiz-prev" class="hud-btn hidden">Voltar</button>
+          <button type="button" id="btn-wiz-next" class="hud-btn">Próximo Passo</button>
+          <button type="button" id="btn-save-point" class="hud-btn primary">Salvar no Astrolábio</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. MODAL DE CONFIGURACOES GLOBAIS E TEMA -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2>Configurações</h2>
+        <p>Personalização visual e integrações do M.P.E.</p>
+      </div>
+      <div class="modal-body grid-2">
+        <div>
+          <h3 class="section-subtitle">Geral</h3>
+          <label class="field-label">Nome de Usuário</label>
+          <input type="text" id="cfg-user-name" class="field-input" placeholder="Seu nome" />
+
+          <label class="field-label">Tom de Linguagem</label>
+          <select id="cfg-language-tone" class="field-input">
+            <option value="amigavel">Amigável</option>
+            <option value="neutra">Neutra</option>
+            <option value="profissional">Profissional</option>
+          </select>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-start-windows" />
+            <span><strong>Iniciar com o Windows</strong></span>
+          </label>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-auto-orbit" checked />
+            <span>Movimento orbital 3D suave</span>
+          </label>
+
+          <h3 class="section-subtitle">Telegram</h3>
+          <label class="field-label">Conversa de Destino</label>
+          <input type="text" id="cfg-tg-chat" class="field-input" placeholder="Eu | Você | Leonardo" />
+
+          <label class="field-label">Pasta de Capturas (Prints)</label>
+          <div class="input-with-btn">
+            <input type="text" id="cfg-tg-folder" class="field-input" placeholder="./prints" />
+            <button type="button" id="btn-cfg-browse-folder" class="hud-btn small">Escolher...</button>
+          </div>
+
+          <label class="field-label">Organizar Prints por</label>
+          <select id="cfg-cap-org-mode" class="field-input">
+            <option value="system_date">Sistema / Ano-Mês (ex: Chrome/2026-11/)</option>
+            <option value="date">Data (ex: 2026-11-12/)</option>
+            <option value="system">Sistema de Origem (ex: Telegram/)</option>
+            <option value="category">Categoria / Ano-Mês (ex: Recibos/2026-11/)</option>
+            <option value="flat">Pasta Única (Sem subpastas)</option>
+          </select>
+
+          <div class="subgrid-2">
+            <div>
+              <label class="field-label">Padrão de Nome</label>
+              <input type="text" id="cfg-cap-pattern" class="field-input" placeholder="{prefix}_{system}_{date}_{time}" />
+            </div>
+            <div>
+              <label class="field-label">Prefixo Padrão</label>
+              <input type="text" id="cfg-cap-prefix" class="field-input" placeholder="MPE" />
+            </div>
+          </div>
+
+          <label class="field-label">Pasta de Arquivos Organizados</label>
+          <div class="input-with-btn">
+            <input type="text" id="cfg-docs-folder" class="field-input" placeholder="./arquivos" />
+            <button type="button" id="btn-cfg-browse-docs" class="hud-btn small">Escolher...</button>
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-cap-auto-index" checked />
+            <span>Indexar Prints Nomeados na I.A Local</span>
+          </label>
+
+          <label class="field-label">Bot Token (Opcional)</label>
+          <input type="password" id="cfg-tg-token" class="field-input" placeholder="123456789:ABCdef..." />
+
+          <label class="field-label">Chat ID (Opcional)</label>
+          <input type="text" id="cfg-tg-chatid" class="field-input" placeholder="Ex: 987654321" />
+
+          <h3 class="section-subtitle">Obsidian & I.A Local</h3>
+          <label class="field-label">Pasta do Cofre Obsidian (Vault)</label>
+          <div class="input-with-btn">
+            <input type="text" id="cfg-obsidian-vault" class="field-input" placeholder="./arquivos/Obsidian_Vault" />
+            <button type="button" id="btn-cfg-browse-obsidian" class="hud-btn small">Escolher...</button>
+          </div>
+
+          <label class="field-label">Pasta Padrão dentro do Vault</label>
+          <input type="text" id="cfg-obsidian-folder" class="field-input" placeholder="Notas" />
+
+          <label class="field-label">Motor de I.A</label>
+          <select id="cfg-ai-provider" class="field-input">
+            <option value="auto">Auto (Mozilla llamafile + AI Kataros)</option>
+            <option value="builtin">Motor Embutido Offline Kataros</option>
+            <option value="ollama">Ollama Local (127.0.0.1:11434)</option>
+            <option value="lmstudio">LM Studio Local (127.0.0.1:1234)</option>
+          </select>
+        </div>
+
+        <div>
+          <h3 class="section-subtitle">Cores e Tema</h3>
+          <label class="field-label">Predefinições</label>
+          <div class="preset-chips">
+            <button type="button" class="preset-chip" data-preset="gold-obsidian">Ouro e Preto</button>
+            <button type="button" class="preset-chip" data-preset="solar-imperial">Ouro Imperial</button>
+            <button type="button" class="preset-chip" data-preset="cyber-cyan">Cyber Cyan</button>
+            <button type="button" class="preset-chip" data-preset="crimson-eclipse">Eclipse Carmesim</button>
+          </div>
+
+          <div class="color-grid">
+            <div class="color-item">
+              <label>Ouro Principal</label>
+              <input type="color" id="clr-gold-primary" value="#E5B84B" />
+            </div>
+            <div class="color-item">
+              <label>Brilho Secundário</label>
+              <input type="color" id="clr-gold-secondary" value="#FFE08A" />
+            </div>
+            <div class="color-item">
+              <label>Fundo Obsidiana</label>
+              <input type="color" id="clr-bg-primary" value="#040406" />
+            </div>
+            <div class="color-item">
+              <label>Centro do Degradê</label>
+              <input type="color" id="clr-bg-secondary" value="#171206" />
+            </div>
+            <div class="color-item">
+              <label>Vetores Azuis</label>
+              <input type="color" id="clr-vector-accent" value="#5C73B8" />
+            </div>
+            <div class="color-item">
+              <label>Anel Nexus</label>
+              <input type="color" id="clr-nexus-red" value="#9E2A2B" />
+            </div>
+          </div>
+
+          <label class="field-label">Sensibilidade 3D</label>
+          <input type="range" id="cfg-sensitivity" min="0.4" max="2.2" step="0.1" value="1.0" class="field-range" />
+
+          <h3 class="section-subtitle">Edição & Organizador (Arquithon)</h3>
+          <div class="subgrid-2">
+            <div>
+              <label class="field-label">Tamanho da Fonte</label>
+              <select id="cfg-org-fontsize" class="field-input">
+                <option value="small">Pequena</option>
+                <option value="medium" selected>Média</option>
+                <option value="large">Grande</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Modo Visual</label>
+              <select id="cfg-org-uimode" class="field-input">
+                <option value="dark" selected>Escuro (Ouro & Obsidiana)</option>
+                <option value="light">Claro (Pergaminho)</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="field-label">Critério Padrão de Organização</label>
+          <select id="cfg-org-criterion" class="field-input">
+            <option value="type">Por Tipo (imagens/png, documentos/pdf...)</option>
+            <option value="date">Por Data de Modificação (Ano / Ano-Mês)</option>
+            <option value="name">Por Nome (A - Z)</option>
+            <option value="size">Por Tamanho (Pequenos / Médios / Grandes)</option>
+          </select>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-org-move-default" />
+            <span>Marcar "Mover em vez de copiar" por padrão</span>
+          </label>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-org-search-content" checked />
+            <span>Buscar também no conteúdo de arquivos de texto</span>
+          </label>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="cfg-org-remember-state" />
+            <span>Lembrar última aba aberta (se desmarcado, sempre inicia no Astrolábio)</span>
+          </label>
+
+          <div class="machine-info-box">
+            <div><strong>Máquina:</strong> <span id="info-machine-name">-</span></div>
+            <div><strong>Config:</strong> <code>./codigo/mpe.config.json</code></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer end">
+        <button id="btn-cancel-settings" class="hud-btn subtle">Fechar</button>
+        <button id="btn-save-settings" class="hud-btn primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. MODAL DE SELECAO DE TEXTO E TRANSFERENCIA ENTRE SISTEMAS -->
+  <div id="modal-text-selection" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Selecao de Texto Capturada do Sistema Ativo</h2>
+        <p>Edite, copie ou transfira diretamente para outro sistema aberto ou Telegram.</p>
+      </div>
+      <div class="modal-body">
+        <textarea id="captured-text-area" class="field-textarea" rows="5" placeholder="O texto selecionado aparecera aqui..."></textarea>
+        <label class="field-label">Transferir para Outro Sistema (Abre ou Ativa automaticamente)</label>
+        <input type="text" id="captured-target-system" class="field-input" list="target-system-suggestions" placeholder="Digite o nome do sistema (Ex: Bloco de Notas, Telegram, Word, Paint)" />
+        <datalist id="target-system-suggestions">
+          <option value="Bloco de Notas">Notepad</option>
+          <option value="Telegram">Telegram Desktop (Eu | Você | Leonardo)</option>
+          <option value="WhatsApp">WhatsApp Desktop</option>
+          <option value="Discord">Discord</option>
+          <option value="Paint">Paint (mspaint)</option>
+          <option value="Word">Microsoft Word</option>
+          <option value="Excel">Microsoft Excel</option>
+          <option value="Calculadora">Calculadora</option>
+        </datalist>
+        <div class="target-system-pills">
+          <button type="button" class="system-pill" data-target="Bloco de Notas">Bloco de Notas</button>
+          <button type="button" class="system-pill" data-target="Telegram">Telegram</button>
+          <button type="button" class="system-pill" data-target="WhatsApp">WhatsApp</button>
+          <button type="button" class="system-pill" data-target="Discord">Discord</button>
+          <button type="button" class="system-pill" data-target="Word">Word</button>
+          <button type="button" class="system-pill" data-target="Paint">Paint</button>
+        </div>
+      </div>
+      <div class="modal-footer between">
+        <button id="btn-close-text-modal" class="hud-btn subtle">Fechar</button>
+        <div class="footer-right">
+          <button id="btn-copy-captured-text" class="hud-btn">Copiar</button>
+          <button id="btn-send-captured-system" class="hud-btn">Enviar p/ Sistema</button>
+          <button id="btn-send-captured-telegram" class="hud-btn primary">Enviar p/ Telegram</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. OVERLAY DE SELECAO DE AREA PARA RECORTE DE TELA -->
+  <div id="area-selector-overlay" class="area-selector-overlay hidden">
+    <div class="area-selector-banner">
+      Arraste com o botao esquerdo para selecionar a area do Print • Clique Direito ou ESC para cancelar
+    </div>
+    <canvas id="area-selector-canvas"></canvas>
+  </div>
+
+  <!-- 10. NOTIFICACAO FLUTUANTE ESTELAR (TOAST) -->
+  <div id="hud-toast" class="hud-toast hidden">
+    <span class="toast-icon">[M.P.E]</span>
+    <span id="hud-toast-text">Acao executada!</span>
+  </div>
+
+  <!-- 11. MINI ASSISTENTE FLUTUANTE (LOWER THIRDS SCI-FI) -->
+  <div id="mini-assistant-overlay" class="mini-assistant-overlay hidden">
+    <div class="mini-sci-hud" id="mini-sci-hud-card">
+      <!-- Mascote 3D Holografico Esquerdo (AI Kataros) -->
+      <div class="mini-node-ring" id="kataros-mascot-node" title="Arraste para mover">
+        <canvas id="kataros-mascot-canvas" class="kataros-mascot-canvas"></canvas>
+        <div class="kataros-label-box">
+          <div id="kataros-node-status" class="mini-node-status">AI KATAROS</div>
+          <div id="kataros-node-sub" class="mini-node-sub">LOCAL OK</div>
+        </div>
+      </div>
+
+      <!-- Capsula Sci-Fi (Lower Third) -->
+      <div class="mini-capsule-card">
+        <div class="mini-capsule-header" id="mini-drag-handle" title="Arraste para mover">
+          <div class="mini-header-title">
+            <span class="mini-tag">AI KATAROS</span>
+            <span class="mini-title-text">REVISAO & ENVIO</span>
+          </div>
+          <div class="mini-header-controls">
+            <button id="btn-mini-chat-toggle" class="mini-btn-icon" title="Abrir Chat Lateral">CHAT</button>
+            <button id="btn-mini-close" class="mini-btn-icon close" title="Fechar (ESC)">X</button>
+          </div>
+        </div>
+
+        <div class="mini-capsule-body">
+          <div class="mini-input-row">
+            <textarea id="mini-ai-textarea" class="mini-textarea" rows="2" placeholder="Cole (Ctrl+V) ou escreva um texto..."></textarea>
+          </div>
+
+          <div class="mini-controls-bar">
+            <div class="mini-meta-fields" id="mini-meta-fields">
+              <input type="text" id="mini-note-title" class="mini-field-small" placeholder="Titulo" />
+              <input type="text" id="mini-note-folder" class="mini-field-small" placeholder="Pasta" />
+              <input type="text" id="mini-note-tags" class="mini-field-small" placeholder="#tags" />
+            </div>
+            <div class="mini-action-row">
+              <div class="mini-action-btns">
+                <button id="btn-mini-paste" class="mini-btn" title="Colar texto da area de transferencia">Colar</button>
+                <button id="btn-mini-review" class="mini-btn primary" title="Revisar gramatica e estilo">Revisar</button>
+                <button id="btn-mini-copy" class="mini-btn" title="Copiar texto">Copiar</button>
+                <button id="btn-mini-save-file" class="mini-btn" title="Salvar arquivo ou documento na I.A local">Salvar Arquivo</button>
+              </div>
+              <div class="mini-send-group">
+                <label class="mini-send-label" for="mini-send-target">Enviar:</label>
+                <select id="mini-send-target" class="mini-select" title="Onde enviar">
+                  <option value="obsidian">Obsidian</option>
+                  <option value="ai_local">I.A Local (Arquivo)</option>
+                  <option value="notepad">Bloco de Notas</option>
+                  <option value="telegram">Telegram</option>
+                </select>
+                <button id="btn-mini-send" class="mini-btn gold" title="Enviar texto para o destino escolhido">Enviar</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="mini-review-preview" class="mini-review-preview hidden">
+            <div class="mini-review-header">
+              <span id="mini-review-summary">Revisao Concluida</span>
+              <button id="btn-mini-apply-review" class="mini-pill-btn">Substituir com Revisao</button>
+            </div>
+            <div id="mini-review-text" class="mini-review-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. CHAT LATERAL COM I.A LOCAL (DRAWER DESLIZANTE) -->
+  <div id="side-chat-drawer" class="side-chat-drawer hidden">
+    <div class="side-chat-header">
+      <div class="side-chat-title-group">
+        <div class="side-chat-tag">M.P.E INTELLIGENCE</div>
+        <div class="side-chat-title">CHAT // AI KATAROS</div>
+        <div id="side-ai-status" class="side-ai-status offline">Verificando motor...</div>
+      </div>
+      <button id="btn-close-side-chat" class="side-chat-close-btn" title="Recolher Chat Lateral">&times;</button>
+    </div>
+
+    <!-- Parametros da IA -->
+    <div class="side-chat-params">
+      <div class="side-param-item">
+        <label>Modo</label>
+        <select id="side-ai-mode" class="side-select">
+          <option value="free">Conversa</option>
+          <option value="review">Revisar Texto</option>
+          <option value="code">Programacao</option>
+          <option value="draft">Redigir Texto</option>
+          <option value="obsidian">Organizar Nota</option>
+        </select>
+      </div>
+      <div class="side-param-item">
+        <label>Tom</label>
+        <select id="side-ai-tone" class="side-select">
+          <option value="amigavel">Amigavel</option>
+          <option value="profissional">Profissional</option>
+          <option value="conciso">Conciso / Tecnico</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Area de Mensagens -->
+    <div id="side-chat-messages" class="side-chat-messages">
+      <div class="side-msg assistant">
+        <div class="side-msg-header">AI KATAROS <span class="side-msg-time">Agora</span></div>
+        <div class="side-msg-content">AI Kataros pronta para conversar, revisar textos e redigir codigo com base na memoria e no Obsidian. Envie /ajuda para ver os comandos.</div>
+      </div>
+    </div>
+
+    <!-- Input e Acoes -->
+    <div class="side-chat-input-bar">
+      <textarea id="side-chat-input" class="side-chat-textarea" rows="2" placeholder="Mensagem ou /ajuda (Enter envia, Shift+Enter quebra linha)"></textarea>
+      <div class="side-chat-footer-actions">
+        <button id="btn-side-chat-clear" class="side-action-btn subtle">Limpar</button>
+        <button id="btn-side-chat-save-file" class="side-action-btn" title="Importar ou salvar arquivo/extrato na I.A Local">Salvar Arquivo</button>
+        <button id="btn-side-chat-to-obsidian" class="side-action-btn gold" title="Salvar resposta atual no Obsidian">Salvar no Obsidian</button>
+        <button id="btn-side-chat-send" class="side-action-btn primary">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. MODAL PRINT NOMEADO -->
+  <div id="modal-named-print" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Print Nomeado</h2>
+        <p id="named-print-origin">Defina o nome e a categoria antes de salvar.</p>
+      </div>
+      <div class="modal-body">
+        <div class="named-print-preview-wrap">
+          <img id="named-print-preview" class="named-print-preview" alt="Preview do Print" />
+        </div>
+
+        <label class="field-label">Nome do Print</label>
+        <input type="text" id="named-print-name" class="field-input" placeholder="Ex: Comprovante_PIX_Nubank" maxlength="80" />
+
+        <label class="field-label">Categoria / Subpasta</label>
+        <select id="named-print-category" class="field-input">
+          <option value="Geral">Geral</option>
+          <option value="Extratos">Extratos</option>
+          <option value="Recibos">Recibos</option>
+          <option value="Comprovantes">Comprovantes</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="Sistemas">Sistemas</option>
+          <option value="Contratos">Contratos</option>
+        </select>
+
+        <label class="field-label">Dados / Observação para consulta na I.A (Opcional)</label>
+        <textarea id="named-print-notes" class="field-textarea" rows="2" placeholder="Ex: Recibo R$ 350,00 - Cliente Joao / Saldo R$ 2.400,00"></textarea>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="named-print-save-ai" checked />
+          <span><strong>Salvar arquivo na I.A local?</strong> (Indexa para consultas em /recibo e /extrato)</span>
+        </label>
+      </div>
+      <div class="modal-footer between">
+        <button id="btn-cancel-named-print" class="hud-btn subtle">Cancelar</button>
+        <button id="btn-save-named-print" class="hud-btn primary">Salvar Print</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. MODAL SALVAR ARQUIVO NA I.A LOCAL -->
+  <div id="modal-save-ai-file" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Salvar arquivo na I.A local?</h2>
+        <p>Organiza em ./arquivos/&lt;Categoria&gt;/ e libera consultas de extratos, saldos e recibos na AI Kataros.</p>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Título / Nome do Arquivo</label>
+        <input type="text" id="ai-doc-title" class="field-input" placeholder="Ex: Extrato_Nubank_Nov2026" maxlength="80" />
+
+        <label class="field-label">Categoria do Documento</label>
+        <select id="ai-doc-category" class="field-input">
+          <option value="Auto">Auto (Detectar pelo conteúdo)</option>
+          <option value="Extratos">Extratos</option>
+          <option value="Recibos">Recibos</option>
+          <option value="Comprovantes">Comprovantes</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="Contratos">Contratos</option>
+          <option value="Geral">Geral</option>
+        </select>
+
+        <label class="field-label">Importar Arquivo do Computador (Opcional: .OFX, .CSV, .TXT, .MD, .PDF)</label>
+        <div class="input-with-btn">
+          <input type="text" id="ai-doc-filepath" class="field-input" placeholder="Nenhum arquivo selecionado (ou use o texto abaixo)" readonly />
+          <button type="button" id="btn-ai-doc-pick-file" class="hud-btn small">Arquivo...</button>
+          <button type="button" id="btn-ai-doc-clear-file" class="hud-btn subtle small">Limpar</button>
+        </div>
+
+        <label class="field-label">Conteúdo / Extrato / Recibo</label>
+        <textarea id="ai-doc-content" class="field-textarea" rows="4" placeholder="Cole aqui o extrato, recibo ou notas..."></textarea>
+      </div>
+      <div class="modal-footer between">
+        <button id="btn-cancel-ai-doc" class="hud-btn subtle">Cancelar</button>
+        <button id="btn-confirm-ai-doc" class="hud-btn primary">Salvar na I.A Local</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 15. WORKSPACE ORGANIZADOR DE ARQUIVOS & PRINTS (INSPIRADO NO ARQUITHON) -->
+  <section id="organizer-workspace" class="organizer-workspace hidden">
+    <div class="org-shell">
+      <div class="org-toolbar">
+        <div class="org-scope-switch" title="Alternar entre pasta de arquivos e pasta de prints">
+          <button type="button" class="org-scope-btn active" data-scope="arquivos">Arquivos (arquivos/)</button>
+          <button type="button" class="org-scope-btn" data-scope="prints">Prints (prints/)</button>
+        </div>
+
+        <div class="org-actions-group">
+          <button type="button" id="btn-org-back-astrolabe" class="hud-btn small">Voltar ao Astrolábio</button>
+          <button type="button" id="btn-org-pick-files" class="hud-btn primary small" title="Ctrl+O">Selecionar Arquivos</button>
+          <button type="button" id="btn-org-pick-folder" class="hud-btn small">Selecionar Pasta</button>
+          <button type="button" id="btn-org-open-arquivos" class="hud-btn small">Abrir Pasta de Arquivos</button>
+          <button type="button" id="btn-org-open-prints" class="hud-btn small">Abrir Pasta de Prints</button>
+          <button type="button" id="btn-org-undo" class="hud-btn danger small hidden">Desfazer Última Organização</button>
+          <button type="button" id="btn-org-settings" class="hud-btn subtle small">Preferências</button>
+        </div>
+      </div>
+
+      <div class="org-controls-bar">
+        <div class="org-criterion-group">
+          <label class="org-label" for="org-criterion-select">Critério:</label>
+          <select id="org-criterion-select" class="field-input org-select">
+            <option value="type">Por Tipo (Extensão)</option>
+            <option value="date">Por Data de Modificação</option>
+            <option value="name">Por Nome (A - Z)</option>
+            <option value="size">Por Tamanho</option>
+          </select>
+
+          <label class="org-check">
+            <input type="checkbox" id="org-move-checkbox" />
+            <span>Mover em vez de copiar</span>
+          </label>
+        </div>
+
+        <div class="org-search-group">
+          <input type="text" id="org-search-input" class="field-input org-search-input" placeholder="Buscar por nome, pasta ou conteúdo... (Ctrl+F)" />
+          <label class="org-check">
+            <input type="checkbox" id="org-search-content-checkbox" checked />
+            <span>Buscar no conteúdo</span>
+          </label>
+          <button type="button" id="btn-org-refresh" class="hud-btn small">Atualizar</button>
+        </div>
+      </div>
+
+      <!-- Zona de Arrastar e Soltar -->
+      <div id="org-dropzone" class="org-dropzone">
+        <div class="org-dropzone-text">
+          Arraste e solte arquivos ou pastas do Explorer aqui para organizar automaticamente em <strong id="org-target-label">./arquivos</strong>
+        </div>
+        <div id="org-stats-pill" class="org-stats-pill">0 arquivos</div>
+      </div>
+
+      <!-- Barra de Progresso para Lotes -->
+      <div id="org-progress-wrap" class="org-progress-wrap hidden">
+        <div class="org-progress-info">
+          <span id="org-progress-label">Organizando arquivos...</span>
+          <span id="org-progress-count">0 / 0</span>
+        </div>
+        <div class="org-progress-track">
+          <div id="org-progress-bar" class="org-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Arvore Expansivel de Categorias / Resultados de Busca -->
+      <div id="org-tree-list" class="org-tree-list">
+        <div class="org-empty">Nenhum arquivo organizado ainda. Selecione ou arraste arquivos acima.</div>
+      </div>
+    </div>
+
+    <!-- Overlay visual durante dragover -->
+    <div id="org-drag-overlay" class="org-drag-overlay hidden">
+      <div class="org-drag-card">Solte os arquivos ou pastas aqui para organizar</div>
+    </div>
+  </section>
+
+  <!-- Menu de Contexto (Botao Direito) do Organizador -->
+  <div id="org-context-menu" class="org-context-menu hidden">
+    <button type="button" id="ctx-open-file" class="org-ctx-item">Abrir Arquivo</button>
+    <button type="button" id="ctx-open-explorer" class="org-ctx-item">Abrir no Explorer</button>
+    <button type="button" id="ctx-delete-file" class="org-ctx-item danger">Excluir Arquivo</button>
+  </div>
+
+  <!-- Modal Resultado da Organizacao ("O que foi para onde") -->
+  <div id="modal-org-result" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2 id="org-res-title">Organização Concluída</h2>
+        <p id="org-res-subtitle">Resumo dos arquivos organizados.</p>
+      </div>
+      <div class="modal-body">
+        <div id="org-res-list" class="org-res-list"></div>
+      </div>
+      <div class="modal-footer between">
+        <button type="button" id="btn-org-res-revert" class="hud-btn danger">Reverter</button>
+        <div class="footer-right">
+          <button type="button" id="btn-org-res-open" class="hud-btn">Abrir Pasta</button>
+          <button type="button" id="btn-org-res-ok" class="hud-btn primary">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmacao Segura (Mover / Excluir Arquivo) -->
+  <div id="modal-org-confirm" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="org-confirm-title">Confirmar Ação</h2>
+        <p id="org-confirm-desc">Tem certeza?</p>
+      </div>
+      <div class="modal-footer between">
+        <button type="button" id="btn-org-confirm-cancel" class="hud-btn subtle">Cancelar</button>
+        <button type="button" id="btn-org-confirm-ok" class="hud-btn danger">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n-tones.js"></script>
+  <script src="js/astrolabe3d.js"></script>
+  <script src="js/areaSelector.js"></script>
+  <script src="js/kataros3d.js"></script>
+  <script src="js/organizer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
