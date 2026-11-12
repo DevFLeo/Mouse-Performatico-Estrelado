@@ -35,8 +35,13 @@ class Astrolabe3D {
     this.targetZoom = 1.0;
     this.userHasPositioned = false;
 
-    // Controle de arraste interativo
+    // Controle de arraste interativo e reposicionamento de estrelas
     this.isDragging = false;
+    this.draggingPoint = null;
+    this.isMovePointsMode = false;
+    this.isPickingLocation = false;
+    this.pickLocationCallback = null;
+    this.previewCursorCoords = null;
     this.dragStartX = 0;
     this.dragStartY = 0;
     this.dragMoved = 0;
@@ -274,6 +279,65 @@ class Astrolabe3D {
     }
   }
 
+  setMovePointsMode(enabled) {
+    this.isMovePointsMode = Boolean(enabled);
+    if (this.callbacks.onMoveModeChange) {
+      this.callbacks.onMoveModeChange(this.isMovePointsMode);
+    }
+  }
+
+  toggleMovePointsMode() {
+    this.setMovePointsMode(!this.isMovePointsMode);
+    return this.isMovePointsMode;
+  }
+
+  startPickingLocation(callback) {
+    this.isPickingLocation = true;
+    this.pickLocationCallback = callback || null;
+    this.canvas.style.cursor = 'crosshair';
+  }
+
+  cancelPickingLocation() {
+    this.isPickingLocation = false;
+    this.pickLocationCallback = null;
+    this.previewCursorCoords = null;
+    this.canvas.style.cursor = 'grab';
+  }
+
+  /**
+   * Converte (mx, my) da tela para (angle: 0..360, orbit: 1..3, customRadius: 0.12..0.90) no Astrolabio
+   */
+  screenToCircleCoords(mx, my) {
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    const baseR = Math.min(this.width, this.height) * 0.425 * Math.max(0.1, this.introProgress) * this.zoom;
+
+    const dx = mx - cx;
+    const dy = my - cy;
+    const rawDist = Math.hypot(dx, dy) / Math.max(1, baseR);
+    const customRadius = Number(Math.max(0.12, Math.min(0.9, rawDist)).toFixed(3));
+
+    let rad = Math.atan2(dy, dx) - this.wheelRotation;
+    let deg = ((rad * 180) / Math.PI + 90) % 360;
+    if (deg < 0) deg += 360;
+    const angle = Math.round(deg) % 360;
+
+    let orbit = 3;
+    if (customRadius < 0.34) {
+      orbit = 1;
+    } else if (customRadius < 0.79) {
+      orbit = 2;
+    }
+
+    return {
+      angle,
+      orbit,
+      customRadius,
+      screenX: mx,
+      screenY: my
+    };
+  }
+
   resetView() {
     this.wheelRotation = 0;
     this.wheelVelocity = 0;
@@ -289,7 +353,21 @@ class Astrolabe3D {
     window.addEventListener('resize', () => this.resize());
 
     this.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      if (this.isPickingLocation && e.button === 0) {
+        const coords = this.screenToCircleCoords(mx, my);
+        const cb = this.pickLocationCallback;
+        this.cancelPickingLocation();
+        this.spawnShockwave(mx, my, '#73F3FF', 0.9);
+        if (cb) cb(coords);
+        return;
+      }
+
       if (e.button === 0 || e.button === 2) {
+        this.updateHover(mx, my);
         this.isDragging = true;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
@@ -297,6 +375,13 @@ class Astrolabe3D {
         this.lastMouseY = e.clientY;
         this.dragMoved = 0;
         this.wheelVelocity = 0;
+
+        // Se clicou sobre um astro com Modo Mover ativo, ou com Shift, ou com Botao Direito -> Arrasta o Astro!
+        if (this.hoveredPoint && (this.isMovePointsMode || e.shiftKey || e.button === 2)) {
+          this.draggingPoint = this.hoveredPoint;
+        } else {
+          this.draggingPoint = null;
+        }
       }
     });
 
@@ -306,10 +391,28 @@ class Astrolabe3D {
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
+      if (this.isPickingLocation) {
+        this.previewCursorCoords = this.screenToCircleCoords(mx, my);
+        this.canvas.style.cursor = 'crosshair';
+        return;
+      }
+
       if (this.isDragging) {
         const dx = e.clientX - this.lastMouseX;
         const dy = e.clientY - this.lastMouseY;
         this.dragMoved += Math.abs(dx) + Math.abs(dy);
+
+        if (this.draggingPoint && this.dragMoved >= 4) {
+          // Move a estrela diretamente para onde o mouse está no circulo!
+          const coords = this.screenToCircleCoords(mx, my);
+          this.draggingPoint.angle = coords.angle;
+          this.draggingPoint.orbit = coords.orbit;
+          this.draggingPoint.customRadius = coords.customRadius;
+          this.canvas.style.cursor = 'grabbing';
+          this.lastMouseX = e.clientX;
+          this.lastMouseY = e.clientY;
+          return;
+        }
 
         // Gira o circulo suavemente em 2D e 3D e mantem exatamente onde o usuario parar
         const deltaWheel = dx * 0.0052 * this.sensitivity;
@@ -333,6 +436,17 @@ class Astrolabe3D {
       if (!this.isDragging) return;
       this.isDragging = false;
       this.wheelVelocity = 0;
+
+      if (this.draggingPoint && this.dragMoved >= 6) {
+        const movedPt = this.draggingPoint;
+        this.draggingPoint = null;
+        this.spawnShockwave(e.clientX, e.clientY, '#73F3FF', 0.85);
+        if (this.callbacks.onPointMoved) {
+          this.callbacks.onPointMoved(movedPt);
+        }
+        return;
+      }
+      this.draggingPoint = null;
 
       if (this.dragMoved >= 4) {
         this.saveViewState();
@@ -843,11 +957,17 @@ class Astrolabe3D {
     for (let idx = 0; idx < this.points.length; idx++) {
       const pt = this.points[idx];
       const orbitNum = Number(pt.orbit) || 3;
-      const baseOrbitR = orbitRadii[orbitNum] || 0.76;
+      const hasCustomR = typeof pt.customRadius === 'number' && pt.customRadius > 0.08;
+      const baseOrbitR = hasCustomR ? Number(pt.customRadius) : orbitRadii[orbitNum] || 0.76;
+      const isBeingDragged = this.draggingPoint && this.draggingPoint.id === pt.id;
 
-      // Oscilacao harmonica sutil ao redor do ponto (sem tirar o astro do lugar onde o usuario parou)
-      const individualDrift = Math.sin(this.constellationTime * 0.45 + idx * 1.37) * 0.014;
-      const radialBreathing = Math.cos(this.constellationTime * 0.38 + idx * 2.1) * 0.007;
+      // Oscilacao harmonica sutil ao redor do ponto (pausa quando arrastando a estrela)
+      const individualDrift = isBeingDragged
+        ? 0
+        : Math.sin(this.constellationTime * 0.45 + idx * 1.37) * 0.014;
+      const radialBreathing = isBeingDragged
+        ? 0
+        : Math.cos(this.constellationTime * 0.38 + idx * 2.1) * 0.007;
       const orbitR = baseOrbitR + radialBreathing;
 
       const rad =
@@ -1123,6 +1243,48 @@ class Astrolabe3D {
         ctx.fillText(point.title.toUpperCase(), sp.x, sp.y + nodeR + 16 * sp.scale);
       }
 
+      if (this.draggingPoint && this.draggingPoint.id === point.id) {
+        ctx.font = '700 11px "Consolas", monospace';
+        ctx.fillStyle = '#73F3FF';
+        ctx.fillText(
+          `POSICAO: ${point.angle}° | ORBITA ${point.orbit}`,
+          sp.x,
+          sp.y - nodeR - 26 * sp.scale
+        );
+      }
+
+      ctx.restore();
+    }
+
+    // 12. PREVIEW INTERATIVO QUANDO ESCOLHENDO ONDE COLOCAR UM PONTO NO CIRCULO
+    if (this.isPickingLocation && this.previewCursorCoords) {
+      const pc = this.previewCursorCoords;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(nexusScreen.x, nexusScreen.y);
+      ctx.lineTo(pc.screenX, pc.screenY);
+      ctx.strokeStyle = '#73F3FF';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.arc(pc.screenX, pc.screenY, 15, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(115, 243, 255, 0.22)';
+      ctx.fill();
+      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = '#73F3FF';
+      ctx.stroke();
+
+      ctx.font = '700 12px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#73F3FF';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `CLIQUE PARA COLOCAR AQUI (${pc.angle}° • Orbita ${pc.orbit})`,
+        pc.screenX,
+        pc.screenY - 24
+      );
       ctx.restore();
     }
 

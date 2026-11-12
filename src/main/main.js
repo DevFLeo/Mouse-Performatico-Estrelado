@@ -121,6 +121,41 @@ function createWindow() {
         const imgAstrolabe2D = await mainWindow.webContents.capturePage();
         fs.writeFileSync(path.join(outDir, 'verify_4_astrolabe2d.png'), imgAstrolabe2D.toPNG());
 
+        // Teste do fluxo Adicionar Ponto: clicar no circulo -> Forjador abre com posicao preenchida
+        const addResult = await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            document.getElementById('btn-dock-add-point').click();
+            await new Promise(r => setTimeout(r, 200));
+            const cv = document.getElementById('astrolabe-canvas');
+            const r = cv.getBoundingClientRect();
+            const x = r.left + r.width / 2 + 180;
+            const y = r.top + r.height / 2 - 120;
+            cv.dispatchEvent(new MouseEvent('mousedown', { clientX: x, clientY: y, button: 0, bubbles: true }));
+            window.dispatchEvent(new MouseEvent('mouseup', { clientX: x, clientY: y, button: 0, bubbles: true }));
+            await new Promise(r => setTimeout(r, 250));
+            return {
+              modalOpen: !document.getElementById('modal-point').classList.contains('hidden'),
+              angle: document.getElementById('pt-angle').value,
+              orbit: document.getElementById('pt-orbit').value
+            };
+          })()
+        `);
+        console.log('MPE_ADD_POINT_FLOW:', JSON.stringify(addResult));
+        await new Promise((r) => setTimeout(r, 200));
+        const imgAdd = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_5_add_point.png'), imgAdd.toPNG());
+
+        await mainWindow.webContents.executeJavaScript(`
+          document.getElementById('modal-point').classList.add('hidden');
+          document.getElementById('btn-toggle-move-points').click();
+        `);
+        await new Promise((r) => setTimeout(r, 300));
+        const imgMove = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_6_move_points.png'), imgMove.toPNG());
+        await mainWindow.webContents.executeJavaScript(`
+          document.getElementById('btn-cancel-placement').click();
+        `);
+
         console.log('MPE_SELF_TEST_PASSED');
         isQuitting = true;
         hookBridge.stop();

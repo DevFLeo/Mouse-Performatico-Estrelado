@@ -115,3 +115,34 @@ Todos os pontos ficam salvos no arquivo **[`mpe.config.json`](file:///c:/Projeto
 * **Executar a Ação 2D:**
   * Clique no botão **`Acao 2D`** no dock (ou cadastre um ponto com o tipo `Acao 2D: Varredura Astrolabio 2D + Captura Instantanea`) para disparar a onda de choque 2D em todos os vetores, capturar instantaneamente o sistema ativo via GDI+ nativo (`MpeHook.exe --CAPTURE-NOW`), salvar em `./Capturas_MPE/MPE_Acao2D_*.png` e copiar para a Área de Transferência.
   * Todos os pontos estelares do mapa (`08 7`, `04 7`, `08 1`, `09 7`, `07 7`, `06 7`, `05 7`, `09 4`, `01 7`) funcionam integralmente tanto no **Modo 2D** quanto no **Modo 3D**.
+
+
+---
+
+## 5. Adicionar Pontos e Mudar Pontos de Lugar (Somente pelo MPE.exe)
+
+> Edicao de pontos so funciona no Modo Editor (abrindo pelo icone `MPE.exe`). No modo atalho (`Shift + Ctrl + Alt + Botao Direito`) os botoes de edicao ficam ocultos.
+
+### Adicionar um ponto novo
+1. Clique em **`+ Adicionar Ponto`** (dock inferior direito) ou **`+ Salvar Novo Ponto`** (barra superior).
+2. Aparece o aviso **ADICIONAR PONTO**. Um marcador ciano segue o mouse mostrando angulo e orbita.
+3. **Clique no lugar do circulo** onde o ponto deve ficar.
+4. O **Forjador de Estrelas** abre com a posicao ja preenchida. Escolha:
+   - **Tipo de Acao** (Print, Print + Telegram, Recorte, Texto, Abrir Pasta, URL, Comando, Acao 2D, Alternar 2D/3D).
+   - **Destino** (padrao: `Eu | Você | Leonardo`).
+   - Titulo, codigo, cor do vetor e glifo.
+5. Clique em **`Salvar Ponto no JSON`**. O ponto aparece no circulo na hora e fica salvo em `mpe.config.json`.
+
+### Ajustar a posicao dentro do Forjador
+- **Mini-mapa circular**: clique ou arraste o marcador ciano. Os pontos dourados sao os pontos que ja existem.
+- **`Escolher Clicando no Circulo Grande`**: fecha o Forjador por um momento, voce clica no circulo e ele volta com a nova posicao.
+- Tambem da para digitar **Orbita**, **Angulo (0-360)** e **Profundidade 3D** direto nos campos.
+
+### Mudar pontos que ja existem de lugar
+- Clique em **`Mover Pontos`** (dock ou barra superior). O botao fica ciano.
+- **Arraste qualquer estrela** para o novo lugar. Ao soltar, a posicao e salva automaticamente.
+- Atalho sem ativar o modo: segure **Shift** e arraste uma estrela.
+- Para sair: clique em **`Concluir / Voltar`**, clique de novo em **`Mover Pontos`** ou aperte **ESC**.
+
+### Editar ou excluir um ponto
+- **Clique direito** sobre a estrela (sem arrastar) abre o Forjador daquele ponto, com o botao **`Excluir Ponto`**.

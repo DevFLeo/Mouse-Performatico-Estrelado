@@ -373,11 +373,7 @@
     }
 
     if (point.actionType === 'open_settings') {
-      if (currentMode === 'hud-only') {
-        showToast('Para editar ou criar pontos, entre pelo icone executavel MPE.exe.');
-        return;
-      }
-      openPointModal(null);
+      startAddPointFlow();
       return;
     }
 
@@ -465,6 +461,8 @@
       document.getElementById('pt-orbit').value = String(point.orbit || 3);
       document.getElementById('pt-angle').value = String(point.angle || 0);
       document.getElementById('pt-elevation').value = String(point.elevation || 15);
+      document.getElementById('pt-custom-radius').value =
+        typeof point.customRadius === 'number' ? String(point.customRadius) : '';
       document.getElementById('pt-vector-style').value = point.vectorStyle || 'gold';
       document.getElementById('pt-glyph').value = point.glyph || '';
 
@@ -496,6 +494,7 @@
       document.getElementById('pt-orbit').value = '3';
       document.getElementById('pt-angle').value = String((nextNum * 37) % 360);
       document.getElementById('pt-elevation').value = String(((nextNum % 3) - 1) * 18);
+      document.getElementById('pt-custom-radius').value = '';
       document.getElementById('pt-vector-style').value = 'gold';
       document.getElementById('pt-glyph').value = 'Π';
 
@@ -513,6 +512,127 @@
 
     updatePointModalFields();
     modal.classList.remove('hidden');
+    drawPositionMinimap();
+  }
+
+  /**
+   * Mini-mapa circular dentro do Forjador de Estrelas: mostra todos os pontos existentes
+   * (dourado) e o ponto sendo editado (ciano). Clique/arraste nele para escolher a posicao.
+   */
+  function drawPositionMinimap() {
+    const cv = document.getElementById('pt-minimap-canvas');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const w = cv.width;
+    const h = cv.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const R = w / 2 - 6;
+    const radii = { 1: 0.165, 2: 0.725, 3: 0.855 };
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(229, 184, 75, 0.55)';
+    ctx.lineWidth = 1;
+    [1, 2, 3].forEach((o) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * radii[o], 0, Math.PI * 2);
+      ctx.setLineDash(o === 1 ? [2, 3] : []);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = '#E5B84B';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    const toXY = (angle, orbit, customR) => {
+      const r = typeof customR === 'number' && customR > 0.08 ? customR : radii[orbit] || 0.855;
+      const rad = ((angle - 90) * Math.PI) / 180;
+      return { x: cx + Math.cos(rad) * r * R, y: cy + Math.sin(rad) * r * R };
+    };
+
+    (currentConfig.points || []).forEach((p) => {
+      if (p.id === editingPointId) return;
+      const pos = toXY(Number(p.angle) || 0, Number(p.orbit) || 3, p.customRadius);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(229, 184, 75, 0.75)';
+      ctx.fill();
+    });
+
+    const angle = Number(document.getElementById('pt-angle').value) || 0;
+    const orbit = Number(document.getElementById('pt-orbit').value) || 3;
+    const crRaw = document.getElementById('pt-custom-radius').value;
+    const cr = crRaw ? Number(crRaw) : undefined;
+    const me = toXY(angle, orbit, cr);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(me.x, me.y);
+    ctx.strokeStyle = 'rgba(115, 243, 255, 0.6)';
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(me.x, me.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#73F3FF';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  function applyPickedCoords(coords) {
+    document.getElementById('pt-angle').value = String(coords.angle);
+    document.getElementById('pt-orbit').value = String(coords.orbit);
+    document.getElementById('pt-custom-radius').value = String(coords.customRadius);
+    drawPositionMinimap();
+  }
+
+  function showPlacementBanner(text) {
+    const banner = document.getElementById('placement-banner');
+    document.getElementById('placement-banner-text').textContent = text;
+    banner.classList.remove('hidden');
+  }
+
+  function hidePlacementBanner() {
+    document.getElementById('placement-banner').classList.add('hidden');
+  }
+
+  function setMovePointsUI(enabled) {
+    document.getElementById('btn-toggle-move-points').classList.toggle('active', enabled);
+    const topBtn = document.getElementById('btn-move-stars-top');
+    if (topBtn) topBtn.classList.toggle('primary', enabled);
+    if (enabled) {
+      showPlacementBanner(
+        'MODO MOVER PONTOS: Clique e arraste qualquer estrela para muda-la de lugar. Ao soltar, a nova posicao e salva automaticamente.'
+      );
+    } else {
+      hidePlacementBanner();
+    }
+  }
+
+  /**
+   * Fluxo "Adicionar Ponto": 1) usuario clica no circulo onde quer o ponto, 2) abre o Forjador
+   * ja com angulo/orbita preenchidos para configurar a acao (Print, Telegram, Recorte, etc.).
+   */
+  function startAddPointFlow() {
+    if (currentMode === 'hud-only') {
+      showToast('Para adicionar ou editar pontos, abra pelo icone executavel MPE.exe.');
+      return;
+    }
+    if (astrolabe.isMovePointsMode) {
+      astrolabe.setMovePointsMode(false);
+    }
+    showPlacementBanner(
+      'ADICIONAR PONTO: Clique no lugar do Circulo onde o novo ponto deve ficar. Depois voce escolhe a acao dele.'
+    );
+    astrolabe.startPickingLocation((coords) => {
+      hidePlacementBanner();
+      openPointModal(null);
+      applyPickedCoords(coords);
+      showToast(`Posicao escolhida: ${coords.angle} graus, Orbita ${coords.orbit}. Agora configure a acao do ponto.`);
+    });
   }
 
   async function savePointFromModal() {
@@ -526,6 +646,8 @@
     const elevation = Number(document.getElementById('pt-elevation').value) || 0;
     const vectorStyle = document.getElementById('pt-vector-style').value;
     const glyph = document.getElementById('pt-glyph').value;
+    const customRadiusRaw = document.getElementById('pt-custom-radius').value;
+    const customRadius = customRadiusRaw ? Number(customRadiusRaw) : undefined;
 
     const pointObj = {
       id: editingPointId || `star-${Date.now()}`,
@@ -536,6 +658,7 @@
       orbit,
       angle,
       elevation,
+      ...(typeof customRadius === 'number' && !Number.isNaN(customRadius) ? { customRadius } : {}),
       vectorStyle,
       glyph,
       hasArrow: vectorStyle === 'blue',
@@ -685,10 +808,100 @@
           return;
         }
         openPointModal(pt);
+      },
+      onPointMoved: async (pt) => {
+        if (currentMode === 'hud-only') {
+          // Desfaz o movimento: edicao apenas pelo executavel
+          currentConfig = await window.mpeApi.getConfig();
+          astrolabe.setConfig(currentConfig);
+          showToast('Para mudar pontos de lugar, abra pelo icone executavel MPE.exe.');
+          return;
+        }
+        const points = (currentConfig.points || []).map((p) =>
+          p.id === pt.id
+            ? Object.assign({}, p, {
+                angle: pt.angle,
+                orbit: pt.orbit,
+                customRadius: pt.customRadius
+              })
+            : p
+        );
+        currentConfig.points = points;
+        currentConfig = await window.mpeApi.saveConfig(currentConfig);
+        astrolabe.setConfig(currentConfig);
+        showToast(`Ponto [${pt.code}] movido para ${pt.angle} graus (Orbita ${pt.orbit}) e salvo.`);
       }
     });
     astrolabe.setConfig(currentConfig);
     syncDimensionButtons(astrolabe.projectionMode);
+
+    // Adicionar Ponto (Dock + Topo) e Mover Pontos
+    document.getElementById('btn-dock-add-point').addEventListener('click', startAddPointFlow);
+    const toggleMove = () => {
+      if (currentMode === 'hud-only') {
+        showToast('Para mudar pontos de lugar, abra pelo icone executavel MPE.exe.');
+        return;
+      }
+      astrolabe.cancelPickingLocation();
+      const enabled = astrolabe.toggleMovePointsMode();
+      setMovePointsUI(enabled);
+    };
+    document.getElementById('btn-toggle-move-points').addEventListener('click', toggleMove);
+    document.getElementById('btn-move-stars-top').addEventListener('click', toggleMove);
+    document.getElementById('btn-cancel-placement').addEventListener('click', () => {
+      astrolabe.cancelPickingLocation();
+      astrolabe.setMovePointsMode(false);
+      setMovePointsUI(false);
+    });
+
+    // Escolher posicao dentro do Forjador: clicando no Circulo grande
+    document.getElementById('btn-pick-on-circle').addEventListener('click', () => {
+      const modal = document.getElementById('modal-point');
+      modal.classList.add('hidden');
+      showPlacementBanner('Clique no Circulo onde este ponto deve ficar.');
+      astrolabe.startPickingLocation((coords) => {
+        hidePlacementBanner();
+        modal.classList.remove('hidden');
+        applyPickedCoords(coords);
+      });
+    });
+
+    // Escolher posicao no mini-mapa (clique ou arraste)
+    const minimap = document.getElementById('pt-minimap-canvas');
+    let minimapDragging = false;
+    const pickFromMinimap = (e) => {
+      const rect = minimap.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * minimap.width;
+      const y = ((e.clientY - rect.top) / rect.height) * minimap.height;
+      const cx = minimap.width / 2;
+      const cy = minimap.height / 2;
+      const R = minimap.width / 2 - 6;
+      const dist = Math.min(0.9, Math.max(0.12, Math.hypot(x - cx, y - cy) / R));
+      let deg = (Math.atan2(y - cy, x - cx) * 180) / Math.PI + 90;
+      if (deg < 0) deg += 360;
+      applyPickedCoords({
+        angle: Math.round(deg) % 360,
+        orbit: dist < 0.34 ? 1 : dist < 0.79 ? 2 : 3,
+        customRadius: Number(dist.toFixed(3))
+      });
+    };
+    minimap.addEventListener('mousedown', (e) => {
+      minimapDragging = true;
+      pickFromMinimap(e);
+    });
+    minimap.addEventListener('mousemove', (e) => {
+      if (minimapDragging) pickFromMinimap(e);
+    });
+    window.addEventListener('mouseup', () => {
+      minimapDragging = false;
+    });
+    ['pt-angle', 'pt-orbit'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', () => {
+        // Ao digitar manualmente, volta a usar o raio padrao da orbita escolhida
+        document.getElementById('pt-custom-radius').value = '';
+        drawPositionMinimap();
+      });
+    });
 
     document.getElementById('btn-mode-2d').addEventListener('click', () => {
       playUiSound('hover');
@@ -730,7 +943,7 @@
       }
     );
 
-    document.getElementById('btn-add-star').addEventListener('click', () => openPointModal(null));
+    document.getElementById('btn-add-star').addEventListener('click', startAddPointFlow);
     document.getElementById('btn-open-register').addEventListener('click', () => {
       const regInput = document.getElementById('reg-user-name');
       regInput.value =
@@ -899,6 +1112,12 @@
     function handleEscapeKey() {
       if (areaSelector && areaSelector.isActive) {
         areaSelector.cancel();
+        return;
+      }
+      if (astrolabe && (astrolabe.isPickingLocation || astrolabe.isMovePointsMode)) {
+        astrolabe.cancelPickingLocation();
+        astrolabe.setMovePointsMode(false);
+        setMovePointsUI(false);
         return;
       }
       const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
