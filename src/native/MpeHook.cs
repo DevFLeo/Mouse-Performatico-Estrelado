@@ -141,10 +141,23 @@ namespace MpeNative
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
-            _cacheDir = Path.Combine(Path.GetTempPath(), "MPE_PreCapture");
-            if (!Directory.Exists(_cacheDir))
+            try
             {
-                Directory.CreateDirectory(_cacheDir);
+                string rootDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."));
+                _cacheDir = Path.Combine(rootDir, "Capturas_MPE", ".cache");
+                if (!Directory.Exists(_cacheDir))
+                {
+                    Directory.CreateDirectory(_cacheDir);
+                }
+            }
+            catch
+            {
+                try
+                {
+                    _cacheDir = Path.Combine(Path.GetTempPath(), "MPE_PreCapture");
+                    if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
+                }
+                catch { }
             }
 
             if (args.Length > 0)
@@ -181,46 +194,64 @@ namespace MpeNative
             return r;
         }
 
+        private static readonly object _snapLock = new object();
+
         /// <summary>
-        /// Pre-captura instantaneamente o Sistema de Origem no exato momento em que o usuario
-        /// aciona Shift + Ctrl + Alt + Botao Direito, antes de exibir o HUD 3D.
+        /// Pre-captura em RAM (~5ms) o Sistema de Origem no exato momento em que o usuario
+        /// aciona Shift + Ctrl + Alt + Botao Direito, e grava o PNG em background thread
+        /// para nao bloquear o hook de mouse do Windows (zero lag na abertura do HUD).
         /// </summary>
         private static void CaptureOriginSnapshots(IntPtr originHwnd, RECT winRect, out string fullPath, out string winPath)
         {
             fullPath = Path.Combine(_cacheDir, "origin_fullscreen.png");
             winPath = Path.Combine(_cacheDir, "origin_window.png");
 
+            string fPath = fullPath;
+            string wPath = winPath;
+
             try
             {
                 Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
-                using (Bitmap bmpFull = new Bitmap(screenBounds.Width, screenBounds.Height, PixelFormat.Format32bppArgb))
+                Bitmap bmpFull = new Bitmap(screenBounds.Width, screenBounds.Height, PixelFormat.Format32bppArgb);
+                using (Graphics g = Graphics.FromImage(bmpFull))
                 {
-                    using (Graphics g = Graphics.FromImage(bmpFull))
-                    {
-                        g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
-                    }
-                    bmpFull.Save(fullPath, ImageFormat.Png);
-
-                    int wLeft = Math.Max(screenBounds.Left, winRect.Left);
-                    int wTop = Math.Max(screenBounds.Top, winRect.Top);
-                    int wRight = Math.Min(screenBounds.Right, winRect.Right);
-                    int wBottom = Math.Min(screenBounds.Bottom, winRect.Bottom);
-                    int wWidth = wRight - wLeft;
-                    int wHeight = wBottom - wTop;
-
-                    if (wWidth > 80 && wHeight > 80)
-                    {
-                        Rectangle cropRect = new Rectangle(wLeft - screenBounds.Left, wTop - screenBounds.Top, wWidth, wHeight);
-                        using (Bitmap bmpWin = bmpFull.Clone(cropRect, bmpFull.PixelFormat))
-                        {
-                            bmpWin.Save(winPath, ImageFormat.Png);
-                        }
-                    }
-                    else
-                    {
-                        bmpFull.Save(winPath, ImageFormat.Png);
-                    }
+                    g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
                 }
+
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    lock (_snapLock)
+                    {
+                        try
+                        {
+                            using (bmpFull)
+                            {
+                                bmpFull.Save(fPath, ImageFormat.Png);
+
+                                int wLeft = Math.Max(screenBounds.Left, winRect.Left);
+                                int wTop = Math.Max(screenBounds.Top, winRect.Top);
+                                int wRight = Math.Min(screenBounds.Right, winRect.Right);
+                                int wBottom = Math.Min(screenBounds.Bottom, winRect.Bottom);
+                                int wWidth = wRight - wLeft;
+                                int wHeight = wBottom - wTop;
+
+                                if (wWidth > 80 && wHeight > 80)
+                                {
+                                    Rectangle cropRect = new Rectangle(wLeft - screenBounds.Left, wTop - screenBounds.Top, wWidth, wHeight);
+                                    using (Bitmap bmpWin = bmpFull.Clone(cropRect, bmpFull.PixelFormat))
+                                    {
+                                        bmpWin.Save(wPath, ImageFormat.Png);
+                                    }
+                                }
+                                else
+                                {
+                                    bmpFull.Save(wPath, ImageFormat.Png);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                });
             }
             catch
             {
@@ -373,6 +404,28 @@ namespace MpeNative
             if (cmd == "--LIST-WINDOWS")
             {
                 ListOpenWindowsJson();
+                return;
+            }
+            else if (cmd == "--CAPTURE-NOW" && args.Length > 1)
+            {
+                string outPath = args[1];
+                try
+                {
+                    Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
+                    using (Bitmap bmp = new Bitmap(screenBounds.Width, screenBounds.Height, PixelFormat.Format32bppArgb))
+                    {
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
+                        }
+                        bmp.Save(outPath, ImageFormat.Png);
+                    }
+                    Console.WriteLine("CAPTURED_OK|" + outPath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("CAPTURE_ERR|" + ex.Message);
+                }
                 return;
             }
             else if (cmd == "--COPY-SELECTION" && args.Length > 1)

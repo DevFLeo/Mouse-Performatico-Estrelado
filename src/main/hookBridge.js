@@ -107,6 +107,23 @@ class HookBridge extends EventEmitter {
     };
   }
 
+  captureScreenFast(outPath) {
+    return new Promise((resolve) => {
+      if (!fs.existsSync(this.hookExePath)) {
+        return resolve(false);
+      }
+      execFile(
+        this.hookExePath,
+        ['--CAPTURE-NOW', outPath],
+        { windowsHide: true, encoding: 'utf8' },
+        (err, stdout) => {
+          if (err || !stdout) return resolve(false);
+          resolve(stdout.includes('CAPTURED_OK') && fs.existsSync(outPath));
+        }
+      );
+    });
+  }
+
   listOpenWindows() {
     return new Promise((resolve) => {
       if (!fs.existsSync(this.hookExePath)) {

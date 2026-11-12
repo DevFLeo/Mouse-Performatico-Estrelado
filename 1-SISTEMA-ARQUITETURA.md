@@ -97,8 +97,13 @@ c:\Projetos\MousePerformaticoEstrelado\
 ### 3.3. Camada de Renderização e Motor Matemático 3D (`src/renderer/`)
 
 * **[`src/renderer/js/astrolabe3d.js`](file:///c:/Projetos/MousePerformaticoEstrelado/src/renderer/js/astrolabe3d.js)**:
-  * Renderiza a geometria tridimensional do Astrolábio em Degradê Preto e Dourado:
+  * Renderiza a geometria hibrida **2D (Base Original da Imagem)** e **3D (Constelacao Orbital Profunda)** do Astrolabio em Degrade Preto e Dourado:
     $$x_1 = x \cos(\text{tiltY}) - z \sin(\text{tiltY}), \quad z_1 = z \cos(\text{tiltY}) + x \sin(\text{tiltY})$$
     $$y_2 = y \cos(\text{tiltX}) - z_1 \sin(\text{tiltX}), \quad z_2 = z_1 \cos(\text{tiltX}) + y \cos(\text{tiltX})$$
-    $$P(x, y, z) = \left( C_x + x_2 \cdot R \cdot \frac{f}{f + 0.55 z_2}, \; C_y + y_2 \cdot R \cdot \frac{f}{f + 0.55 z_2} \right)$$
-  * Permite girar o círculo 3D lateralmente com física inercial e selecionar cada ponto salvo.
+    $$P(x, y, z) = \left( C_x + x_2 \cdot R \cdot \frac{f}{f + 0.85 \cdot \beta \cdot z_2}, \; C_y + y_2 \cdot R \cdot \frac{f}{f + 0.85 \cdot \beta \cdot z_2} \right)$$
+    onde $\beta \in [0, 1]$ (`modeBlend`) interpola suavemente entre o **Modo 2D Plano** ($\beta = 0$, fiel a imagem original de referencia) e o **Modo 3D Orbital** ($\beta = 1$).
+  * **Otimizacao de Velocidade (Zero Lag):**
+    * **Batching de Geometria GPU:** Todos os 72 marcadores de grau, 12 grupos de barras (`|||||`) e 12 grupos de pontos (`....`) sao agrupados em chamadas unicas de `ctx.stroke()` e `ctx.fill()`, sem `shadowBlur` custoso por segmento.
+    * **Hook Win32 Assincrono (`MpeHook.cs`):** A captura em memoria RAM (`CopyFromScreen`) leva apenas ~5ms no hook de mouse e a compressao PNG ocorre em background thread (`ThreadPool.QueueUserWorkItem`), liberando a abertura do HUD sem qualquer atraso no cursor.
+    * **Pausa Inteligente (`0% CPU/GPU`):** Quando minimizado com `ESC`, o loop `requestAnimationFrame` entra em estado `pause()` ate o proximo acionamento.
+  * **Trava de Posicao 2D/3D:** Ao girar ou inclinar o circulo com o mouse, ele permanece fixado exatamente no ponto escolhido pelo usuario (sem voltar para o zero) para facilitar o acionamento do comando.

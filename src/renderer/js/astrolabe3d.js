@@ -1,24 +1,30 @@
 /**
- * Motor Grafico 3D Interativo do Astrolabio M.P.E
- * Baseado na geometria do Astrolabio Dourado com:
- *  - Profundidade 3D expandida (Coroa cilindrica 3D no anel graduado, arcos meridianos 3D,
- *    hastes de elevacao Z entre o plano orbital e cada astro, escala e iluminacao por profundidade Z)
- *  - Movimento lento e organico entre os "astros" como uma constelacao viva (deriva orbital
- *    harmonica independente por astro, filamentos de constelacao dinamicos e particulas de luz
- *    fluindo lentamente entre os astros)
- *  - Rotacao circular interativa para os lados e inclinacao 3D em todos os eixos
+ * Motor Grafico Hibrido 2D / 3D de Alta Performance do Astrolabio M.P.E
+ * - Modo 2D ("2d"): Geometria plana fiel a imagem de referencia (assets/reference-astrolabe.jpg),
+ *   com circulos excentricos classicos, Nexus no quadrante inferior-direito, vetores azuis/dourados,
+ *   setas direcionais, glifos (Π, Δ, h, C), varredura de radar animada e ondas de choque 2D.
+ * - Modo 3D ("3d"): Profundidade orbital expandida com coroa cilindrica 3D, hastes de elevacao Z,
+ *   malha de constelacao viva entre os astros e inclinacao 3D travada no ponto onde o usuario parar.
+ * - Otimizacao Extrema (Zero Lag): Batching de chamadas Canvas (1 unico stroke por camada de ticks/barras),
+ *   eliminacao de Gaussian shadowBlur em loops massivos e pausa automatica quando minimizado (0% CPU/GPU).
  */
 class Astrolabe3D {
   constructor(canvas, callbacks = {}) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.ctx = canvas.getContext('2d', { alpha: true, desynchronized: true }) || canvas.getContext('2d');
     this.callbacks = callbacks;
 
     this.width = window.innerWidth;
     this.height = window.innerHeight;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 
-    // Estado de rotacao 3D e giro circular para os lados (mantem a posicao onde o usuario parar)
+    // Modo de Projecao: '2d' (Base fiel da imagem) ou '3d' (Orbital profundo)
+    // modeBlend: 0.0 = 2D puro, 1.0 = 3D completo (transicao animada suave)
+    this.projectionMode = '3d';
+    this.modeBlend = 1.0;
+    this.targetModeBlend = 1.0;
+
+    // Estado de rotacao circular e inclinacao 3D (permanece travado onde o usuario posicionar)
     this.wheelRotation = 0;
     this.wheelVelocity = 0;
     this.tiltX = 0.34;
@@ -28,7 +34,6 @@ class Astrolabe3D {
     this.zoom = 1.0;
     this.targetZoom = 1.0;
     this.userHasPositioned = false;
-    this.loadSavedViewState();
 
     // Controle de arraste interativo
     this.isDragging = false;
@@ -38,11 +43,21 @@ class Astrolabe3D {
     this.lastMouseX = 0;
     this.lastMouseY = 0;
 
-    // Tempo continuo para o movimento lento de constelacao entre os astros
+    // Animacoes de alta performance (2D e 3D)
     this.constellationTime = 0;
+    this.radarAngle = 0;
+    this.reticleAngle = 0;
     this.introProgress = 1;
     this.activePulsePointId = null;
     this.activePulseProgress = 0;
+    this.shockwaves = [];
+    this.laserBursts = [];
+    this.nexusHovered = false;
+    this.nexusScreenPos = { x: 0, y: 0, r: 18 };
+
+    // Controle de ciclo de renderizacao para 0% de uso em segundo plano
+    this.isPaused = false;
+    this.rafId = null;
 
     // Dados e Tema
     this.points = [];
@@ -62,43 +77,50 @@ class Astrolabe3D {
       glowIntensity: 0.85
     };
 
-    // Poeira estelar 3D em multiplas camadas de profundidade
+    // Poeira estelar otimizada
     this.stars = [];
-    this.initStarfield(180);
+    this.initStarfield(95);
+    this.loadSavedViewState();
 
     this.bindEvents();
     this.resize();
     this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
+    this.startLoop();
+  }
+
+  startLoop() {
+    if (!this.rafId && !this.isPaused) {
+      this.rafId = requestAnimationFrame(this.animate);
+    }
+  }
+
+  pause() {
+    this.isPaused = true;
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  resume() {
+    if (!this.isPaused && this.rafId) return;
+    this.isPaused = false;
+    this.startLoop();
   }
 
   initStarfield(count) {
     this.stars = [];
     for (let i = 0; i < count; i++) {
       this.stars.push({
-        x: (Math.random() - 0.5) * 2.5,
-        y: (Math.random() - 0.5) * 2.5,
-        z: (Math.random() - 0.5) * 1.8,
-        vx: (Math.random() - 0.5) * 0.00035,
-        vy: (Math.random() - 0.5) * 0.00035,
-        size: Math.random() * 1.9 + 0.4,
-        alpha: Math.random() * 0.65 + 0.15,
+        x: (Math.random() - 0.5) * 2.4,
+        y: (Math.random() - 0.5) * 2.4,
+        z: (Math.random() - 0.5) * 1.4,
+        vx: (Math.random() - 0.5) * 0.0003,
+        vy: (Math.random() - 0.5) * 0.0003,
+        size: Math.random() * 1.6 + 0.5,
+        alpha: Math.random() * 0.55 + 0.15,
         phase: Math.random() * Math.PI * 2
       });
-    }
-  }
-
-  setConfig(config) {
-    if (!config) return;
-    if (Array.isArray(config.points)) {
-      this.points = config.points;
-    }
-    if (config.theme) {
-      this.theme = Object.assign({}, this.theme, config.theme);
-    }
-    if (config.system) {
-      this.autoOrbit = config.system.autoOrbit !== false;
-      this.sensitivity = Number(config.system.sensitivity3D) || 1.0;
     }
   }
 
@@ -120,6 +142,11 @@ class Astrolabe3D {
         this.targetZoom = saved.targetZoom;
         this.zoom = saved.targetZoom;
       }
+      if (saved.projectionMode === '2d' || saved.projectionMode === '3d') {
+        this.projectionMode = saved.projectionMode;
+        this.targetModeBlend = saved.projectionMode === '2d' ? 0.0 : 1.0;
+        this.modeBlend = this.targetModeBlend;
+      }
       this.userHasPositioned = Boolean(saved.userHasPositioned);
     } catch (_) {}
   }
@@ -133,22 +160,116 @@ class Astrolabe3D {
           targetTiltX: this.targetTiltX,
           targetTiltY: this.targetTiltY,
           targetZoom: this.targetZoom,
+          projectionMode: this.projectionMode,
           userHasPositioned: this.userHasPositioned
         })
       );
     } catch (_) {}
   }
 
+  setConfig(config) {
+    if (!config) return;
+    if (Array.isArray(config.points)) {
+      this.points = config.points;
+    }
+    if (config.theme) {
+      this.theme = Object.assign({}, this.theme, config.theme);
+    }
+    if (config.system) {
+      this.autoOrbit = config.system.autoOrbit !== false;
+      this.sensitivity = Number(config.system.sensitivity3D) || 1.0;
+      if (config.system.projectionMode === '2d' || config.system.projectionMode === '3d') {
+        this.setProjectionMode(config.system.projectionMode, false);
+      }
+    }
+  }
+
+  setProjectionMode(mode, animateBurst = true) {
+    const normalized = mode === '2d' ? '2d' : '3d';
+    this.projectionMode = normalized;
+    this.targetModeBlend = normalized === '2d' ? 0.0 : 1.0;
+    if (normalized === '2d' && animateBurst) {
+      // Alinha exatamente na orientacao canonica da imagem base em 2D
+      this.wheelRotation = 0;
+      this.wheelVelocity = 0;
+    }
+    this.saveViewState();
+
+    if (animateBurst) {
+      this.spawnShockwave(
+        this.nexusScreenPos.x || this.width / 2,
+        this.nexusScreenPos.y || this.height / 2,
+        normalized === '2d' ? this.theme.goldSecondary : this.theme.vectorAccent,
+        1.35
+      );
+      this.triggerAllVectorsBurst();
+    }
+
+    if (this.callbacks.onModeChange) {
+      this.callbacks.onModeChange(normalized);
+    }
+  }
+
+  toggleProjectionMode() {
+    const nextMode = this.projectionMode === '2d' ? '3d' : '2d';
+    this.setProjectionMode(nextMode, true);
+    return nextMode;
+  }
+
+  spawnShockwave(x, y, color, speed = 1.0) {
+    this.shockwaves.push({
+      x,
+      y,
+      radius: 8,
+      maxRadius: Math.min(this.width, this.height) * 0.44,
+      alpha: 0.92,
+      color: color || this.theme.goldSecondary,
+      speed: speed * 9.5
+    });
+    if (this.shockwaves.length > 8) {
+      this.shockwaves.shift();
+    }
+  }
+
+  triggerAllVectorsBurst() {
+    this.laserBursts = [];
+    for (let i = 0; i < this.projectedPoints.length; i++) {
+      const p = this.projectedPoints[i];
+      this.laserBursts.push({
+        pointId: p.point.id,
+        progress: 0,
+        speed: 0.045 + (i % 3) * 0.008,
+        color: p.point.vectorStyle === 'gold' ? this.theme.goldSecondary : '#8AB4FF'
+      });
+    }
+  }
+
+  triggerPointBurst(point) {
+    if (!point) return;
+    this.activePulsePointId = point.id;
+    this.activePulseProgress = 0;
+    const found = this.projectedPoints.find((p) => p.point.id === point.id);
+    if (found) {
+      this.spawnShockwave(found.screen.x, found.screen.y, this.theme.goldSecondary, 0.9);
+      this.laserBursts.push({
+        pointId: point.id,
+        progress: 0,
+        speed: 0.065,
+        color: '#FFFFFF'
+      });
+    }
+  }
+
   triggerIntroAnimation(preservePosition = true) {
-    this.introProgress = 0;
+    this.resume();
+    this.introProgress = 0.15;
     if (!preservePosition && !this.userHasPositioned) {
-      this.wheelVelocity = 0.015;
-      this.tiltX = 0.58;
-      this.tiltY = -0.42;
+      this.wheelVelocity = 0.012;
+      this.tiltX = 0.52;
+      this.tiltY = -0.36;
       this.targetTiltX = 0.34;
       this.targetTiltY = -0.24;
     } else {
-      // Mantem exatamente o ponto e angulo 3D que o usuario posicionou
       this.wheelVelocity = 0;
     }
   }
@@ -161,6 +282,7 @@ class Astrolabe3D {
     this.targetZoom = 1.0;
     this.userHasPositioned = false;
     this.saveViewState();
+    this.spawnShockwave(this.width / 2, this.height / 2, this.theme.goldPrimary, 1.1);
   }
 
   bindEvents() {
@@ -179,6 +301,7 @@ class Astrolabe3D {
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (this.isPaused) return;
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -188,20 +311,20 @@ class Astrolabe3D {
         const dy = e.clientY - this.lastMouseY;
         this.dragMoved += Math.abs(dx) + Math.abs(dy);
 
-        // Movimentar gira o circulo 3D e mantem exatamente no ponto onde o usuario soltar
+        // Gira o circulo suavemente em 2D e 3D e mantem exatamente onde o usuario parar
         const deltaWheel = dx * 0.0052 * this.sensitivity;
         this.wheelRotation += deltaWheel;
         this.wheelVelocity = 0;
 
-        this.targetTiltY = Math.max(-1.05, Math.min(1.05, this.targetTiltY + dx * 0.0034 * this.sensitivity));
-        this.targetTiltX = Math.max(-1.05, Math.min(1.05, this.targetTiltX + dy * 0.0034 * this.sensitivity));
+        if (this.modeBlend > 0.1) {
+          this.targetTiltY = Math.max(-1.05, Math.min(1.05, this.targetTiltY + dx * 0.0034 * this.sensitivity));
+          this.targetTiltX = Math.max(-1.05, Math.min(1.05, this.targetTiltX + dy * 0.0034 * this.sensitivity));
+        }
 
         this.userHasPositioned = true;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
       } else {
-        // Nao reseta para zero ao mover o mouse: mantem o angulo 3D travado no ponto escolhido pelo usuario
-        // para facilitar o acionamento preciso do comando estelar
         this.updateHover(mx, my);
       }
     });
@@ -210,6 +333,7 @@ class Astrolabe3D {
       if (!this.isDragging) return;
       this.isDragging = false;
       this.wheelVelocity = 0;
+
       if (this.dragMoved >= 4) {
         this.saveViewState();
       }
@@ -226,11 +350,16 @@ class Astrolabe3D {
               this.callbacks.onPointEdit(this.hoveredPoint);
             }
           } else {
-            this.activePulsePointId = this.hoveredPoint.id;
-            this.activePulseProgress = 0;
+            this.triggerPointBurst(this.hoveredPoint);
             if (this.callbacks.onPointClick) {
               this.callbacks.onPointClick(this.hoveredPoint);
             }
+          }
+        } else if (this.nexusHovered && e.button === 0) {
+          // Clicar no Nexus de Origem executa a Acao Orbital 2D/3D (pulso + alternancia de modo)
+          const newMode = this.toggleProjectionMode();
+          if (this.callbacks.onNexusAction) {
+            this.callbacks.onNexusAction(newMode);
           }
         }
       }
@@ -257,79 +386,97 @@ class Astrolabe3D {
   resize() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
-    this.canvas.width = this.width * this.dpr;
-    this.canvas.height = this.height * this.dpr;
+    this.canvas.width = Math.round(this.width * this.dpr);
+    this.canvas.height = Math.round(this.height * this.dpr);
     this.canvas.style.width = `${this.width}px`;
     this.canvas.style.height = `${this.height}px`;
   }
 
   /**
-   * Projeta uma coordenada 3D (x, y, z) no espaco do Astrolabio para (screenX, screenY, scale)
+   * Projeta coordenadas (x, y, z) interpolando suavemente entre:
+   * - Modo 2D (modeBlend = 0): Plano 2D fiel a imagem de referencia (tilt = 0, z = 0)
+   * - Modo 3D (modeBlend = 1): Perspectiva 3D completa com inclinacao X/Y e elevacao Z
    */
   project3D(x, y, z, radiusBase) {
-    const cosX = Math.cos(this.tiltX);
-    const sinX = Math.sin(this.tiltX);
-    const cosY = Math.cos(this.tiltY);
-    const sinY = Math.sin(this.tiltY);
+    const blend = this.modeBlend;
+    const effTiltX = this.tiltX * blend;
+    const effTiltY = this.tiltY * blend;
+    const effZ = z * blend;
 
-    // 1. Rotacao em Y
-    const x1 = x * cosY - z * sinY;
-    const z1 = z * cosY + x * sinY;
+    const cosX = Math.cos(effTiltX);
+    const sinX = Math.sin(effTiltX);
+    const cosY = Math.cos(effTiltY);
+    const sinY = Math.sin(effTiltY);
+
+    const x1 = x * cosY - effZ * sinY;
+    const z1 = effZ * cosY + x * sinY;
     const y1 = y;
 
-    // 2. Rotacao em X
     const y2 = y1 * cosX - z1 * sinX;
     const z2 = z1 * cosX + y1 * sinX;
     const x2 = x1;
 
-    // Projecao perspectiva 3D abrangente
-    const fov = 2.45;
-    const perspective = fov / Math.max(0.4, fov + z2 * 0.68);
-
-    const cx = this.width / 2;
-    const cy = this.height / 2;
+    const fov = 3.2;
+    const perspective = fov / (fov + z2 * 0.85 * blend);
+    const scale = perspective * this.zoom;
 
     return {
-      x: cx + x2 * radiusBase * perspective * this.zoom,
-      y: cy + y2 * radiusBase * perspective * this.zoom,
+      x: this.width / 2 + x2 * radiusBase * scale,
+      y: this.height / 2 + y2 * radiusBase * scale,
       z: z2,
-      scale: perspective * this.zoom
+      scale
     };
   }
 
-  /**
-   * Desenha um anel 3D no espaco com deslocamento excentrico (ox, oy, oz) e inclinacao propria
-   */
-  draw3DRing(ctx, radiusNorm, offsetX, offsetY, offsetZ, ringTiltX, ringTiltY, strokeStyle, lineWidth, segments = 128, dashed = false) {
-    const baseR = Math.min(this.width, this.height) * 0.41 * this.introProgress;
-    ctx.save();
-    if (dashed) {
-      ctx.setLineDash([5, 7]);
-    }
-    ctx.beginPath();
+  draw3DRing(
+    ctx,
+    radiusNorm,
+    offsetX = 0,
+    offsetY = 0,
+    offsetZ = 0,
+    ringTiltX = 0,
+    ringTiltY = 0,
+    color = '#E5B84B',
+    lineWidth = 1.6,
+    segments = 96,
+    dashed = false
+  ) {
+    const baseR = Math.min(this.width, this.height) * 0.42 * this.introProgress;
+    const blend = this.modeBlend;
+    const effRingTiltX = ringTiltX * blend;
+    const effRingTiltY = ringTiltY * blend;
+    const effOffsetZ = offsetZ * blend;
 
-    const cRX = Math.cos(ringTiltX);
-    const sRX = Math.sin(ringTiltX);
-    const cRY = Math.cos(ringTiltY);
-    const sRY = Math.sin(ringTiltY);
+    ctx.save();
+    ctx.beginPath();
+    if (dashed) {
+      ctx.setLineDash([4, 6]);
+    }
+
+    const cRX = Math.cos(effRingTiltX);
+    const sRX = Math.sin(effRingTiltX);
+    const cRY = Math.cos(effRingTiltY);
+    const sRY = Math.sin(effRingTiltY);
 
     for (let i = 0; i <= segments; i++) {
-      const theta = (i / segments) * Math.PI * 2 + this.wheelRotation;
+      const theta = (i / segments) * Math.PI * 2 + this.wheelRotation * 0.25;
       const lx = Math.cos(theta) * radiusNorm;
       const ly = Math.sin(theta) * radiusNorm;
-      const lz = 0;
 
-      const ty = ly * cRX - lz * sRX;
-      const tz = lz * cRX + ly * sRX;
-      const tx = lx * cRY - tz * sRY;
-      const fz = tz * cRY + lx * sRY;
+      const rx1 = lx * cRY;
+      const rz1 = lx * sRY;
+      const ry1 = ly * cRX - rz1 * sRX;
+      const rz2 = rz1 * cRX + ly * sRX;
 
-      const p = this.project3D(tx + offsetX, ty + offsetY, fz + offsetZ, baseR);
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
+      const p = this.project3D(rx1 + offsetX, ry1 + offsetY, rz2 + effOffsetZ, baseR);
+      if (i === 0) {
+        ctx.moveTo(p.x, p.y);
+      } else {
+        ctx.lineTo(p.x, p.y);
+      }
     }
 
-    ctx.strokeStyle = strokeStyle;
+    ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
     ctx.restore();
@@ -349,47 +496,83 @@ class Astrolabe3D {
       }
     }
 
+    const ndx = mx - this.nexusScreenPos.x;
+    const ndy = my - this.nexusScreenPos.y;
+    this.nexusHovered = !closest && Math.sqrt(ndx * ndx + ndy * ndy) < 24;
+
     if (this.hoveredPoint !== closest) {
       this.hoveredPoint = closest;
-      this.canvas.style.cursor = closest ? 'pointer' : this.isDragging ? 'grabbing' : 'grab';
-      if (this.callbacks.onPointHover) {
+      if (this. callbacks && this.callbacks.onPointHover) {
         this.callbacks.onPointHover(closest);
       }
     }
+
+    this.canvas.style.cursor =
+      closest || this.nexusHovered ? 'pointer' : this.isDragging ? 'grabbing' : 'grab';
   }
 
   animate() {
-    // Quando o mouse esta sobre um astro, pausa o movimento da constelacao para clique instantaneo
-    const timeStep = this.hoveredPoint ? 0 : 0.0085;
+    if (this.isPaused) {
+      this.rafId = null;
+      return;
+    }
+
+    const timeStep = this.hoveredPoint ? 0 : 0.011;
     this.constellationTime += timeStep;
+    this.radarAngle = (this.radarAngle + 0.014) % (Math.PI * 2);
+    this.reticleAngle = (this.reticleAngle + 0.022) % (Math.PI * 2);
 
     if (this.introProgress < 1) {
-      this.introProgress = Math.min(1, this.introProgress + 0.035);
+      this.introProgress = Math.min(1, this.introProgress + 0.055);
+    }
+
+    // Interpolacao suave entre Modo 2D (0.0) e Modo 3D (1.0)
+    this.modeBlend += (this.targetModeBlend - this.modeBlend) * 0.14;
+    if (Math.abs(this.targetModeBlend - this.modeBlend) < 0.001) {
+      this.modeBlend = this.targetModeBlend;
     }
 
     if (!this.isDragging) {
-      // Desacelera suavemente e trava exatamente no ponto onde o usuario posicionou o circulo 3D
-      this.wheelVelocity *= 0.84;
+      this.wheelVelocity *= 0.82;
       if (Math.abs(this.wheelVelocity) < 0.00005) {
         this.wheelVelocity = 0;
       }
       this.wheelRotation += this.wheelVelocity;
     }
 
-    this.tiltX += (this.targetTiltX - this.tiltX) * 0.14;
-    this.tiltY += (this.targetTiltY - this.tiltY) * 0.14;
-    this.zoom += (this.targetZoom - this.zoom) * 0.14;
+    this.tiltX += (this.targetTiltX - this.tiltX) * 0.16;
+    this.tiltY += (this.targetTiltY - this.tiltY) * 0.16;
+    this.zoom += (this.targetZoom - this.zoom) * 0.16;
 
     if (this.activePulsePointId) {
-      this.activePulseProgress += 0.045;
+      this.activePulseProgress += 0.055;
       if (this.activePulseProgress >= 1) {
         this.activePulsePointId = null;
         this.activePulseProgress = 0;
       }
     }
 
+    // Atualiza ondas de choque (shockwaves)
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const sw = this.shockwaves[i];
+      sw.radius += sw.speed;
+      sw.alpha = Math.max(0, 1 - sw.radius / sw.maxRadius);
+      if (sw.alpha <= 0.02) {
+        this.shockwaves.splice(i, 1);
+      }
+    }
+
+    // Atualiza rajadas de laser nos vetores
+    for (let i = this.laserBursts.length - 1; i >= 0; i--) {
+      const lb = this.laserBursts[i];
+      lb.progress += lb.speed;
+      if (lb.progress >= 1) {
+        this.laserBursts.splice(i, 1);
+      }
+    }
+
     this.render();
-    requestAnimationFrame(this.animate);
+    this.rafId = requestAnimationFrame(this.animate);
   }
 
   render() {
@@ -401,28 +584,24 @@ class Astrolabe3D {
     const h = this.height;
     const cx = w / 2;
     const cy = h / 2;
-    const baseR = Math.min(w, h) * 0.41 * Math.max(0.05, this.introProgress);
+    const blend = this.modeBlend;
+    const baseR = Math.min(w, h) * 0.425 * Math.max(0.08, this.introProgress);
 
     ctx.clearRect(0, 0, w, h);
 
-    // 1. Fundo Degrade Preto e Dourado Imperial com transparencia de Overlay Nativo do Windows
-    const bgGrad = ctx.createRadialGradient(cx, cy, baseR * 0.1, cx, cy, Math.max(w, h) * 0.75);
-    bgGrad.addColorStop(0, this.theme.bgSecondary || '#171206');
-    bgGrad.addColorStop(0.46, this.theme.bgPrimary || '#050508');
-    bgGrad.addColorStop(1, 'rgba(2, 2, 4, 0.76)');
+    // 1. Fundo Degrade Preto Obsidiana e Ouro Imperial
+    const bgGrad = ctx.createRadialGradient(cx, cy, baseR * 0.08, cx, cy, Math.max(w, h) * 0.72);
+    bgGrad.addColorStop(0, blend < 0.3 ? '#0E0B05' : this.theme.bgSecondary || '#171206');
+    bgGrad.addColorStop(0.5, this.theme.bgPrimary || '#040406');
+    bgGrad.addColorStop(1, 'rgba(3, 3, 5, 0.84)');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Halo Dourado volumétrico 3D
-    const auraGrad = ctx.createRadialGradient(cx, cy, baseR * 0.55, cx, cy, baseR * 1.28);
-    auraGrad.addColorStop(0, 'rgba(229, 184, 75, 0.08)');
-    auraGrad.addColorStop(0.5, 'rgba(229, 184, 75, 0.035)');
-    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = auraGrad;
-    ctx.fillRect(0, 0, w, h);
-
-    // 2. Poeira Estelar 3D com deriva lenta de constelacao ao fundo
-    for (const s of this.stars) {
+    // 2. Poeira Estelar Otimizada (sem shadowBlur para maxima taxa de FPS)
+    ctx.fillStyle = 'rgba(255, 224, 138, 0.48)';
+    ctx.beginPath();
+    for (let i = 0; i < this.stars.length; i++) {
+      const s = this.stars[i];
       s.x += s.vx;
       s.y += s.vy;
       if (s.x > 1.3) s.x = -1.3;
@@ -430,139 +609,196 @@ class Astrolabe3D {
       if (s.y > 1.3) s.y = -1.3;
       if (s.y < -1.3) s.y = 1.3;
 
-      const sp = this.project3D(
-        s.x * Math.cos(this.wheelRotation * 0.2) - s.y * Math.sin(this.wheelRotation * 0.2),
-        s.x * Math.sin(this.wheelRotation * 0.2) + s.y * Math.cos(this.wheelRotation * 0.2),
-        s.z,
-        baseR
+      const sp = this.project3D(s.x, s.y, s.z, baseR);
+      const r = s.size * sp.scale;
+      ctx.moveTo(sp.x + r, sp.y);
+      ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+
+    // 3. ANEL DUPLO GRADUADO EXTERNO (Fiel a imagem reference-astrolabe.jpg + Coroa 3D quando em 3D)
+    if (blend > 0.05) {
+      this.draw3DRing(
+        ctx,
+        1.0,
+        0,
+        0,
+        -0.075,
+        0,
+        0,
+        `rgba(229, 184, 75, ${(0.28 * blend).toFixed(2)})`,
+        1.1,
+        84
       );
-      const twinkle = Math.sin(this.constellationTime * 2.2 + s.phase) * 0.28 + 0.72;
-      ctx.fillStyle = `rgba(255, 224, 138, ${s.alpha * twinkle})`;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, s.size * sp.scale, 0, Math.PI * 2);
-      ctx.fill();
+      this.draw3DRing(
+        ctx,
+        0.895,
+        0,
+        0,
+        0.045,
+        0,
+        0,
+        `rgba(229, 184, 75, ${(0.22 * blend).toFixed(2)})`,
+        1.0,
+        84,
+        true
+      );
     }
 
-    ctx.shadowColor = this.theme.goldPrimary;
-    ctx.shadowBlur = 10 * (this.theme.glowIntensity || 0.8);
+    // Halo suave do anel principal (sem usar shadowBlur)
+    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, 'rgba(229, 184, 75, 0.18)', 5.5, 112);
+    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.35, 112);
+    this.draw3DRing(ctx, 0.895, 0, 0, 0, 0, 0, this.theme.goldPrimary, 1.85, 112);
 
-    // 3. ESTRUTURA 3D EXPANDIDA DO ANEL EXTERNO (Coroa cilindrica 3D com anel de base em Z = -0.07)
-    this.draw3DRing(ctx, 1.0, 0, 0, -0.075, 0, 0, 'rgba(229, 184, 75, 0.28)', 1.1, 128);
-    this.draw3DRing(ctx, 0.895, 0, 0, 0.045, 0, 0, 'rgba(229, 184, 75, 0.24)', 1.0, 128, true);
-
-    // Anel Principal Duplo Graduado
-    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.3, 160);
-    this.draw3DRing(ctx, 0.895, 0, 0, 0, 0, 0, this.theme.goldPrimary, 1.6, 160);
-
-    // Pilares 3D axiais conectando o anel frontal (Z=0) ao anel de profundidade (Z=-0.075) + Ticks de Grau
+    // 4. MARCADORES GRADUADOS EM BATCH UNICO (72 Ticks + 12 Barras de Sinal ||||| + 12 Grupos de Pontos ....)
     const numTicks = 72;
-    for (let i = 0; i < numTicks; i++) {
-      const deg = i * (360 / numTicks);
-      const rad = (deg * Math.PI) / 180 + this.wheelRotation;
-      const cosA = Math.cos(rad);
-      const sinA = Math.sin(rad);
 
-      // Conector de profundidade 3D a cada 15 graus na coroa externa
-      if (i % 3 === 0) {
-        const pFront = this.project3D(cosA * 1.0, sinA * 1.0, 0, baseR);
-        const pDepth = this.project3D(cosA * 1.0, sinA * 1.0, -0.075, baseR);
-        ctx.beginPath();
+    // 4a. Conectores 3D de profundidade (apenas quando em 3D)
+    if (blend > 0.08) {
+      ctx.beginPath();
+      for (let i = 0; i < numTicks; i += 3) {
+        const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
+        const cosA = Math.cos(rad);
+        const sinA = Math.sin(rad);
+        const pFront = this.project3D(cosA, sinA, 0, baseR);
+        const pDepth = this.project3D(cosA, sinA, -0.075, baseR);
         ctx.moveTo(pFront.x, pFront.y);
         ctx.lineTo(pDepth.x, pDepth.y);
-        ctx.strokeStyle = 'rgba(229, 184, 75, 0.32)';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
       }
-
-      const pInner = this.project3D(cosA * 0.912, sinA * 0.912, 0, baseR);
-      const pOuter = this.project3D(cosA * 0.932, sinA * 0.932, 0, baseR);
-      ctx.beginPath();
-      ctx.moveTo(pInner.x, pInner.y);
-      ctx.lineTo(pOuter.x, pOuter.y);
-      ctx.strokeStyle = this.theme.goldPrimary;
-      ctx.lineWidth = i % 6 === 0 ? 2.0 : 1.1;
+      ctx.strokeStyle = `rgba(229, 184, 75, ${(0.32 * blend).toFixed(2)})`;
+      ctx.lineWidth = 1.0;
       ctx.stroke();
-
-      if (i % 6 === 0) {
-        const barHeights = [0.036, 0.032, 0.025, 0.016, 0.012];
-        for (let b = 0; b < barHeights.length; b++) {
-          const offsetAngle = rad + (b - 2) * 0.011;
-          const bStart = this.project3D(
-            Math.cos(offsetAngle) * (0.992 - barHeights[b]),
-            Math.sin(offsetAngle) * (0.992 - barHeights[b]),
-            0,
-            baseR
-          );
-          const bEnd = this.project3D(
-            Math.cos(offsetAngle) * 0.992,
-            Math.sin(offsetAngle) * 0.992,
-            0,
-            baseR
-          );
-          ctx.beginPath();
-          ctx.moveTo(bStart.x, bStart.y);
-          ctx.lineTo(bEnd.x, bEnd.y);
-          ctx.strokeStyle = this.theme.goldSecondary;
-          ctx.lineWidth = 1.6;
-          ctx.stroke();
-        }
-      } else if (i % 3 === 0) {
-        for (let d = -1.5; d <= 1.5; d += 1) {
-          const dotAngle = rad + d * 0.009;
-          const dp = this.project3D(Math.cos(dotAngle) * 0.982, Math.sin(dotAngle) * 0.982, 0, baseR);
-          ctx.fillStyle = this.theme.goldPrimary;
-          ctx.fillRect(dp.x - 1, dp.y - 1, 2.2, 2.2);
-        }
-      }
     }
 
-    // 4. ANEIS ORBITAIS INTERNOS EXCENTRICOS EM 3D (Com precessao lenta de constelacao)
-    const slowPrecession = Math.sin(this.constellationTime * 0.45) * 0.06;
-    const slowNutation = Math.cos(this.constellationTime * 0.35) * 0.05;
+    // 4b. Ticks Internos de Grau (Batch unico = 1 chamada de GPU)
+    ctx.beginPath();
+    for (let i = 0; i < numTicks; i++) {
+      const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
+      const cosA = Math.cos(rad);
+      const sinA = Math.sin(rad);
+      const innerR = i % 6 === 0 ? 0.908 : 0.914;
+      const outerR = i % 6 === 0 ? 0.935 : 0.93;
+      const pInner = this.project3D(cosA * innerR, sinA * innerR, 0, baseR);
+      const pOuter = this.project3D(cosA * outerR, sinA * outerR, 0, baseR);
+      ctx.moveTo(pInner.x, pInner.y);
+      ctx.lineTo(pOuter.x, pOuter.y);
+    }
+    ctx.strokeStyle = this.theme.goldPrimary;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // Orbita Grande Excentrica 1 + Anel Gemeo de Profundidade 3D
-    this.draw3DRing(ctx, 0.78, -0.02, -0.01, 0.08, 0.22 + slowPrecession, -0.14, this.theme.goldPrimary, 1.75, 140);
-    this.draw3DRing(ctx, 0.78, -0.02, -0.01, -0.06, 0.22 + slowPrecession, -0.14, 'rgba(229, 184, 75, 0.20)', 0.9, 110, true);
+    // 4c. 12 Indicadores de Barras de Sinal (|||||) a cada 30 graus (Batch unico + pulso de onda animado)
+    const barHeights = [0.038, 0.032, 0.025, 0.017, 0.011];
+    ctx.beginPath();
+    for (let i = 0; i < numTicks; i += 6) {
+      const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
+      const waveBoost = 1 + Math.sin(this.constellationTime * 3.0 + i * 0.5) * 0.18;
+      for (let b = 0; b < barHeights.length; b++) {
+        const offsetAngle = rad + (b - 2) * 0.0115;
+        const hBar = barHeights[b] * waveBoost;
+        const bStart = this.project3D(
+          Math.cos(offsetAngle) * (0.991 - hBar),
+          Math.sin(offsetAngle) * (0.991 - hBar),
+          0,
+          baseR
+        );
+        const bEnd = this.project3D(
+          Math.cos(offsetAngle) * 0.991,
+          Math.sin(offsetAngle) * 0.991,
+          0,
+          baseR
+        );
+        ctx.moveTo(bStart.x, bStart.y);
+        ctx.lineTo(bEnd.x, bEnd.y);
+      }
+    }
+    ctx.strokeStyle = this.theme.goldSecondary;
+    ctx.lineWidth = 1.7;
+    ctx.stroke();
 
-    // Orbita Excentrica 2 (inclinada em plano 3D oposto)
-    this.draw3DRing(ctx, 0.68, -0.03, -0.06, -0.09, -0.24 + slowNutation, 0.18, this.theme.goldPrimary, 1.65, 140);
+    // 4d. 12 Grupos de 4 Pontos (....) intercalados a cada 30 graus (Batch unico)
+    ctx.fillStyle = this.theme.goldPrimary;
+    ctx.beginPath();
+    for (let i = 3; i < numTicks; i += 6) {
+      const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
+      for (let d = -1.5; d <= 1.5; d += 1) {
+        const dotAngle = rad + d * 0.0095;
+        const dp = this.project3D(Math.cos(dotAngle) * 0.981, Math.sin(dotAngle) * 0.981, 0, baseR);
+        ctx.rect(dp.x - 1.2, dp.y - 1.2, 2.4, 2.4);
+      }
+    }
+    ctx.fill();
 
-    // Arco Gimbal Equatorial 3D (abrange a profundidade esferica da constelacao)
-    this.draw3DRing(ctx, 0.54, 0, 0, 0.02, 0.48 + slowPrecession, 0.32 - slowNutation, 'rgba(92, 115, 184, 0.30)', 1.1, 120, true);
+    // 5. CIRCULOS INTERNOS EXCENTRICOS (Geometria 1:1 da imagem reference-astrolabe.jpg em 2D + inclinacao 3D)
+    const slowPrecession = Math.sin(this.constellationTime * 0.45) * 0.05 * blend;
+    const slowNutation = Math.cos(this.constellationTime * 0.35) * 0.04 * blend;
 
-    // Posicao 3D do Nexus de Origem (com respiracao orbital lenta)
-    const nexusLocalAngle = 0.92 + this.wheelRotation * 0.35 + Math.sin(this.constellationTime * 0.3) * 0.08;
+    // Circulo Excentrico Grande A (R = 0.805)
+    this.draw3DRing(
+      ctx,
+      0.805,
+      0.01,
+      -0.01,
+      0.07 * blend,
+      0.21 + slowPrecession,
+      -0.14,
+      this.theme.goldPrimary,
+      1.8,
+      104
+    );
+
+    // Circulo Excentrico Grande B (R = 0.725, tangenciando o topo perto de 04 7 e 08 1 como na imagem base)
+    this.draw3DRing(
+      ctx,
+      0.725,
+      -0.025,
+      -0.075,
+      -0.08 * blend,
+      -0.22 + slowNutation,
+      0.17,
+      this.theme.goldPrimary,
+      1.75,
+      104
+    );
+
+    // Posicao do Nexus de Origem no quadrante inferior-direito (fiel a imagem reference-astrolabe.jpg)
+    const nexusBaseAngle = 0.72 + this.wheelRotation * 0.35;
+    const nexusDist = 0.34;
     const nexus3D = {
-      x: 0.31 * Math.cos(nexusLocalAngle),
-      y: 0.31 * Math.sin(nexusLocalAngle),
-      z: 0.09 * Math.sin(this.constellationTime * 0.6)
+      x: nexusDist * Math.cos(nexusBaseAngle),
+      y: nexusDist * Math.sin(nexusBaseAngle),
+      z: 0.07 * Math.sin(this.constellationTime * 0.6) * blend
     };
 
-    // Aneis ao redor do Nexus em planos 3D
+    // Circulo Excentrico Medio C (R = 0.285, passando pelo astro 01 7 e pelo Nexus)
     this.draw3DRing(
       ctx,
-      0.31,
-      nexus3D.x * 0.48,
-      nexus3D.y * 0.25,
-      nexus3D.z * 0.5,
-      0.26 - slowNutation,
-      0.22 + slowPrecession,
+      0.285,
+      0.105,
+      0.035,
+      nexus3D.z * 0.4,
+      0.24 - slowNutation,
+      0.2 + slowPrecession,
       this.theme.goldPrimary,
-      1.6,
-      110
+      1.7,
+      90
     );
+
+    // Circulo D ao redor do Nexus (R = 0.165)
     this.draw3DRing(
       ctx,
-      0.16,
+      0.165,
       nexus3D.x,
       nexus3D.y,
       nexus3D.z,
-      -0.18 + slowPrecession,
-      0.19,
+      -0.16 + slowPrecession,
+      0.18,
       this.theme.goldPrimary,
-      1.5,
-      90
+      1.6,
+      80
     );
+
+    // Circulo E Vermelho Carmesim ao redor do Nexus (R = 0.062)
     this.draw3DRing(
       ctx,
       0.062,
@@ -572,38 +808,53 @@ class Astrolabe3D {
       0,
       0,
       this.theme.nexusRed || '#9E2A2B',
-      1.2,
-      64
+      1.3,
+      56
     );
 
     const nexusScreen = this.project3D(nexus3D.x, nexus3D.y, nexus3D.z, baseR);
+    this.nexusScreenPos = { x: nexusScreen.x, y: nexusScreen.y, r: 22 };
 
-    // 5. CALCULAR POSICOES 3D DOS "ASTROS" COM MOVIMENTO LENTO DE CONSTELACAO
+    // Varredura de Radar Animada emanando do Nexus (Foco nas animacoes 2D e 3D)
+    ctx.save();
+    const sweepLen = baseR * 0.85 * this.zoom;
+    const sx = nexusScreen.x + Math.cos(this.radarAngle) * sweepLen;
+    const sy = nexusScreen.y + Math.sin(this.radarAngle) * sweepLen;
+    const sweepGrad = ctx.createLinearGradient(nexusScreen.x, nexusScreen.y, sx, sy);
+    sweepGrad.addColorStop(0, 'rgba(255, 224, 138, 0.30)');
+    sweepGrad.addColorStop(0.6, 'rgba(229, 184, 75, 0.09)');
+    sweepGrad.addColorStop(1, 'rgba(229, 184, 75, 0)');
+    ctx.beginPath();
+    ctx.moveTo(nexusScreen.x, nexusScreen.y);
+    ctx.arc(nexusScreen.x, nexusScreen.y, sweepLen, this.radarAngle - 0.22, this.radarAngle);
+    ctx.closePath();
+    ctx.fillStyle = sweepGrad;
+    ctx.fill();
+    ctx.restore();
+
+    // 6. POSICOES DOS ASTROS (0 graus = topo 12h, sentido horario, identico a reference-astrolabe.jpg)
     this.projectedPoints = [];
     const orbitRadii = {
-      1: 0.31,
-      2: 0.72,
-      3: 0.895
+      1: 0.165,
+      2: 0.725,
+      3: 0.855
     };
 
-    // Cada astro possui uma oscilacao harmonica sutil (sem sair do ponto onde o usuario posicionou),
-    // gerando movimento organico lento entre os astros como uma constelacao viva
     for (let idx = 0; idx < this.points.length; idx++) {
       const pt = this.points[idx];
       const orbitNum = Number(pt.orbit) || 3;
       const baseOrbitR = orbitRadii[orbitNum] || 0.76;
 
-      // Oscilacao harmonica limitada ao redor do ponto (mantem o astro na posicao onde o usuario parar)
-      const individualDrift = Math.sin(this.constellationTime * 0.48 + idx * 1.37) * 0.024;
-
-      // Respiracao radial e oscilacao lenta em profundidade Z (3D)
-      const radialBreathing = Math.cos(this.constellationTime * 0.38 + idx * 2.1) * 0.014;
+      // Oscilacao harmonica sutil ao redor do ponto (sem tirar o astro do lugar onde o usuario parou)
+      const individualDrift = Math.sin(this.constellationTime * 0.45 + idx * 1.37) * 0.014;
+      const radialBreathing = Math.cos(this.constellationTime * 0.38 + idx * 2.1) * 0.007;
       const orbitR = baseOrbitR + radialBreathing;
 
-      const rad = ((Number(pt.angle) || 0) * Math.PI) / 180 + this.wheelRotation + individualDrift;
-      const baseElevZ = ((Number(pt.elevation) || 0) / 100) * 0.75;
-      const harmonicZ = Math.sin(this.constellationTime * 0.55 + idx * 1.15) * 0.055;
-      const pz = baseElevZ + harmonicZ;
+      const rad =
+        (((Number(pt.angle) || 0) - 90) * Math.PI) / 180 + this.wheelRotation + individualDrift;
+      const baseElevZ = ((Number(pt.elevation) || 0) / 100) * 0.72;
+      const harmonicZ = Math.sin(this.constellationTime * 0.55 + idx * 1.15) * 0.045;
+      const pz = (baseElevZ + harmonicZ) * blend;
 
       const px = Math.cos(rad) * orbitR;
       const py = Math.sin(rad) * orbitR;
@@ -620,7 +871,7 @@ class Astrolabe3D {
       });
     }
 
-    // 6. FILAMENTOS DE CONSTELACAO ENTRE OS ASTROS + PARTICULAS LENTAS DE LUZ
+    // 7. MALHA DE CONSTELACAO E PARTICULAS DE LUZ ENTRE OS ASTROS
     ctx.save();
     for (let i = 0; i < this.projectedPoints.length; i++) {
       for (let j = i + 1; j < this.projectedPoints.length; j++) {
@@ -629,88 +880,79 @@ class Astrolabe3D {
         const dx = a.world.x - b.world.x;
         const dy = a.world.y - b.world.y;
         const dz = a.world.z - b.world.z;
-        const dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-        // Conecta astros vizinhos no espaco 3D formando uma malha de constelacao viva
-        if (dist3D < 0.88) {
-          const alpha = (1 - dist3D / 0.88) * 0.34;
+        if (dist < 0.85) {
+          const alpha = (1 - dist / 0.85) * 0.28;
           ctx.beginPath();
           ctx.moveTo(a.screen.x, a.screen.y);
           ctx.lineTo(b.screen.x, b.screen.y);
           ctx.strokeStyle = `rgba(229, 184, 75, ${alpha.toFixed(3)})`;
-          ctx.lineWidth = 0.95;
+          ctx.lineWidth = 0.9;
           ctx.setLineDash([3, 6]);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Particula estelar viajando lentamente pelo filamento entre os dois astros
-          const flowT = (this.constellationTime * 0.18 + (i * 0.31 + j * 0.17)) % 1;
+          const flowT = (this.constellationTime * 0.22 + (i * 0.31 + j * 0.17)) % 1;
           const fx = a.screen.x + (b.screen.x - a.screen.x) * flowT;
           const fy = a.screen.y + (b.screen.y - a.screen.y) * flowT;
           ctx.beginPath();
-          ctx.arc(fx, fy, 1.9, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 224, 138, ${(alpha * 2.2).toFixed(3)})`;
+          ctx.arc(fx, fy, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 224, 138, ${(alpha * 2.4).toFixed(3)})`;
           ctx.fill();
         }
       }
     }
     ctx.restore();
 
-    // Ordena por profundidade Z para renderizacao 3D correta
+    // Ordena por profundidade Z
     this.projectedPoints.sort((a, b) => b.screen.z - a.screen.z);
 
-    // 7. HASTES DE ELEVACAO 3D (Conectam cada Astro a sua projecao no plano orbital Z=0) + VETORES DO NEXUS
+    // 8. VETORES DO NEXUS ATE CADA ASTRO + SETAS DIRECIONAIS + GLIFOS + PULSOS ANIMADOS
     for (const item of this.projectedPoints) {
       const { point, screen: sp, planeScreen: pp } = item;
       const isHovered = this.hoveredPoint && this.hoveredPoint.id === point.id;
       const isGoldVector = point.vectorStyle === 'gold';
 
-      ctx.save();
-
-      // Haste de Profundidade 3D (mostra visualmente o quanto o astro flutua em 3D acima/abaixo do plano)
-      const elevDist = Math.hypot(sp.x - pp.x, sp.y - pp.y);
-      if (elevDist > 3) {
-        ctx.beginPath();
-        ctx.moveTo(pp.x, pp.y);
-        ctx.lineTo(sp.x, sp.y);
-        ctx.strokeStyle = 'rgba(255, 224, 138, 0.38)';
-        ctx.lineWidth = 1.1;
-        ctx.setLineDash([2, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Pequeno anel de ancoragem no plano orbital Z=0
-        ctx.beginPath();
-        ctx.arc(pp.x, pp.y, 3.2 * pp.scale, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(229, 184, 75, 0.55)';
-        ctx.lineWidth = 1.1;
-        ctx.stroke();
+      // Haste de elevacao 3D (visivel quando modeBlend > 0.1)
+      if (blend > 0.1) {
+        const elevDist = Math.hypot(sp.x - pp.x, sp.y - pp.y);
+        if (elevDist > 3) {
+          ctx.beginPath();
+          ctx.moveTo(pp.x, pp.y);
+          ctx.lineTo(sp.x, sp.y);
+          ctx.strokeStyle = `rgba(255, 224, 138, ${(0.36 * blend).toFixed(2)})`;
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([2, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
 
-      // Linha vetorial do Nexus ate o Astro
+      // Linha vetorial principal partindo do Nexus
       ctx.beginPath();
       ctx.moveTo(nexusScreen.x, nexusScreen.y);
       ctx.lineTo(sp.x, sp.y);
-
-      if (isHovered) {
-        ctx.strokeStyle = this.theme.goldSecondary;
-        ctx.lineWidth = 2.4;
-        ctx.shadowColor = this.theme.goldSecondary;
-        ctx.shadowBlur = 16;
-      } else if (isGoldVector) {
-        ctx.strokeStyle = this.theme.goldPrimary;
-        ctx.lineWidth = 1.45;
-        ctx.shadowBlur = 4;
-      } else {
-        ctx.strokeStyle = this.theme.vectorAccent || '#5C73B8';
-        ctx.lineWidth = 1.35;
-        ctx.shadowBlur = 0;
-      }
+      ctx.strokeStyle = isHovered
+        ? this.theme.goldSecondary
+        : isGoldVector
+        ? this.theme.goldPrimary
+        : this.theme.vectorAccent || '#5C73B8';
+      ctx.lineWidth = isHovered ? 2.5 : isGoldVector ? 1.55 : 1.45;
       ctx.stroke();
 
-      // Seta direcional no vetor (com deslize harmonico suave)
-      if (point.hasArrow) {
-        const t = 0.40 + Math.sin(this.constellationTime * 0.8 + item.idx) * 0.04;
+      // Particula de pulso continuo viajando pelo vetor (animacao fluida em 2D e 3D)
+      const streamT = (this.constellationTime * 0.36 + item.idx * 0.19) % 1;
+      const stX = nexusScreen.x + (sp.x - nexusScreen.x) * streamT;
+      const stY = nexusScreen.y + (sp.y - nexusScreen.y) * streamT;
+      ctx.beginPath();
+      ctx.arc(stX, stY, isHovered ? 3.2 : 2.1, 0, Math.PI * 2);
+      ctx.fillStyle = isGoldVector ? this.theme.goldSecondary : '#9BB8FF';
+      ctx.fill();
+
+      // Seta direcional dourada no vetor azul (exatamente como na imagem de referencia)
+      if (point.hasArrow || point.vectorStyle === 'blue') {
+        const t = 0.39 + Math.sin(this.constellationTime * 1.1 + item.idx) * 0.025;
         const ax = nexusScreen.x + (sp.x - nexusScreen.x) * t;
         const ay = nexusScreen.y + (sp.y - nexusScreen.y) * t;
         const angle = Math.atan2(sp.y - nexusScreen.y, sp.x - nexusScreen.x);
@@ -720,10 +962,10 @@ class Astrolabe3D {
         ctx.rotate(angle);
         ctx.fillStyle = this.theme.goldPrimary;
         ctx.beginPath();
-        ctx.moveTo(6, 0);
-        ctx.lineTo(-5, -4.2);
-        ctx.lineTo(-3, 0);
-        ctx.lineTo(-5, 4.2);
+        ctx.moveTo(6.5, 0);
+        ctx.lineTo(-5.2, -4.4);
+        ctx.lineTo(-3.2, 0);
+        ctx.lineTo(-5.2, 4.4);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -731,82 +973,136 @@ class Astrolabe3D {
 
       // Glifo geometrico (Π, Δ, h, C)
       if (point.glyph) {
-        const gt = 0.62;
-        const gx = nexusScreen.x + (sp.x - nexusScreen.x) * gt - 18;
+        const gt = 0.6;
+        const gx = nexusScreen.x + (sp.x - nexusScreen.x) * gt - 16;
         const gy = nexusScreen.y + (sp.y - nexusScreen.y) * gt - 8;
-        ctx.font = '600 12px "Segoe UI", Consolas, monospace';
+        ctx.font = '600 12.5px "Consolas", "Segoe UI", monospace';
         ctx.fillStyle = this.theme.goldPrimary;
         ctx.fillText(point.glyph, gx, gy);
       }
 
-      // Pulso energetico ao acionar o astro
-      if (this.activePulsePointId === point.id) {
-        const px = nexusScreen.x + (sp.x - nexusScreen.x) * this.activePulseProgress;
-        const py = nexusScreen.y + (sp.y - nexusScreen.y) * this.activePulseProgress;
-        ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowColor = this.theme.goldSecondary;
-        ctx.shadowBlur = 20;
-        ctx.fill();
+      // Rajadas de laser ativas no vetor
+      for (let b = 0; b < this.laserBursts.length; b++) {
+        const lb = this.laserBursts[b];
+        if (lb.pointId === point.id) {
+          const lx = nexusScreen.x + (sp.x - nexusScreen.x) * lb.progress;
+          const ly = nexusScreen.y + (sp.y - nexusScreen.y) * lb.progress;
+          ctx.beginPath();
+          ctx.arc(lx, ly, 5.2, 0, Math.PI * 2);
+          ctx.fillStyle = lb.color;
+          ctx.fill();
+        }
       }
+    }
 
+    // 9. ONDAS DE CHOQUE (SHOCKWAVES) 2D / 3D
+    for (let i = 0; i < this.shockwaves.length; i++) {
+      const sw = this.shockwaves[i];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = sw.color;
+      ctx.globalAlpha = sw.alpha;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
       ctx.restore();
     }
 
-    // 8. Desenha o No Central Nexus
+    // 10. NO DE ORIGEM NEXUS (Interativo: Clique alterna 2D/3D e dispara pulso orbital)
     ctx.save();
+    const nxScale = nexusScreen.scale;
+    const nxR = (this.nexusHovered ? 13 : 10.8) * nxScale;
+
+    if (this.nexusHovered) {
+      ctx.beginPath();
+      ctx.arc(nexusScreen.x, nexusScreen.y, nxR * 2.1, 0, Math.PI * 2);
+      ctx.strokeStyle = this.theme.goldSecondary;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     ctx.beginPath();
-    ctx.arc(nexusScreen.x, nexusScreen.y, 10.5 * nexusScreen.scale, 0, Math.PI * 2);
+    ctx.arc(nexusScreen.x, nexusScreen.y, nxR, 0, Math.PI * 2);
     ctx.fillStyle = '#050508';
     ctx.fill();
-    ctx.lineWidth = 3.8 * nexusScreen.scale;
+    ctx.lineWidth = 3.8 * nxScale;
     ctx.strokeStyle = '#FFFFFF';
-    ctx.shadowColor = '#FFFFFF';
-    ctx.shadowBlur = 12;
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(nexusScreen.x - 5 * nexusScreen.scale, nexusScreen.y + 4 * nexusScreen.scale);
-    ctx.lineTo(nexusScreen.x + 5 * nexusScreen.scale, nexusScreen.y - 4 * nexusScreen.scale);
-    ctx.strokeStyle = this.theme.goldPrimary;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
+    // Etiqueta discreta do modo 2D/3D junto ao Nexus quando sob o mouse
+    if (this.nexusHovered) {
+      ctx.font = '700 10.5px "Segoe UI", sans-serif';
+      ctx.fillStyle = this.theme.goldSecondary;
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        this.projectionMode === '2d' ? 'NEXUS [MODO 2D -> 3D]' : 'NEXUS [MODO 3D -> 2D]',
+        nexusScreen.x,
+        nexusScreen.y + nxR + 18
+      );
+    }
     ctx.restore();
 
-    // 9. Desenha cada Astro Salvo (Com Halo 3D, Seta Direcional, Codigo e Titulo)
+    // 11. ASTROS / PONTOS ESTELARES (Fiel a imagem reference-astrolabe.jpg + Reticulas Animadas)
     for (const item of this.projectedPoints) {
       const { point, screen: sp } = item;
       const isHovered = this.hoveredPoint && this.hoveredPoint.id === point.id;
-      const nodeR = (isHovered ? 14.8 : 11.5) * sp.scale;
+      const nodeR = (isHovered ? 15.0 : 11.8) * sp.scale;
 
       ctx.save();
 
+      // Anel externo grande nos astros principais (08 7, 09 4, 01 7) e no astro sob o cursor
       if (point.vectorStyle === 'gold' || isHovered) {
+        const outerRingR = nodeR * 2.6;
         ctx.beginPath();
-        ctx.arc(sp.x, sp.y, nodeR * 2.55, 0, Math.PI * 2);
+        ctx.arc(sp.x, sp.y, outerRingR, 0, Math.PI * 2);
         ctx.strokeStyle = isHovered ? this.theme.goldSecondary : this.theme.goldPrimary;
-        ctx.lineWidth = isHovered ? 2.0 : 1.5;
+        ctx.lineWidth = isHovered ? 2.1 : 1.55;
         ctx.stroke();
+
+        // Arco reticular animado ao redor do astro em foco
+        if (isHovered) {
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, outerRingR + 5, this.reticleAngle, this.reticleAngle + Math.PI * 0.65);
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(
+            sp.x,
+            sp.y,
+            outerRingR + 5,
+            this.reticleAngle + Math.PI,
+            this.reticleAngle + Math.PI * 1.65
+          );
+          ctx.stroke();
+        }
       }
 
+      // Circulo principal do Astro
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, nodeR, 0, Math.PI * 2);
-      ctx.fillStyle = '#07070A';
+      ctx.fillStyle = '#060609';
       ctx.fill();
       ctx.lineWidth = (isHovered ? 3.6 : 3.0) * sp.scale;
       ctx.strokeStyle = isHovered ? this.theme.goldSecondary : this.theme.goldPrimary;
-      ctx.shadowColor = this.theme.goldPrimary;
-      ctx.shadowBlur = isHovered ? 22 : 10;
+      if (isHovered) {
+        ctx.shadowColor = this.theme.goldSecondary;
+        ctx.shadowBlur = 16;
+      }
       ctx.stroke();
+      ctx.shadowBlur = 0;
 
+      // Ponteiro de bussola interno apontando na direcao do vetor
       const vecAngle = Math.atan2(sp.y - nexusScreen.y, sp.x - nexusScreen.x);
       ctx.save();
       ctx.translate(sp.x, sp.y);
       ctx.rotate(vecAngle);
       ctx.fillStyle = isHovered ? '#FFFFFF' : this.theme.goldPrimary;
       ctx.beginPath();
-      ctx.moveTo(nodeR * 0.55, 0);
+      ctx.moveTo(nodeR * 0.56, 0);
       ctx.lineTo(-nodeR * 0.42, -nodeR * 0.42);
       ctx.lineTo(-nodeR * 0.2, 0);
       ctx.lineTo(-nodeR * 0.42, nodeR * 0.42);
@@ -814,17 +1110,16 @@ class Astrolabe3D {
       ctx.fill();
       ctx.restore();
 
+      // Codigo numerico superior (ex: 08 7 ϟ) exatamente como na imagem de referencia
       const codeText = point.code || '00 1';
       ctx.font = `700 ${Math.round(12.5 * sp.scale)}px "Consolas", "Orbitron", "Segoe UI", monospace`;
       ctx.fillStyle = isHovered ? '#FFFFFF' : '#EBF0FF';
       ctx.textAlign = 'center';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 6;
-      ctx.fillText(`${codeText} ϟ`, sp.x + 4, sp.y - nodeR - 9 * sp.scale);
+      ctx.fillText(`${codeText} ϟ`, sp.x + 3, sp.y - nodeR - 9 * sp.scale);
 
       if (point.title) {
-        ctx.font = `${isHovered ? '700' : '500'} ${Math.round((isHovered ? 12.5 : 10.5) * sp.scale)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = isHovered ? this.theme.goldSecondary : 'rgba(229, 184, 75, 0.88)';
+        ctx.font = `${isHovered ? '700' : '600'} ${Math.round((isHovered ? 12.2 : 10.5) * sp.scale)}px "Segoe UI", sans-serif`;
+        ctx.fillStyle = isHovered ? this.theme.goldSecondary : 'rgba(229, 184, 75, 0.90)';
         ctx.fillText(point.title.toUpperCase(), sp.x, sp.y + nodeR + 16 * sp.scale);
       }
 

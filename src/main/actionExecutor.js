@@ -23,7 +23,7 @@ class ActionExecutor {
    * Captura a tela ou a janela exata do Sistema de Origem em alta resolucao.
    * Prioriza o snapshot pre-capturado pelo daemon Win32 no instante exato do atalho (Zero Flicker).
    */
-  async captureScreenImage(cropToOriginWindow = false) {
+  async captureScreenImage(cropToOriginWindow = false, mainWindow = null) {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.size;
     const scaleFactor = primaryDisplay.scaleFactor || 1;
@@ -54,6 +54,43 @@ class ActionExecutor {
     const thumbWidth = Math.floor(width * scaleFactor);
     const thumbHeight = Math.floor(height * scaleFactor);
 
+    // Captura nativa ultra-rapida via GDI+ (MpeHook.exe --CAPTURE-NOW)
+    if (this.hookBridge && typeof this.hookBridge.captureScreenFast === 'function') {
+      const fastTmpPath = path.join(
+        this.configManager.resolvePath('./Capturas_MPE'),
+        '_fast_capture_cache.png'
+      );
+      const dir = path.dirname(fastTmpPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const okFast = await this.hookBridge.captureScreenFast(fastTmpPath);
+      if (okFast && fs.existsSync(fastTmpPath)) {
+        let fastImg = nativeImage.createFromPath(fastTmpPath);
+        if (!fastImg.isEmpty()) {
+          if (cropToOriginWindow && this.hookBridge.lastWindowRect) {
+            const rect = this.hookBridge.lastWindowRect;
+            if (rect.width > 80 && rect.height > 80) {
+              try {
+                const cropped = fastImg.crop({
+                  x: Math.max(0, Math.floor(rect.left)),
+                  y: Math.max(0, Math.floor(rect.top)),
+                  width: Math.min(fastImg.getSize().width, Math.floor(rect.width)),
+                  height: Math.min(fastImg.getSize().height, Math.floor(rect.height))
+                });
+                if (!cropped.isEmpty()) {
+                  fastImg = cropped;
+                }
+              } catch (_) {}
+            }
+          }
+          return {
+            image: fastImg,
+            displaySize: { width, height, scaleFactor },
+            fromNativeGdi: true
+          };
+        }
+      }
+    }
+
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: thumbWidth, height: thumbHeight }
@@ -78,6 +115,12 @@ class ActionExecutor {
           finalImage = finalImage.crop({ x: cx, y: cy, width: cw, height: ch });
         } catch (_) {}
       }
+    }
+
+    if (finalImage.isEmpty() && mainWindow && mainWindow.webContents) {
+      try {
+        finalImage = await mainWindow.webContents.capturePage();
+      } catch (_) {}
     }
 
     return {
@@ -344,6 +387,19 @@ class ActionExecutor {
     const originTitle = (this.hookBridge && this.hookBridge.lastWindowTitle) || 'Sistema Atual';
 
     switch (type) {
+      case 'action_2d_scan': {
+        const cropWin = params.captureScope === 'active_window';
+        const { image } = await this.captureScreenImage(cropWin, mainWindow);
+        const saved = this.saveAndCopyImage(image, params.saveDir, 'MPE_Acao2D');
+        return {
+          ok: true,
+          type: 'action_2d_scan',
+          filePath: saved.filePath,
+          fileName: saved.fileName,
+          message: `Acao 2D executada em [${originTitle}]! Salvo em ${saved.fileName} e copiado para a Area de Transferencia.`
+        };
+      }
+
       case 'print': {
         if (mainWindow && mainWindow.isVisible()) {
           mainWindow.hide();

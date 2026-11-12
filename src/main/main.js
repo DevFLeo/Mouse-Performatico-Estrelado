@@ -21,9 +21,8 @@ const ActionExecutor = require('./actionExecutor');
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
 
-// Otimizacoes de GPU e memoria para maxima fluidez do motor 3D
+// Otimizacoes de GPU e memoria para maxima fluidez do motor 2D e 3D
 app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('disable-http-cache');
 
 let mainWindow = null;
@@ -108,10 +107,19 @@ function createWindow() {
         await mainWindow.webContents.executeJavaScript(`
           document.getElementById('splash-screen').classList.add('hidden');
           document.getElementById('modal-register').classList.add('hidden');
+          document.getElementById('btn-mode-3d').click();
         `);
-        await new Promise((r) => setTimeout(r, 900));
-        const imgAstrolabe = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'verify_3_astrolabe3d.png'), imgAstrolabe.toPNG());
+        await new Promise((r) => setTimeout(r, 600));
+        const imgAstrolabe3D = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_3_astrolabe3d.png'), imgAstrolabe3D.toPNG());
+
+        // Testa o Modo 2D (base da imagem) e aciona a Acao 2D com animacoes
+        await mainWindow.webContents.executeJavaScript(`
+          document.getElementById('btn-action-2d').click();
+        `);
+        await new Promise((r) => setTimeout(r, 550));
+        const imgAstrolabe2D = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'verify_4_astrolabe2d.png'), imgAstrolabe2D.toPNG());
 
         console.log('MPE_SELF_TEST_PASSED');
         isQuitting = true;

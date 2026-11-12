@@ -315,9 +315,62 @@
       point.description || `Acao: ${point.actionType}`;
   }
 
+  function syncDimensionButtons(mode) {
+    const btn2d = document.getElementById('btn-mode-2d');
+    const btn3d = document.getElementById('btn-mode-3d');
+    const badge = document.getElementById('hud-mode-badge');
+    if (btn2d) btn2d.classList.toggle('active', mode === '2d');
+    if (btn3d) btn3d.classList.toggle('active', mode === '3d');
+    if (badge) badge.textContent = mode === '2d' ? '2D WIN32' : '3D WIN32';
+  }
+
+  async function executeQuick2DAction() {
+    playUiSound('execute');
+    if (astrolabe) {
+      astrolabe.setProjectionMode('2d', true);
+      syncDimensionButtons('2d');
+    }
+    const res = await window.mpeApi.executePoint({
+      id: 'quick-2d-action',
+      title: 'Acao 2D Instantanea',
+      actionType: 'action_2d_scan',
+      params: {
+        captureScope: 'active_window',
+        saveDir:
+          (currentConfig &&
+            currentConfig.telegram &&
+            currentConfig.telegram.savedScreenshotsFolder) ||
+          './Capturas_MPE'
+      }
+    });
+    if (res && res.message) {
+      showToast(res.message);
+    } else {
+      showToast('Acao 2D executada no plano original!');
+    }
+  }
+
   async function handlePointExecute(point) {
     if (!point) return;
     playUiSound('execute');
+
+    if (point.actionType === 'toggle_2d_3d') {
+      if (astrolabe) {
+        const nextMode = astrolabe.toggleProjectionMode();
+        syncDimensionButtons(nextMode);
+        showToast(
+          nextMode === '2d'
+            ? 'Modo 2D Ativado (Base Fiel da Imagem com Animacoes 2D)'
+            : 'Modo 3D Ativado (Constelacao Orbital em Profundidade)'
+        );
+      }
+      return;
+    }
+
+    if (point.actionType === 'action_2d_scan') {
+      await executeQuick2DAction();
+      return;
+    }
 
     if (point.actionType === 'open_settings') {
       if (currentMode === 'hud-only') {
@@ -614,6 +667,18 @@
     astrolabe = new window.Astrolabe3D(canvas, {
       onPointHover: handlePointHover,
       onPointClick: handlePointExecute,
+      onModeChange: (newMode) => {
+        syncDimensionButtons(newMode);
+      },
+      onNexusAction: (newMode) => {
+        playUiSound('execute');
+        syncDimensionButtons(newMode);
+        showToast(
+          newMode === '2d'
+            ? 'Modo 2D Ativado (Base da Imagem + Pulso 2D)'
+            : 'Modo 3D Ativado (Orbital Profundo)'
+        );
+      },
       onPointEdit: (pt) => {
         if (currentMode === 'hud-only') {
           showToast('Modo Performance: Para editar pontos, abra pelo icone executavel MPE.exe.');
@@ -623,6 +688,23 @@
       }
     });
     astrolabe.setConfig(currentConfig);
+    syncDimensionButtons(astrolabe.projectionMode);
+
+    document.getElementById('btn-mode-2d').addEventListener('click', () => {
+      playUiSound('hover');
+      astrolabe.setProjectionMode('2d', true);
+      syncDimensionButtons('2d');
+      showToast('Modo 2D Ativado (Base Original da Imagem)');
+    });
+    document.getElementById('btn-mode-3d').addEventListener('click', () => {
+      playUiSound('hover');
+      astrolabe.setProjectionMode('3d', true);
+      syncDimensionButtons('3d');
+      showToast('Modo 3D Ativado (Constelacao Orbital)');
+    });
+    document.getElementById('btn-action-2d').addEventListener('click', () => {
+      executeQuick2DAction();
+    });
 
     areaSelector = new window.AreaSelector(
       document.getElementById('area-selector-overlay'),
@@ -659,7 +741,10 @@
     document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
     document.getElementById('btn-recenter').addEventListener('click', () => astrolabe.resetView());
     document.getElementById('btn-replay-intro').addEventListener('click', () => runInitializationSequence(true));
-    document.getElementById('btn-hide-hud').addEventListener('click', () => window.mpeApi.hideHud());
+    document.getElementById('btn-hide-hud').addEventListener('click', () => {
+      if (astrolabe) astrolabe.pause();
+      window.mpeApi.hideHud();
+    });
 
     document.querySelectorAll('.tone-pill').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -820,7 +905,8 @@
       if (openModals.length > 0) {
         openModals.forEach((m) => m.classList.add('hidden'));
       }
-      // Minimiza a janela do HUD para segundo plano sem fechar o projeto
+      // Pausa o motor grafico para consumir 0% de CPU/GPU e minimiza para segundo plano sem fechar o projeto
+      if (astrolabe) astrolabe.pause();
       window.mpeApi.hideHud();
     }
 
@@ -828,6 +914,14 @@
       if (e.key === 'Escape') {
         e.preventDefault();
         handleEscapeKey();
+      } else if (e.key === 'Tab') {
+        const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
+        if (openModals.length === 0 && astrolabe) {
+          e.preventDefault();
+          const nextMode = astrolabe.toggleProjectionMode();
+          syncDimensionButtons(nextMode);
+          showToast(nextMode === '2d' ? 'Modo 2D Ativado' : 'Modo 3D Ativado');
+        }
       } else if (e.key === 'ArrowLeft') {
         astrolabe.wheelVelocity -= 0.012;
       } else if (e.key === 'ArrowRight') {
@@ -851,6 +945,7 @@
     }
 
     window.mpeApi.onHudSummoned((payload) => {
+      if (astrolabe) astrolabe.resume();
       if (payload && payload.mode) {
         setInterfaceMode(payload.mode);
       }

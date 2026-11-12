@@ -105,3 +105,13 @@ Todos os pontos ficam salvos no arquivo **[`mpe.config.json`](file:///c:/Projeto
 
 ### Migração Automática para Outra Máquina:
 * Ao copiar a pasta do projeto (ou o arquivo `mpe.config.json` da raiz) para outra máquina e abrir o **`MPE.exe`**, o sistema lê automaticamente todos os pontos já salvos, suas cores e seu nome cadastrado (`"Bem-vindo, [Seu Nome]"`), registrando a nova máquina na seção `machines` do JSON e em `%APPDATA%`.
+
+---
+
+## 4. Como Usar o Modo 2D (Base Original da Imagem) e Executar a Ação 2D
+
+* **Alternância Instantânea 2D / 3D:**
+  * No dock inferior direito (**`Modo 2D` | `Modo 3D` | `Acao 2D`**), clique em **`Modo 2D`** (ou pressione a tecla **`Tab`**, ou clique diretamente sobre o **Nexus Central** branco/dourado do Astrolábio) para alinhar o sistema exatamente na geometria plana 2D da imagem de referência, com varredura de radar animada, feixes de energia nos vetores e retículas giratórias.
+* **Executar a Ação 2D:**
+  * Clique no botão **`Acao 2D`** no dock (ou cadastre um ponto com o tipo `Acao 2D: Varredura Astrolabio 2D + Captura Instantanea`) para disparar a onda de choque 2D em todos os vetores, capturar instantaneamente o sistema ativo via GDI+ nativo (`MpeHook.exe --CAPTURE-NOW`), salvar em `./Capturas_MPE/MPE_Acao2D_*.png` e copiar para a Área de Transferência.
+  * Todos os pontos estelares do mapa (`08 7`, `04 7`, `08 1`, `09 7`, `07 7`, `06 7`, `05 7`, `09 4`, `01 7`) funcionam integralmente tanto no **Modo 2D** quanto no **Modo 3D**.

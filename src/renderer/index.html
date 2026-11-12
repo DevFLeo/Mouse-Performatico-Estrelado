@@ -40,16 +40,23 @@
     </div>
   </div>
 
-  <!-- 2. CANVAS 3D INTERATIVO DO ASTROLABIO ESTELAR -->
+  <!-- 2. CANVAS 2D / 3D INTERATIVO DO ASTROLABIO ESTELAR -->
   <canvas id="astrolabe-canvas"></canvas>
+
+  <!-- CONTROLE FLUTUANTE RAPIDO 2D / 3D (Visivel tanto no Modo Atalho quanto no Modo Editor) -->
+  <div id="floating-dimension-dock" class="floating-dimension-dock">
+    <button id="btn-mode-2d" class="dim-pill" data-dim="2d" title="Ativar Projecao 2D Plana (Base Original da Imagem)">Modo 2D</button>
+    <button id="btn-mode-3d" class="dim-pill active" data-dim="3d" title="Ativar Projecao 3D Orbital Profunda">Modo 3D</button>
+    <button id="btn-action-2d" class="dim-pill action-2d-btn" title="Executar Acao 2D Instantanea (Varredura + Captura 2D)">Acao 2D</button>
+  </div>
 
   <!-- 3. BARRA SUPERIOR DO HUD -->
   <header class="hud-topbar">
     <div class="hud-brand">
       <div class="brand-emblem">O</div>
       <div>
-        <div class="brand-title">M . P . E <span class="brand-badge">3D WIN32</span></div>
-        <div id="hud-status-text" class="brand-subtitle">Arraste para os lados para girar o Circulo 3D</div>
+        <div class="brand-title">M . P . E <span id="hud-mode-badge" class="brand-badge">2D / 3D WIN32</span></div>
+        <div id="hud-status-text" class="brand-subtitle">Arraste para os lados para girar o Circulo</div>
       </div>
     </div>
 
@@ -149,6 +156,8 @@
 
           <label class="field-label">Tipo de Acao Performatica</label>
           <select id="pt-action-type" class="field-input">
+            <option value="action_2d_scan">Acao 2D: Varredura Astrolabio 2D + Captura Instantanea</option>
+            <option value="toggle_2d_3d">Alternar Modo 2D (Base Imagem) / 3D (Orbital)</option>
             <option value="system_to_system_print">Print do Sistema Atual -> Enviar para Outro Sistema (Win32)</option>
             <option value="area_print_system">Recorte de Sistema -> Enviar para Outro Sistema (Win32)</option>
             <option value="print_telegram">Print + Enviar para Conversa no Telegram (Caminho Salvo)</option>
