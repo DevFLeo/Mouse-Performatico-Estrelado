@@ -18,15 +18,17 @@ class Astrolabe3D {
     this.height = window.innerHeight;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // Estado de rotacao 3D e giro circular para os lados
+    // Estado de rotacao 3D e giro circular para os lados (mantem a posicao onde o usuario parar)
     this.wheelRotation = 0;
-    this.wheelVelocity = 0.0009;
+    this.wheelVelocity = 0;
     this.tiltX = 0.34;
     this.tiltY = -0.24;
     this.targetTiltX = 0.34;
     this.targetTiltY = -0.24;
     this.zoom = 1.0;
     this.targetZoom = 1.0;
+    this.userHasPositioned = false;
+    this.loadSavedViewState();
 
     // Controle de arraste interativo
     this.isDragging = false;
@@ -100,20 +102,65 @@ class Astrolabe3D {
     }
   }
 
-  triggerIntroAnimation() {
+  loadSavedViewState() {
+    try {
+      const raw = localStorage.getItem('mpe_3d_view_state');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (typeof saved.wheelRotation === 'number') this.wheelRotation = saved.wheelRotation;
+      if (typeof saved.targetTiltX === 'number') {
+        this.targetTiltX = saved.targetTiltX;
+        this.tiltX = saved.targetTiltX;
+      }
+      if (typeof saved.targetTiltY === 'number') {
+        this.targetTiltY = saved.targetTiltY;
+        this.tiltY = saved.targetTiltY;
+      }
+      if (typeof saved.targetZoom === 'number') {
+        this.targetZoom = saved.targetZoom;
+        this.zoom = saved.targetZoom;
+      }
+      this.userHasPositioned = Boolean(saved.userHasPositioned);
+    } catch (_) {}
+  }
+
+  saveViewState() {
+    try {
+      localStorage.setItem(
+        'mpe_3d_view_state',
+        JSON.stringify({
+          wheelRotation: this.wheelRotation,
+          targetTiltX: this.targetTiltX,
+          targetTiltY: this.targetTiltY,
+          targetZoom: this.targetZoom,
+          userHasPositioned: this.userHasPositioned
+        })
+      );
+    } catch (_) {}
+  }
+
+  triggerIntroAnimation(preservePosition = true) {
     this.introProgress = 0;
-    this.wheelVelocity = 0.032;
-    this.tiltX = 0.72;
-    this.tiltY = -0.55;
-    this.targetTiltX = 0.34;
-    this.targetTiltY = -0.24;
+    if (!preservePosition && !this.userHasPositioned) {
+      this.wheelVelocity = 0.015;
+      this.tiltX = 0.58;
+      this.tiltY = -0.42;
+      this.targetTiltX = 0.34;
+      this.targetTiltY = -0.24;
+    } else {
+      // Mantem exatamente o ponto e angulo 3D que o usuario posicionou
+      this.wheelVelocity = 0;
+    }
   }
 
   resetView() {
+    this.wheelRotation = 0;
+    this.wheelVelocity = 0;
     this.targetTiltX = 0.34;
     this.targetTiltY = -0.24;
-    this.wheelVelocity = 0.008;
     this.targetZoom = 1.0;
+    this.userHasPositioned = false;
+    this.saveViewState();
   }
 
   bindEvents() {
@@ -127,6 +174,7 @@ class Astrolabe3D {
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
         this.dragMoved = 0;
+        this.wheelVelocity = 0;
       }
     });
 
@@ -140,23 +188,20 @@ class Astrolabe3D {
         const dy = e.clientY - this.lastMouseY;
         this.dragMoved += Math.abs(dx) + Math.abs(dy);
 
-        // Movimentar para os lados gira o circulo 3D e expande a inclinacao 3D
+        // Movimentar gira o circulo 3D e mantem exatamente no ponto onde o usuario soltar
         const deltaWheel = dx * 0.0052 * this.sensitivity;
         this.wheelRotation += deltaWheel;
-        this.wheelVelocity = deltaWheel * 0.82;
+        this.wheelVelocity = 0;
 
-        this.targetTiltY = Math.max(-0.95, Math.min(0.95, this.targetTiltY + dx * 0.0032 * this.sensitivity));
-        this.targetTiltX = Math.max(-0.95, Math.min(0.95, this.targetTiltX + dy * 0.0032 * this.sensitivity));
+        this.targetTiltY = Math.max(-1.05, Math.min(1.05, this.targetTiltY + dx * 0.0034 * this.sensitivity));
+        this.targetTiltX = Math.max(-1.05, Math.min(1.05, this.targetTiltX + dy * 0.0034 * this.sensitivity));
 
+        this.userHasPositioned = true;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
       } else {
-        // Parallax 3D responsivo ao movimento do cursor
-        const normX = (mx / this.width - 0.5) * 2;
-        const normY = (my / this.height - 0.5) * 2;
-        this.targetTiltY = -0.12 + normX * 0.38 * this.sensitivity;
-        this.targetTiltX = 0.28 + normY * 0.34 * this.sensitivity;
-
+        // Nao reseta para zero ao mover o mouse: mantem o angulo 3D travado no ponto escolhido pelo usuario
+        // para facilitar o acionamento preciso do comando estelar
         this.updateHover(mx, my);
       }
     });
@@ -164,6 +209,10 @@ class Astrolabe3D {
     window.addEventListener('mouseup', (e) => {
       if (!this.isDragging) return;
       this.isDragging = false;
+      this.wheelVelocity = 0;
+      if (this.dragMoved >= 4) {
+        this.saveViewState();
+      }
 
       if (this.dragMoved < 8) {
         const rect = this.canvas.getBoundingClientRect();
@@ -195,9 +244,11 @@ class Astrolabe3D {
           this.targetZoom = Math.max(0.65, Math.min(1.45, this.targetZoom - e.deltaY * 0.001));
         } else {
           const step = (e.deltaY || e.deltaX) * 0.0018 * this.sensitivity;
-          this.wheelVelocity += step * 0.35;
           this.wheelRotation += step;
+          this.wheelVelocity = 0;
         }
+        this.userHasPositioned = true;
+        this.saveViewState();
       },
       { passive: false }
     );
@@ -308,27 +359,26 @@ class Astrolabe3D {
   }
 
   animate() {
-    // Quando o mouse esta sobre um astro, desacelera suavemente o movimento de constelacao para facilitar o clique
-    const timeStep = this.hoveredPoint ? 0.0025 : 0.0095;
+    // Quando o mouse esta sobre um astro, pausa o movimento da constelacao para clique instantaneo
+    const timeStep = this.hoveredPoint ? 0 : 0.0085;
     this.constellationTime += timeStep;
 
     if (this.introProgress < 1) {
-      this.introProgress = Math.min(1, this.introProgress + 0.022);
+      this.introProgress = Math.min(1, this.introProgress + 0.035);
     }
 
     if (!this.isDragging) {
-      if (this.autoOrbit) {
-        const targetVel = this.hoveredPoint ? 0.00015 : 0.00075;
-        this.wheelVelocity += (targetVel - this.wheelVelocity) * 0.04;
-      } else {
-        this.wheelVelocity *= 0.94;
+      // Desacelera suavemente e trava exatamente no ponto onde o usuario posicionou o circulo 3D
+      this.wheelVelocity *= 0.84;
+      if (Math.abs(this.wheelVelocity) < 0.00005) {
+        this.wheelVelocity = 0;
       }
       this.wheelRotation += this.wheelVelocity;
     }
 
-    this.tiltX += (this.targetTiltX - this.tiltX) * 0.085;
-    this.tiltY += (this.targetTiltY - this.tiltY) * 0.085;
-    this.zoom += (this.targetZoom - this.zoom) * 0.1;
+    this.tiltX += (this.targetTiltX - this.tiltX) * 0.14;
+    this.tiltY += (this.targetTiltY - this.tiltY) * 0.14;
+    this.zoom += (this.targetZoom - this.zoom) * 0.14;
 
     if (this.activePulsePointId) {
       this.activePulseProgress += 0.045;
@@ -536,26 +586,23 @@ class Astrolabe3D {
       3: 0.895
     };
 
-    // Cada astro possui uma velocidade kepleriana sutil e oscilacao harmonica propria,
-    // gerando movimento relativo lento entre os astros como uma constelacao viva
+    // Cada astro possui uma oscilacao harmonica sutil (sem sair do ponto onde o usuario posicionou),
+    // gerando movimento organico lento entre os astros como uma constelacao viva
     for (let idx = 0; idx < this.points.length; idx++) {
       const pt = this.points[idx];
       const orbitNum = Number(pt.orbit) || 3;
       const baseOrbitR = orbitRadii[orbitNum] || 0.76;
 
-      // Velocidades diferenciais suaves por orbita e indice para movimento entre os astros
-      const keplerFactor = orbitNum === 1 ? 0.22 : orbitNum === 2 ? -0.15 : 0.11;
-      const individualDrift =
-        this.constellationTime * keplerFactor +
-        Math.sin(this.constellationTime * 0.55 + idx * 1.37) * 0.095;
+      // Oscilacao harmonica limitada ao redor do ponto (mantem o astro na posicao onde o usuario parar)
+      const individualDrift = Math.sin(this.constellationTime * 0.48 + idx * 1.37) * 0.024;
 
       // Respiracao radial e oscilacao lenta em profundidade Z (3D)
-      const radialBreathing = Math.cos(this.constellationTime * 0.42 + idx * 2.1) * 0.022;
+      const radialBreathing = Math.cos(this.constellationTime * 0.38 + idx * 2.1) * 0.014;
       const orbitR = baseOrbitR + radialBreathing;
 
       const rad = ((Number(pt.angle) || 0) * Math.PI) / 180 + this.wheelRotation + individualDrift;
       const baseElevZ = ((Number(pt.elevation) || 0) / 100) * 0.75;
-      const harmonicZ = Math.sin(this.constellationTime * 0.65 + idx * 1.15) * 0.085;
+      const harmonicZ = Math.sin(this.constellationTime * 0.55 + idx * 1.15) * 0.055;
       const pz = baseElevZ + harmonicZ;
 
       const px = Math.cos(rad) * orbitR;

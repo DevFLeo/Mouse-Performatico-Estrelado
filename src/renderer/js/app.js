@@ -173,9 +173,33 @@
   let initInterval = null;
   let welcomeTimeout = null;
   let welcomeHideTimeout = null;
+  let safetyUnlockTimeout = null;
   let lastIntroStartTs = 0;
+  let hasCompletedInitialIntro = false;
+
+  function forceUnlockToAstrolabe() {
+    if (initInterval) {
+      clearInterval(initInterval);
+      initInterval = null;
+    }
+    if (welcomeTimeout) clearTimeout(welcomeTimeout);
+    if (welcomeHideTimeout) clearTimeout(welcomeHideTimeout);
+    if (safetyUnlockTimeout) clearTimeout(safetyUnlockTimeout);
+
+    hasCompletedInitialIntro = true;
+    const splash = document.getElementById('splash-screen');
+    if (splash) {
+      splash.classList.add('hidden');
+      splash.classList.remove('fade-out');
+    }
+  }
 
   function runInitializationSequence(force = false) {
+    if (!force && hasCompletedInitialIntro) {
+      forceUnlockToAstrolabe();
+      return;
+    }
+
     const now = Date.now();
     if (!force && initInterval && now - lastIntroStartTs < 1500) {
       return;
@@ -185,6 +209,7 @@
     if (initInterval) clearInterval(initInterval);
     if (welcomeTimeout) clearTimeout(welcomeTimeout);
     if (welcomeHideTimeout) clearTimeout(welcomeHideTimeout);
+    if (safetyUnlockTimeout) clearTimeout(safetyUnlockTimeout);
 
     const splash = document.getElementById('splash-screen');
     const phaseInit = document.getElementById('splash-phase-init');
@@ -204,9 +229,14 @@
     if (percentValEl) percentValEl.textContent = '0%';
     if (percentRemEl) percentRemEl.textContent = 'Faltam 100% para ativar o M.P.E';
 
+    // Trava de seguranca: garante que nunca fique preso na tela de inicializacao
+    safetyUnlockTimeout = setTimeout(() => {
+      forceUnlockToAstrolabe();
+    }, 2600);
+
     let progress = 0;
     initInterval = setInterval(() => {
-      progress = Math.min(100, progress + 5);
+      progress = Math.min(100, progress + 10);
       const remaining = Math.max(0, 100 - progress);
 
       progressBar.style.width = `${progress}%`;
@@ -223,30 +253,21 @@
         initInterval = null;
         setTimeout(() => {
           onInitBarCompleted();
-        }, 180);
+        }, 120);
       }
-    }, 55);
+    }, 65);
   }
 
   function onInitBarCompleted() {
-    const hasName =
-      currentConfig &&
-      currentConfig.profile &&
-      currentConfig.profile.userName &&
-      currentConfig.profile.userName.trim().length > 0;
+    hasCompletedInitialIntro = true;
+    const userName =
+      (currentConfig &&
+        currentConfig.profile &&
+        currentConfig.profile.userName &&
+        currentConfig.profile.userName.trim()) ||
+      'Leonardo';
 
-    if (!hasName) {
-      // Oculta a tela de splash e abre o modal de cadastro em primeiro plano (z-index: 200)
-      const splash = document.getElementById('splash-screen');
-      splash.classList.add('hidden');
-      const regModal = document.getElementById('modal-register');
-      regModal.classList.remove('hidden');
-      setTimeout(() => {
-        document.getElementById('reg-user-name').focus();
-      }, 50);
-    } else {
-      showWelcomePhase(currentConfig.profile.userName.trim());
-    }
+    showWelcomePhase(userName);
   }
 
   function showWelcomePhase(userName) {
@@ -269,12 +290,12 @@
     welcomeTimeout = setTimeout(() => {
       splash.classList.add('fade-out');
       if (astrolabe) {
-        astrolabe.triggerIntroAnimation();
+        astrolabe.triggerIntroAnimation(true);
       }
       welcomeHideTimeout = setTimeout(() => {
-        splash.classList.add('hidden');
-      }, 650);
-    }, 1500);
+        forceUnlockToAstrolabe();
+      }, 450);
+    }, 950);
   }
 
   function handlePointHover(point) {
@@ -578,6 +599,9 @@
   }
 
   async function init() {
+    // Inicia imediatamente a contagem 0% -> 100% sem bloquear a abertura
+    runInitializationSequence();
+
     currentConfig = await window.mpeApi.getConfig();
     if (currentConfig.originSystem && currentConfig.originSystem.windowTitle) {
       originSystemName = currentConfig.originSystem.windowTitle;
@@ -694,11 +718,7 @@
     });
 
     document.getElementById('splash-screen').addEventListener('click', () => {
-      if (initInterval) {
-        clearInterval(initInterval);
-        initInterval = null;
-        onInitBarCompleted();
-      }
+      forceUnlockToAstrolabe();
     });
 
     document.getElementById('pt-action-type').addEventListener('change', updatePointModalFields);
@@ -843,15 +863,17 @@
         applyLanguageToneUI();
         astrolabe.setConfig(currentConfig);
       }
-      if (payload && payload.playIntro) {
+      if (payload && payload.source === 'tray-intro') {
+        runInitializationSequence(true);
+      } else if (payload && payload.playIntro && !hasCompletedInitialIntro) {
         runInitializationSequence();
       } else {
-        document.getElementById('splash-screen').classList.add('hidden');
-        astrolabe.triggerIntroAnimation();
+        forceUnlockToAstrolabe();
+        if (astrolabe) {
+          astrolabe.triggerIntroAnimation(true);
+        }
       }
     });
-
-    runInitializationSequence();
   }
 
   window.addEventListener('DOMContentLoaded', init);

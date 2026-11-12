@@ -40,8 +40,8 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // Quando o usuario clica novamente no icone executavel MPE.exe, abre no Modo Edicao Completo
-    summonHud({ playIntro: true, mode: 'executable-editor', source: 'executable' });
+    // Quando o usuario clica novamente no icone executavel MPE.exe, abre imediatamente no Modo Edicao Completo
+    summonHud({ playIntro: false, mode: 'executable-editor', source: 'executable' });
   });
 }
 
