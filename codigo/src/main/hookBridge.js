@@ -10,10 +10,10 @@ const EventEmitter = require('events');
  * e executa transferencia direta para qualquer Sistema de Destino no Windows.
  */
 class HookBridge extends EventEmitter {
-  constructor(rootDir) {
+  constructor(codeDir) {
     super();
-    this.rootDir = rootDir;
-    this.hookExePath = path.join(rootDir, 'src', 'native', 'bin', 'MpeHook.exe');
+    this.codeDir = codeDir;
+    this.hookExePath = path.join(codeDir, 'src', 'native', 'bin', 'MpeHook.exe');
     this.proc = null;
     this.lastHwnd = '0';
     this.lastWindowRect = null;
@@ -85,6 +85,33 @@ class HookBridge extends EventEmitter {
             winSnapPath: this.lastWinSnapPath,
             windowTitle: this.lastWindowTitle
           });
+        } else if (line.startsWith('TRIGGER_MINI|')) {
+          const parts = line.split('|');
+          const x = parseInt(parts[1] || '0', 10);
+          const y = parseInt(parts[2] || '0', 10);
+          const hwnd = parts[3] || '0';
+          const rectRaw = (parts[4] || '0,0,0,0').split(',').map((n) => parseInt(n, 10));
+          const winTitle = parts.slice(7).join(' ').trim();
+
+          let winRect = null;
+          if (rectRaw.length === 4 && rectRaw[2] > rectRaw[0] && rectRaw[3] > rectRaw[1]) {
+            winRect = {
+              left: rectRaw[0],
+              top: rectRaw[1],
+              right: rectRaw[2],
+              bottom: rectRaw[3],
+              width: rectRaw[2] - rectRaw[0],
+              height: rectRaw[3] - rectRaw[1]
+            };
+          }
+
+          this.emit('trigger-mini', {
+            x,
+            y,
+            hwnd,
+            windowRect: winRect,
+            windowTitle: winTitle
+          });
         }
       }
     });
@@ -105,6 +132,41 @@ class HookBridge extends EventEmitter {
       fullSnapPath: this.lastFullSnapPath,
       winSnapPath: this.lastWinSnapPath
     };
+  }
+
+  refreshForegroundWindow() {
+    return new Promise((resolve) => {
+      if (!fs.existsSync(this.hookExePath)) return resolve(null);
+      execFile(
+        this.hookExePath,
+        ['--GET-FOREGROUND'],
+        { windowsHide: true, encoding: 'utf8' },
+        (err, stdout) => {
+          if (!err && stdout && stdout.startsWith('FOREGROUND|')) {
+            const parts = stdout.trim().split('|');
+            const hwnd = parts[1] || '0';
+            const rectRaw = (parts[2] || '0,0,0,0').split(',').map((n) => parseInt(n, 10));
+            const winTitle = parts.slice(3).join(' ').trim();
+            if (hwnd !== '0') {
+              this.lastHwnd = hwnd;
+              if (winTitle) this.lastWindowTitle = winTitle;
+              if (rectRaw.length === 4 && rectRaw[2] > rectRaw[0] && rectRaw[3] > rectRaw[1]) {
+                this.lastWindowRect = {
+                  left: rectRaw[0],
+                  top: rectRaw[1],
+                  right: rectRaw[2],
+                  bottom: rectRaw[3],
+                  width: rectRaw[2] - rectRaw[0],
+                  height: rectRaw[3] - rectRaw[1]
+                };
+              }
+            }
+            return resolve(this.getOriginSystemInfo());
+          }
+          resolve(null);
+        }
+      );
+    });
   }
 
   captureScreenFast(outPath) {

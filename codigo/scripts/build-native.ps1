@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference = "Stop"
 
-$RootDir = Split-Path -Parent $PSScriptRoot
-$AssetsDir = Join-Path $RootDir "assets"
-$NativeBinDir = Join-Path $RootDir "src\native\bin"
+$CodeDir = Split-Path -Parent $PSScriptRoot
+$RootDir = Split-Path -Parent $CodeDir
+$AssetsDir = Join-Path $CodeDir "assets"
+$NativeBinDir = Join-Path $CodeDir "src\native\bin"
 
 if (!(Test-Path $AssetsDir)) { New-Item -ItemType Directory -Path $AssetsDir | Out-Null }
 if (!(Test-Path $NativeBinDir)) { New-Item -ItemType Directory -Path $NativeBinDir | Out-Null }
@@ -72,11 +73,11 @@ if (!(Test-Path $csc)) {
     $csc = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
 }
 
-$hookSrc = Join-Path $RootDir "src\native\MpeHook.cs"
+$hookSrc = Join-Path $CodeDir "src\native\MpeHook.cs"
 $hookOut = Join-Path $NativeBinDir "MpeHook.exe"
 & $csc /nologo /optimize+ /target:exe /out:$hookOut $hookSrc
 
-$launcherSrc = Join-Path $RootDir "src\native\MpeLauncher.cs"
+$launcherSrc = Join-Path $CodeDir "src\native\MpeLauncher.cs"
 $launcherOut = Join-Path $RootDir "MPE.exe"
 & $csc /nologo /optimize+ /target:winexe /win32icon:$icoPath /out:$launcherOut $launcherSrc
 

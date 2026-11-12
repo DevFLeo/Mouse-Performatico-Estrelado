@@ -1,3 +1,9 @@
-node_modules/
-Capturas_MPE/
+codigo/node_modules/
+codigo/logs/
+codigo/data/
+codigo/models/*.llamafile*
+codigo/models/*.gguf
+codigo/models/*.exe
+prints/
+arquivos/
 *.log

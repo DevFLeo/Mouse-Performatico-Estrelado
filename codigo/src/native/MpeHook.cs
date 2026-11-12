@@ -38,14 +38,22 @@ namespace MpeNative
         private const int SW_SHOW = 5;
         private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
+        private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+        private const uint WINEVENT_OUTOFCONTEXT = 0;
+
         private static LowLevelMouseProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
         private static bool _suppressNextRightUp = false;
         private static IntPtr _lastForegroundHwnd = IntPtr.Zero;
+        private static string _lastWindowTitle = "";
         private static string _cacheDir = "";
 
         private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+        private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+        private static WinEventDelegate _winEventProc = WinEventCallback;
+        private static IntPtr _winEventHook = IntPtr.Zero;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -134,6 +142,12 @@ namespace MpeNative
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
         [STAThread]
         public static void Main(string[] args)
         {
@@ -143,8 +157,8 @@ namespace MpeNative
 
             try
             {
-                string rootDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."));
-                _cacheDir = Path.Combine(rootDir, "Capturas_MPE", ".cache");
+                string codeDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."));
+                _cacheDir = Path.Combine(codeDir, "data", ".cache");
                 if (!Directory.Exists(_cacheDir))
                 {
                     Directory.CreateDirectory(_cacheDir);
@@ -172,12 +186,31 @@ namespace MpeNative
             };
             stdinThread.Start();
 
+            _winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
             _hookID = SetHook(_proc);
             Console.WriteLine("MPE_HOOK_READY");
             Console.Out.Flush();
 
             Application.Run();
+            if (_winEventHook != IntPtr.Zero) UnhookWinEvent(_winEventHook);
             UnhookWindowsHookEx(_hookID);
+        }
+
+        private static void WinEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+        {
+            if (hwnd == IntPtr.Zero) return;
+            try
+            {
+                string title = GetWindowTitle(hwnd);
+                if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) return;
+                uint pid;
+                GetWindowThreadProcessId(hwnd, out pid);
+                if (pid == (uint)Process.GetCurrentProcess().Id) return;
+
+                _lastForegroundHwnd = hwnd;
+                _lastWindowTitle = title;
+            }
+            catch { }
         }
 
         private static RECT GetAccurateWindowRect(IntPtr hWnd)
@@ -264,10 +297,9 @@ namespace MpeNative
         {
             if (hWnd == IntPtr.Zero) return;
 
-            IntPtr fgHwnd = GetForegroundWindow();
-            uint dummyPid;
-            uint fgThread = GetWindowThreadProcessId(fgHwnd, out dummyPid);
-            uint curThread = GetCurrentThreadId();
+            // 1. Simula toque na tecla ALT para desarmar a restricao de foco do Windows (LockSetForegroundWindow)
+            keybd_event((byte)VK_MENU, 0, 0, UIntPtr.Zero);
+            keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
 
             if (IsIconic(hWnd))
             {
@@ -277,6 +309,11 @@ namespace MpeNative
             {
                 ShowWindow(hWnd, SW_SHOW);
             }
+
+            IntPtr fgHwnd = GetForegroundWindow();
+            uint dummyPid;
+            uint fgThread = GetWindowThreadProcessId(fgHwnd, out dummyPid);
+            uint curThread = GetCurrentThreadId();
 
             if (fgThread != curThread && fgThread != 0)
             {
@@ -306,6 +343,13 @@ namespace MpeNative
             string qRaw = query.Trim().ToLowerInvariant();
             string qNormalized = qRaw.Replace("|", " ");
 
+            bool isNotepadQuery = qRaw.Contains("bloco") || qRaw.Contains("nota") || qRaw.Contains("notepad");
+            bool isPaintQuery = qRaw.Contains("paint") || qRaw.Contains("desenho");
+            bool isCalcQuery = qRaw.Contains("calc") || qRaw.Contains("calcul");
+            bool isWordQuery = qRaw.Contains("word") || qRaw.Contains("winword");
+            bool isExcelQuery = qRaw.Contains("excel");
+            bool isTelegramQuery = qRaw.Contains("leonardo") || qRaw.Contains("eu |") || qRaw.Contains("voce") || qRaw.Contains("você") || qRaw.Contains("telegram");
+
             // 1. Busca direta pelo titulo exato/parcial (incluindo "Eu | Você | Leonardo") nos processos
             foreach (Process p in Process.GetProcesses())
             {
@@ -321,6 +365,36 @@ namespace MpeNative
                     string procLow = procName.ToLowerInvariant();
 
                     if (titleLow.Contains(qRaw) || titleNorm.Contains(qNormalized) || procLow.Contains(qRaw))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isNotepadQuery && (procLow.Contains("notepad") || titleLow.Contains("bloco de nota") || titleLow.Contains("notepad")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isPaintQuery && (procLow.Contains("mspaint") || titleLow.Contains("paint")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isCalcQuery && (procLow.Contains("calc") || procLow.Contains("calculatorapp") || titleLow.Contains("calcul")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isWordQuery && (procLow.Contains("winword") || titleLow.Contains("word")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isExcelQuery && (procLow.Contains("excel") || titleLow.Contains("excel")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isTelegramQuery && (procLow.Contains("telegram") || titleLow.Contains("telegram") || titleLow.Contains("leonardo")))
                     {
                         return p.MainWindowHandle;
                     }
@@ -343,13 +417,38 @@ namespace MpeNative
                     found = hWnd;
                     return false;
                 }
+
+                if (isNotepadQuery && (titleLow.Contains("bloco de nota") || titleLow.Contains("notepad")))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
+                if (isPaintQuery && titleLow.Contains("paint"))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
+                if (isCalcQuery && titleLow.Contains("calcul"))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
+                if (isTelegramQuery && (titleLow.Contains("telegram") || titleLow.Contains("leonardo")))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
                 return true;
             }, IntPtr.Zero);
 
             if (found != IntPtr.Zero) return found;
 
-            // 3. Se o destino for a pasta/conversa do Telegram ("Eu | Você | Leonardo"), foca a janela do Telegram Desktop
-            if (qRaw.Contains("leonardo") || qRaw.Contains("eu |") || qRaw.Contains("voce") || qRaw.Contains("você") || qRaw.Contains("telegram"))
+            // 3. Fallback de Telegram Desktop
+            if (isTelegramQuery)
             {
                 foreach (Process p in Process.GetProcesses())
                 {
@@ -429,7 +528,16 @@ namespace MpeNative
         {
             string cmd = args[0].ToUpperInvariant();
 
-            if (cmd == "--LIST-WINDOWS")
+            if (cmd == "--GET-FOREGROUND")
+            {
+                IntPtr fg = GetForegroundWindow();
+                string title = GetWindowTitle(fg);
+                RECT r = GetAccurateWindowRect(fg);
+                string rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
+                Console.WriteLine(string.Format("FOREGROUND|{0}|{1}|{2}", fg.ToInt64(), rectStr, title));
+                return;
+            }
+            else if (cmd == "--LIST-WINDOWS")
             {
                 ListOpenWindowsJson();
                 return;
@@ -456,30 +564,52 @@ namespace MpeNative
                 }
                 return;
             }
-            else if (cmd == "--COPY-SELECTION" && args.Length > 1)
+            else if (cmd == "--COPY-SELECTION")
             {
-                long hwndVal;
-                if (long.TryParse(args[1], out hwndVal) && hwndVal != 0)
+                long hwndVal = 0;
+                if (args.Length > 1)
+                {
+                    long.TryParse(args[1], out hwndVal);
+                }
+                if (hwndVal == 0 && _lastForegroundHwnd != IntPtr.Zero)
+                {
+                    hwndVal = _lastForegroundHwnd.ToInt64();
+                }
+                if (hwndVal == 0)
+                {
+                    EnumWindows(delegate (IntPtr h, IntPtr lp)
+                    {
+                        if (!IsWindowVisible(h)) return true;
+                        string t = GetWindowTitle(h);
+                        if (string.IsNullOrWhiteSpace(t) || t == "Program Manager" || t.Contains("M.P.E") || t.Contains("Mouse Perform")) return true;
+                        hwndVal = h.ToInt64();
+                        return false;
+                    }, IntPtr.Zero);
+                }
+
+                if (hwndVal != 0)
                 {
                     IntPtr targetHwnd = new IntPtr(hwndVal);
                     ForceActivateWindow(targetHwnd);
-                    Thread.Sleep(150);
+                    Thread.Sleep(220);
                 }
                 SendCtrlKey(VK_C);
-                Thread.Sleep(150);
+                Thread.Sleep(200);
+                Console.WriteLine("COPIED_FROM|" + hwndVal);
                 return;
             }
             else if (cmd == "--PASTE-AND-SEND")
             {
                 bool autoSend = args.Length <= 1 || args[1] != "0";
-                Thread.Sleep(620);
+                Thread.Sleep(400);
                 SendCtrlKey(VK_V);
                 if (autoSend)
                 {
                     // Aguarda modal de preview de imagem (Telegram, WhatsApp, Discord, Teams) e confirma com Enter
-                    Thread.Sleep(550);
+                    Thread.Sleep(450);
                     SendReturnKey();
                 }
+                Console.WriteLine("PASTED_AND_SENT");
                 return;
             }
             else if (cmd == "--DELIVER-TO-SYSTEM" && args.Length > 1)
@@ -491,11 +621,11 @@ namespace MpeNative
                 if (targetHwnd != IntPtr.Zero)
                 {
                     ForceActivateWindow(targetHwnd);
-                    Thread.Sleep(450);
+                    Thread.Sleep(350);
                     SendCtrlKey(VK_V);
                     if (autoSend)
                     {
-                        Thread.Sleep(550);
+                        Thread.Sleep(450);
                         SendReturnKey();
                     }
                     Console.WriteLine("DELIVERED_TO_WINDOW|" + GetWindowTitle(targetHwnd));
@@ -540,11 +670,15 @@ namespace MpeNative
         {
             keybd_event((byte)VK_SHIFT, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event((byte)VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            Thread.Sleep(30);
 
             keybd_event((byte)VK_CONTROL, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(30);
             keybd_event(vKey, 0, 0, UIntPtr.Zero);
-            Thread.Sleep(45);
+            Thread.Sleep(60);
             keybd_event(vKey, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            Thread.Sleep(30);
             keybd_event((byte)VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
@@ -595,6 +729,29 @@ namespace MpeNative
                             rectStr,
                             fullSnap,
                             winSnap,
+                            winTitle
+                        ));
+                        Console.Out.Flush();
+
+                        return (IntPtr)1;
+                    }
+                    else if (shift && ctrl && !alt)
+                    {
+                        // Atalho: Shift + Ctrl + Botao Direito do Mouse -> Mini Ajudante Flutuante
+                        MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
+                        _lastForegroundHwnd = GetForegroundWindow();
+                        string winTitle = GetWindowTitle(_lastForegroundHwnd);
+                        RECT r = GetAccurateWindowRect(_lastForegroundHwnd);
+                        string rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
+
+                        _suppressNextRightUp = true;
+
+                        Console.WriteLine(string.Format(
+                            "TRIGGER_MINI|{0}|{1}|{2}|{3}|||{4}",
+                            hookStruct.pt.x,
+                            hookStruct.pt.y,
+                            _lastForegroundHwnd.ToInt64(),
+                            rectStr,
                             winTitle
                         ));
                         Console.Out.Flush();

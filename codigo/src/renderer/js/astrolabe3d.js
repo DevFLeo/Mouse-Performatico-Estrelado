@@ -267,7 +267,15 @@ class Astrolabe3D {
 
   triggerIntroAnimation(preservePosition = true) {
     this.resume();
-    this.introProgress = 0.15;
+    this.introProgress = 0.2;
+    // Pulso estelar de ignicao holografica ao abrir via Shift + Ctrl + Alt + Botao Direito
+    this.spawnShockwave(
+      this.nexusScreenPos.x || this.width / 2,
+      this.nexusScreenPos.y || this.height / 2,
+      this.theme.goldSecondary,
+      1.45
+    );
+    this.triggerAllVectorsBurst();
     if (!preservePosition && !this.userHasPositioned) {
       this.wheelVelocity = 0.012;
       this.tiltX = 0.52;
@@ -275,7 +283,7 @@ class Astrolabe3D {
       this.targetTiltX = 0.34;
       this.targetTiltY = -0.24;
     } else {
-      this.wheelVelocity = 0;
+      this.wheelVelocity = 0.005;
     }
   }
 
@@ -730,7 +738,27 @@ class Astrolabe3D {
     }
     ctx.fill();
 
-    // 3. ANEL DUPLO GRADUADO EXTERNO (Fiel a imagem reference-astrolabe.jpg + Coroa 3D quando em 3D)
+    // 3. ANEL EXTERNO PRINCIPAL (Astrolabio de Alta Precisao - Bezel Duplo, Pista Metalica e Graduacoes)
+    // 3a. Pista metalica de fundo entre os aneis (R = 0.895 ate R = 1.0)
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i <= 96; i++) {
+      const theta = (i / 96) * Math.PI * 2;
+      const p = this.project3D(Math.cos(theta), Math.sin(theta), 0, baseR);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    for (let i = 96; i >= 0; i--) {
+      const theta = (i / 96) * Math.PI * 2;
+      const p = this.project3D(Math.cos(theta) * 0.895, Math.sin(theta) * 0.895, 0, baseR);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(229, 184, 75, 0.055)';
+    ctx.fill();
+    ctx.restore();
+
+    // 3b. Coroa 3D cilindrica quando em modo 3D
     if (blend > 0.05) {
       this.draw3DRing(
         ctx,
@@ -740,7 +768,7 @@ class Astrolabe3D {
         -0.075,
         0,
         0,
-        `rgba(229, 184, 75, ${(0.28 * blend).toFixed(2)})`,
+        `rgba(229, 184, 75, ${(0.32 * blend).toFixed(2)})`,
         1.1,
         84
       );
@@ -752,19 +780,36 @@ class Astrolabe3D {
         0.045,
         0,
         0,
-        `rgba(229, 184, 75, ${(0.22 * blend).toFixed(2)})`,
+        `rgba(229, 184, 75, ${(0.26 * blend).toFixed(2)})`,
         1.0,
         84,
         true
       );
     }
 
-    // Halo suave do anel principal (sem usar shadowBlur)
-    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, 'rgba(229, 184, 75, 0.18)', 5.5, 112);
-    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.35, 112);
-    this.draw3DRing(ctx, 0.895, 0, 0, 0, 0, 0, this.theme.goldPrimary, 1.85, 112);
+    // 3c. Anel Orbital Pontilhado Externo (Fiel a reference-astrolabe.jpg - R = 1.032)
+    this.draw3DRing(
+      ctx,
+      1.032,
+      0,
+      0,
+      0,
+      0,
+      0,
+      'rgba(229, 184, 75, 0.38)',
+      1.2,
+      96,
+      true
+    );
 
-    // 4. MARCADORES GRADUADOS EM BATCH UNICO (72 Ticks + 12 Barras de Sinal ||||| + 12 Grupos de Pontos ....)
+    // 3d. Borda externa principal e interna com brilho dourado
+    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, 'rgba(229, 184, 75, 0.22)', 5.5, 112);
+    this.draw3DRing(ctx, 1.0, 0, 0, 0, 0, 0, this.theme.goldSecondary, 1.5, 112);
+    this.draw3DRing(ctx, 0.996, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.2, 112);
+    this.draw3DRing(ctx, 0.895, 0, 0, 0, 0, 0, this.theme.goldPrimary, 2.0, 112);
+    this.draw3DRing(ctx, 0.891, 0, 0, 0, 0, 0, 'rgba(229, 184, 75, 0.28)', 1.0, 112);
+
+    // 4. MARCADORES GRADUADOS E COMPASSO ASTRONOMICO NO ULTIMO ANEL
     const numTicks = 72;
 
     // 4a. Conectores 3D de profundidade (apenas quando em 3D)
@@ -779,29 +824,46 @@ class Astrolabe3D {
         ctx.moveTo(pFront.x, pFront.y);
         ctx.lineTo(pDepth.x, pDepth.y);
       }
-      ctx.strokeStyle = `rgba(229, 184, 75, ${(0.32 * blend).toFixed(2)})`;
+      ctx.strokeStyle = `rgba(229, 184, 75, ${(0.35 * blend).toFixed(2)})`;
       ctx.lineWidth = 1.0;
       ctx.stroke();
     }
 
-    // 4b. Ticks Internos de Grau (Batch unico = 1 chamada de GPU)
+    // 4b. 12 Raios Maiores de Divisao que conectam o anel interno ao externo (R = 0.895 a 1.0)
     ctx.beginPath();
-    for (let i = 0; i < numTicks; i++) {
+    for (let i = 0; i < numTicks; i += 6) {
       const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
       const cosA = Math.cos(rad);
       const sinA = Math.sin(rad);
-      const innerR = i % 6 === 0 ? 0.908 : 0.914;
-      const outerR = i % 6 === 0 ? 0.935 : 0.93;
+      const pIn = this.project3D(cosA * 0.895, sinA * 0.895, 0, baseR);
+      const pOut = this.project3D(cosA * 1.0, sinA * 1.0, 0, baseR);
+      ctx.moveTo(pIn.x, pIn.y);
+      ctx.lineTo(pOut.x, pOut.y);
+    }
+    ctx.strokeStyle = this.theme.goldSecondary;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // 4c. Ticks Hierarquicos de Grau (Batch unico: 15° longos, 5° medios)
+    ctx.beginPath();
+    for (let i = 0; i < numTicks; i++) {
+      if (i % 6 === 0) continue; // Pula os raios maiores ja desenhados
+      const rad = ((i * 5) * Math.PI) / 180 + this.wheelRotation;
+      const cosA = Math.cos(rad);
+      const sinA = Math.sin(rad);
+      const isMajor15 = i % 3 === 0;
+      const innerR = isMajor15 ? 0.902 : 0.916;
+      const outerR = isMajor15 ? 0.942 : 0.932;
       const pInner = this.project3D(cosA * innerR, sinA * innerR, 0, baseR);
       const pOuter = this.project3D(cosA * outerR, sinA * outerR, 0, baseR);
       ctx.moveTo(pInner.x, pInner.y);
       ctx.lineTo(pOuter.x, pOuter.y);
     }
     ctx.strokeStyle = this.theme.goldPrimary;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.4;
     ctx.stroke();
 
-    // 4c. 12 Indicadores de Barras de Sinal (|||||) a cada 30 graus (Batch unico + pulso de onda animado)
+    // 4d. 12 Indicadores de Barras de Sinal (|||||) a cada 30 graus com pulso de onda
     const barHeights = [0.038, 0.032, 0.025, 0.017, 0.011];
     ctx.beginPath();
     for (let i = 0; i < numTicks; i += 6) {
@@ -830,7 +892,7 @@ class Astrolabe3D {
     ctx.lineWidth = 1.7;
     ctx.stroke();
 
-    // 4d. 12 Grupos de 4 Pontos (....) intercalados a cada 30 graus (Batch unico)
+    // 4e. 12 Grupos de 4 Pontos (....) intercalados a cada 30 graus
     ctx.fillStyle = this.theme.goldPrimary;
     ctx.beginPath();
     for (let i = 3; i < numTicks; i += 6) {
@@ -842,6 +904,36 @@ class Astrolabe3D {
       }
     }
     ctx.fill();
+
+    // 4f. Balizas Cardinais Astronomicas (Losangos nos 4 polos cardinais: 0°, 90°, 180°, 270°)
+    const cardinalAngles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+    ctx.save();
+    for (let c = 0; c < cardinalAngles.length; c++) {
+      const cAng = cardinalAngles[c] + this.wheelRotation;
+      const midR = 0.947;
+      const cp = this.project3D(Math.cos(cAng) * midR, Math.sin(cAng) * midR, 0, baseR);
+      const dSize = 3.8 * cp.scale;
+
+      ctx.beginPath();
+      ctx.moveTo(cp.x, cp.y - dSize);
+      ctx.lineTo(cp.x + dSize * 0.75, cp.y);
+      ctx.lineTo(cp.x, cp.y + dSize);
+      ctx.lineTo(cp.x - dSize * 0.75, cp.y);
+      ctx.closePath();
+      ctx.fillStyle = this.theme.goldSecondary;
+      ctx.fill();
+      ctx.strokeStyle = this.theme.goldPrimary;
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+
+      // Micro-astro brilhante na orbita pontilhada externa
+      const outerStarP = this.project3D(Math.cos(cAng) * 1.032, Math.sin(cAng) * 1.032, 0, baseR);
+      ctx.beginPath();
+      ctx.arc(outerStarP.x, outerStarP.y, 2.2 * outerStarP.scale, 0, Math.PI * 2);
+      ctx.fillStyle = this.theme.goldSecondary;
+      ctx.fill();
+    }
+    ctx.restore();
 
     // 5. CIRCULOS INTERNOS EXCENTRICOS (Geometria 1:1 da imagem reference-astrolabe.jpg em 2D + inclinacao 3D)
     const slowPrecession = Math.sin(this.constellationTime * 0.45) * 0.05 * blend;

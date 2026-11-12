@@ -74,39 +74,48 @@ namespace MpeNative
 
             try
             {
-                string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-                if (!string.IsNullOrEmpty(startupFolder) && Directory.Exists(startupFolder))
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType != null)
                 {
-                    string lnkPath = Path.Combine(startupFolder, "M.P.E - Mouse Performatico Estrelado.lnk");
-                    if (enable)
+                    object shell = Activator.CreateInstance(shellType);
+                    string icoPath = Path.Combine(baseDir.TrimEnd('\\'), "codigo", "assets", "icon.ico");
+                    if (!File.Exists(icoPath))
                     {
-                        Type shellType = Type.GetTypeFromProgID("WScript.Shell");
-                        if (shellType != null)
-                        {
-                            object shell = Activator.CreateInstance(shellType);
-                            object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { lnkPath });
-                            Type scType = shortcut.GetType();
-                            scType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { exePath });
-                            scType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { "--startup" });
-                            scType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { baseDir.TrimEnd('\\') });
-                            scType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "M.P.E - Mouse Performatico Estrelado (DevFLeo)" });
-                            string icoPath = Path.Combine(baseDir.TrimEnd('\\'), "assets", "icon.ico");
-                            if (File.Exists(icoPath))
-                            {
-                                scType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { icoPath });
-                            }
-                            scType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
-                        }
+                        icoPath = Path.Combine(baseDir.TrimEnd('\\'), "assets", "icon.ico");
                     }
-                    else if (File.Exists(lnkPath))
+
+                    // 1. Atalho em "Start Menu\Programs" (para o Windows associar o icone correto ao Fixar na Barra de Tarefas)
+                    string programsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+                    if (!string.IsNullOrEmpty(programsFolder) && Directory.Exists(programsFolder))
                     {
-                        File.Delete(lnkPath);
+                        string progLnk = Path.Combine(programsFolder, "M.P.E - Mouse Performatico Estrelado.lnk");
+                        object scProg = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { progLnk });
+                        Type scProgType = scProg.GetType();
+                        scProgType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, scProg, new object[] { exePath });
+                        scProgType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, scProg, new object[] { baseDir.TrimEnd('\\') });
+                        scProgType.InvokeMember("Description", BindingFlags.SetProperty, null, scProg, new object[] { "M.P.E - Mouse Performatico Estrelado" });
+                        if (File.Exists(icoPath))
+                        {
+                            scProgType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, scProg, new object[] { icoPath });
+                        }
+                        scProgType.InvokeMember("Save", BindingFlags.InvokeMethod, null, scProg, null);
+                    }
+
+                    // 2. Remove atalho redundante da pasta Startup caso exista (evita duplicacao no Gerenciador de Tarefas do Windows)
+                    string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                    if (!string.IsNullOrEmpty(startupFolder) && Directory.Exists(startupFolder))
+                    {
+                        string lnkPath = Path.Combine(startupFolder, "M.P.E - Mouse Performatico Estrelado.lnk");
+                        if (File.Exists(lnkPath))
+                        {
+                            try { File.Delete(lnkPath); } catch { }
+                        }
                     }
                 }
             }
             catch
             {
-                // Ignora caso a pasta Startup nao permita escrita
+                // Ignora caso politica local bloqueie criacao de atalhos
             }
         }
 
@@ -114,7 +123,11 @@ namespace MpeNative
         {
             try
             {
-                string cfgPath = Path.Combine(baseDir.TrimEnd('\\'), "mpe.config.json");
+                string cfgPath = Path.Combine(baseDir.TrimEnd('\\'), "codigo", "mpe.config.json");
+                if (!File.Exists(cfgPath))
+                {
+                    cfgPath = Path.Combine(baseDir.TrimEnd('\\'), "mpe.config.json");
+                }
                 if (!File.Exists(cfgPath)) return true;
                 string raw = File.ReadAllText(cfgPath);
                 if (raw.Contains("\"startWithWindows\": false")) return false;
@@ -153,21 +166,35 @@ namespace MpeNative
                     ConfigureWindowsStartup(baseDir, true);
                 }
 
-                string electronExe = Path.Combine(baseDir, "node_modules", "electron", "dist", "electron.exe");
+                string codigoDir = Path.Combine(baseDir.TrimEnd('\\'), "codigo");
+                string appDir = Directory.Exists(codigoDir) ? codigoDir : baseDir.TrimEnd('\\');
+                string electronExe = Path.Combine(appDir, "node_modules", "electron", "dist", "electron.exe");
+                if (!File.Exists(electronExe))
+                {
+                    electronExe = Path.Combine(baseDir.TrimEnd('\\'), "node_modules", "electron", "dist", "electron.exe");
+                }
 
                 string passedArgs = args != null && args.Length > 0
                     ? string.Join(" ", args)
                     : "--launch-ui";
+
+                try
+                {
+                    string logsDir = Path.Combine(appDir, "logs");
+                    if (!Directory.Exists(logsDir)) Directory.CreateDirectory(logsDir);
+                    File.AppendAllText(Path.Combine(logsDir, "mpe_launcher.log"),
+                        DateTime.Now.ToString("s") + " [MpeLauncher] Args: " + passedArgs + " | Exe: " + electronExe + " | Exists: " + File.Exists(electronExe) + Environment.NewLine);
+                }
+                catch { }
 
                 if (File.Exists(electronExe))
                 {
                     ProcessStartInfo psi = new ProcessStartInfo
                     {
                         FileName = electronExe,
-                        Arguments = string.Format("\"{0}\" {1}", baseDir.TrimEnd('\\'), passedArgs),
-                        WorkingDirectory = baseDir,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
+                        Arguments = string.Format("\"{0}\" {1}", appDir, passedArgs),
+                        WorkingDirectory = appDir,
+                        UseShellExecute = true
                     };
                     Process.Start(psi);
                 }
@@ -177,10 +204,10 @@ namespace MpeNative
                     ProcessStartInfo psi = new ProcessStartInfo
                     {
                         FileName = "cmd.exe",
-                        Arguments = string.Format("/c npx electron \"{0}\" {1}", baseDir.TrimEnd('\\'), passedArgs),
-                        WorkingDirectory = baseDir,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
+                        Arguments = string.Format("/c npx electron \"{0}\" {1}", appDir, passedArgs),
+                        WorkingDirectory = appDir,
+                        UseShellExecute = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
                     };
                     Process.Start(psi);
                 }

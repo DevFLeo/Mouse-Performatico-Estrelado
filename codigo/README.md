@@ -26,10 +26,10 @@ O **M.P.E (Mouse Performático Estrelado)** é um aplicativo executável para Wi
 
 ## Documentação Técnica Detalhada (Os 3 Markdowns Principais + Pitch)
 
-1. **[1-SISTEMA-ARQUITETURA.md](1-SISTEMA-ARQUITETURA.md)** — Detalhamento técnico profundo do que cada pasta, binário Win32 (`MpeHook.exe`, `MPE.exe`), ponte entre sistemas (`EnumWindows`, `AttachThreadInput`), pipeline IPC e cálculo de projeção 3D significa.
-2. **[2-COMO-SALVAR-ATALHOS.md](2-COMO-SALVAR-ATALHOS.md)** — Guia completo passo a passo de como criar, editar e salvar novos pontos estelares, configurar transferência de Print de um sistema para outro, Seleção de Texto, Telegram e migrar entre máquinas via JSON.
-3. **[3-COMO-MODIFICAR-PROJETO.md](3-COMO-MODIFICAR-PROJETO.md)** — Guia de engenharia sobre como modificar ou alterar o projeto, adicionar novas ações, customizar o motor 3D e recompilar os executáveis nativos.
-4. **[PITCH.md](PITCH.md)** — O Pitch Executivo, Comercial e Técnico do M.P.E.
+1. **[1-SISTEMA-ARQUITETURA.md](docs/1-SISTEMA-ARQUITETURA.md)** — Detalhamento técnico profundo do que cada pasta, binário Win32 (`MpeHook.exe`, `MPE.exe`), ponte entre sistemas (`EnumWindows`, `AttachThreadInput`), pipeline IPC e cálculo de projeção 3D significa.
+2. **[2-COMO-SALVAR-ATALHOS.md](docs/2-COMO-SALVAR-ATALHOS.md)** — Guia completo passo a passo de como criar, editar e salvar novos pontos estelares, configurar transferência de Print de um sistema para outro, Seleção de Texto, Telegram e migrar entre máquinas via JSON.
+3. **[3-COMO-MODIFICAR-PROJETO.md](docs/3-COMO-MODIFICAR-PROJETO.md)** — Guia de engenharia sobre como modificar ou alterar o projeto, adicionar novas ações, customizar o motor 3D e recompilar os executáveis nativos.
+4. **[PITCH.md](docs/PITCH.md)** — O Pitch Executivo, Comercial e Técnico do M.P.E.
 
 ---
 

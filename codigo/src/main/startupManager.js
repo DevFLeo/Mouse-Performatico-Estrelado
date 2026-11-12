@@ -12,8 +12,9 @@ const REG_VALUE_NAME = 'M.P.E - Mouse Performatico Estrelado';
  * e na pasta Startup do Windows para aparecer em "Aplicativos de inicializacao" do Gerenciador de Tarefas.
  */
 class StartupManager {
-  constructor(rootDir) {
+  constructor(rootDir, codeDir) {
     this.rootDir = rootDir;
+    this.codeDir = codeDir || path.join(rootDir, 'codigo');
     this.launcherExe = path.join(rootDir, 'MPE.exe');
     this.startupFolder = path.join(
       os.homedir(),
@@ -59,8 +60,9 @@ class StartupManager {
       if (process.platform !== 'win32') {
         return resolve(false);
       }
+      // Limpa atalho redundante da pasta Startup se existir
       if (fs.existsSync(this.shortcutPath)) {
-        return resolve(true);
+        try { fs.unlinkSync(this.shortcutPath); } catch (_) {}
       }
       execFile(
         'reg.exe',
@@ -74,6 +76,38 @@ class StartupManager {
         }
       );
     });
+  }
+
+  createAppShortcuts() {
+    if (process.platform !== 'win32') return;
+    try {
+      const programsFolder = path.join(
+        os.homedir(),
+        'AppData',
+        'Roaming',
+        'Microsoft',
+        'Windows',
+        'Start Menu',
+        'Programs'
+      );
+      const startMenuLnk = path.join(programsFolder, 'M.P.E - Mouse Performatico Estrelado.lnk');
+      const icoPath = fs.existsSync(path.join(this.codeDir, 'assets', 'icon.ico'))
+        ? path.join(this.codeDir, 'assets', 'icon.ico')
+        : path.join(this.rootDir, 'assets', 'icon.ico');
+
+      if (fs.existsSync(this.launcherExe)) {
+        const psScript = `
+          $ws = New-Object -ComObject WScript.Shell
+          $sc = $ws.CreateShortcut('${startMenuLnk.replace(/'/g, "''")}')
+          $sc.TargetPath = '${this.launcherExe.replace(/'/g, "''")}'
+          $sc.WorkingDirectory = '${this.rootDir.replace(/'/g, "''")}'
+          $sc.IconLocation = '${icoPath.replace(/'/g, "''")}'
+          $sc.Description = 'M.P.E - Mouse Performatico Estrelado'
+          $sc.Save()
+        `;
+        execFile('powershell.exe', ['-NoProfile', '-Command', psScript], { windowsHide: true }, () => {});
+      }
+    } catch (_) {}
   }
 }
 
