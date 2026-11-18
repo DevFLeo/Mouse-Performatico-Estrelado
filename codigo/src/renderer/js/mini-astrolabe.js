@@ -19,10 +19,10 @@
     expanded: false,
     paused: false,
     dragging: false,
-    size: 68,
+    size: 48,
     scale: 1.0,
-    fanRadius: 140,
-    hubDia: 68,
+    fanRadius: 98,
+    hubDia: 48,
     btnDia: 48,
     hubX: 600,
     hubY: 400,
@@ -105,7 +105,7 @@
 
   function applyLayoutVars() {
     state.hubDia = clamp(Math.round(state.size * state.scale), 40, 132);
-    state.btnDia = clamp(Math.round(48 * state.scale), 40, 64);
+    state.btnDia = clamp(Math.round(40 * state.scale), 40, 64);
     const rootStyle = document.documentElement.style;
     rootStyle.setProperty('--hub-size', `${state.hubDia}px`);
     rootStyle.setProperty('--hub-x', `${state.hubLocalX}px`);
@@ -340,7 +340,7 @@
     let r1 = Math.max(
       Math.round(hubDia / 2 + btnDia / 2 + 22 * scale),
       Math.round(state.fanRadius * 0.74 * scale),
-      Math.round(104 * scale)
+      Math.round(73 * scale)
     );
     let minSep = btnDia + Math.max(14, Math.round(16 * scale));
     let radialStep = btnDia + Math.max(24, Math.round(26 * scale));

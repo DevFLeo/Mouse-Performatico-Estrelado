@@ -73,7 +73,7 @@ async function runM1Suite({ runCase, makeTempDir, rmSafe, CODE_DIR, ROOT_DIR }) 
       assert.strictEqual(cfg.consent.permissions.launchAppsAndLinks, false);
       assert.strictEqual(cfg.consent.permissions.pythonAutomation, false);
       assert.strictEqual(cfg.miniAstrolabe.enabled, true);
-      assert.strictEqual(cfg.miniAstrolabe.size, 68);
+      assert.strictEqual(cfg.miniAstrolabe.size, 48); // Mini 30% menor (v2)
       assert.ok(Array.isArray(cfg.autoScripts), 'autoScripts deve ser array');
 
       assert.ok(cfg.points.length >= 3, 'Clean-state deve semear Slot 1, Slot 2 e open_organizer');

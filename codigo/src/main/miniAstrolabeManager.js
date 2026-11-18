@@ -6,9 +6,9 @@ function createDefaultMiniConfig() {
     enabled: true,
     x: null,
     y: null,
-    size: 68,
+    size: 48,
     scale: 1.0,
-    fanRadius: 140
+    fanRadius: 98
   };
 }
 
@@ -95,7 +95,8 @@ class MiniAstrolabeManager {
         : defaults.scale,
       fanRadius: Number.isFinite(fanRadiusRaw)
         ? clamp(Math.round(fanRadiusRaw), 90, 260)
-        : defaults.fanRadius
+        : defaults.fanRadius,
+      layoutVersion: 2
     };
   }
 
@@ -167,11 +168,11 @@ class MiniAstrolabeManager {
         height: Math.min(collapsedSize, wa.height)
       };
     } else {
-      const btnDia = clamp(Math.round(48 * miniCfg.scale), 40, 64);
+      const btnDia = clamp(Math.round(40 * miniCfg.scale), 40, 64);
       const r1 = Math.max(
         Math.round(hubDia / 2 + btnDia / 2 + 24 * miniCfg.scale),
         Math.round(miniCfg.fanRadius * 0.78 * miniCfg.scale),
-        Math.round(108 * miniCfg.scale)
+        Math.round(76 * miniCfg.scale)
       );
       const radialStep = btnDia + Math.max(26, Math.round(28 * miniCfg.scale));
       const ringsNeeded = pointsCount > 15 ? 4 : pointsCount > 8 ? 3 : pointsCount > 3 ? 2 : 1;

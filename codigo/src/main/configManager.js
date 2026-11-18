@@ -82,9 +82,10 @@ function createDefaultMiniAstrolabe() {
     enabled: true,
     x: null,
     y: null,
-    size: 68,
+    size: 48,
     scale: 1.0,
-    fanRadius: 140
+    fanRadius: 98,
+    layoutVersion: 2
   };
 }
 
@@ -94,6 +95,7 @@ function createCleanDefaultPoints() {
       id: 'star-01-1',
       code: '01 1',
       title: 'Bloco de Notas',
+      hotkeyLetter: 'N',
       description: 'Abre o Bloco de Notas do Windows.',
       actionType: 'launch_app_project',
       orbit: 2,
@@ -114,6 +116,7 @@ function createCleanDefaultPoints() {
       id: 'star-02-2',
       code: '02 2',
       title: 'Projeto VS Code',
+      hotkeyLetter: 'V',
       description: 'Abre o projeto configurado no Visual Studio Code.',
       actionType: 'launch_app_project',
       orbit: 2,
@@ -391,12 +394,16 @@ class ConfigManager {
       rootData.consent = normalizeConsent(rootData.consent);
     }
 
-    rootData.miniAstrolabe = Object.assign(
-      createDefaultMiniAstrolabe(),
-      rootData.miniAstrolabe && typeof rootData.miniAstrolabe === 'object'
-        ? rootData.miniAstrolabe
-        : {}
-    );
+    const rawMini =
+      rootData.miniAstrolabe && typeof rootData.miniAstrolabe === 'object' ? rootData.miniAstrolabe : null;
+    const needsMiniV2 = Boolean(rawMini) && rawMini.layoutVersion !== 2;
+    rootData.miniAstrolabe = Object.assign(createDefaultMiniAstrolabe(), rawMini || {});
+    // Migracao v2: Mini 30% menor. Ajusta so quem ainda usa os tamanhos padrao antigos (68 / 140).
+    if (needsMiniV2) {
+      if (rootData.miniAstrolabe.size === 68) rootData.miniAstrolabe.size = 48;
+      if (rootData.miniAstrolabe.fanRadius === 140) rootData.miniAstrolabe.fanRadius = 98;
+      rootData.miniAstrolabe.layoutVersion = 2;
+    }
 
     if (!Array.isArray(rootData.autoScripts)) {
       rootData.autoScripts = [];
@@ -420,6 +427,7 @@ class ConfigManager {
         id: 'star-02-7',
         code: '02 7',
         title: 'Organizar Arquivos',
+        hotkeyLetter: 'O',
         description: 'Abre o Organizador Inteligente de Arquivos e Prints direto pelo Astrolabio.',
         actionType: 'open_organizer',
         orbit: 3,

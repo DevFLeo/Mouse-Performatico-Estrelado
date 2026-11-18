@@ -442,6 +442,9 @@ class Astrolabe3D {
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+      // Radar aponta para o cursor (ultima posicao conhecida)
+      this.pointerX = mx;
+      this.pointerY = my;
 
       if (this.isPickingLocation) {
         this.previewCursorCoords = this.screenToCircleCoords(mx, my);
@@ -684,7 +687,10 @@ class Astrolabe3D {
 
     const timeStep = this.hoveredPoint ? 0 : 0.011;
     this.constellationTime += timeStep;
-    this.radarAngle = (this.radarAngle + 0.014) % (Math.PI * 2);
+    if (typeof this.pointerX !== 'number') {
+      // Sem posicao de mouse ainda: varredura automatica
+      this.radarAngle = (this.radarAngle + 0.014) % (Math.PI * 2);
+    }
     this.reticleAngle = (this.reticleAngle + 0.022) % (Math.PI * 2);
 
     if (this.introProgress < 1) {
@@ -1064,7 +1070,13 @@ class Astrolabe3D {
     const nexusScreen = this.project3D(nexus3D.x, nexus3D.y, nexus3D.z, baseR);
     this.nexusScreenPos = { x: nexusScreen.x, y: nexusScreen.y, r: 22 };
 
-    // Varredura de Radar Animada emanando do Nexus (Foco nas animacoes 2D e 3D)
+    // Varredura de Radar: segue o mouse com suavizacao (menor caminho angular)
+    if (typeof this.pointerX === 'number') {
+      const target = Math.atan2(this.pointerY - nexusScreen.y, this.pointerX - nexusScreen.x);
+      let diff = target - this.radarAngle;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      this.radarAngle += diff * 0.22;
+    }
     ctx.save();
     const sweepLen = baseR * 0.85 * this.zoom;
     const sx = nexusScreen.x + Math.cos(this.radarAngle) * sweepLen;
@@ -1075,7 +1087,7 @@ class Astrolabe3D {
     sweepGrad.addColorStop(1, 'rgba(229, 184, 75, 0)');
     ctx.beginPath();
     ctx.moveTo(nexusScreen.x, nexusScreen.y);
-    ctx.arc(nexusScreen.x, nexusScreen.y, sweepLen, this.radarAngle - 0.22, this.radarAngle);
+    ctx.arc(nexusScreen.x, nexusScreen.y, sweepLen, this.radarAngle - 0.14, this.radarAngle + 0.14);
     ctx.closePath();
     ctx.fillStyle = sweepGrad;
     ctx.fill();
