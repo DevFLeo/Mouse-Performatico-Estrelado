@@ -3129,3 +3129,9 @@ body.theme-light .org-scope-btn.active {
   background: #E9D29A;
   color: #1E1A12;
 }
+
+body.theme-light .org-stats-pill {
+  background: #F1E3BF;
+  color: #1E1A12;
+  border-color: rgba(124, 86, 9, 0.55);
+}

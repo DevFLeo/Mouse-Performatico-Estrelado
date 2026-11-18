@@ -878,7 +878,8 @@ const tier2Tests = [
       await sleep(800);
       const s = await metrics.measureProcessTreeCpuWindow(ctx.processManager, app.session.pid, 3500);
       await app.mainPage.eval(() => window.mpeApi.toggleMiniAstrolabe(true));
-      await sleep(800);
+      // Repouso = depois da janela do Mini ser recriada e carregada (criar janela nao e repouso).
+      await sleep(2500);
       const rotPage = await h.connectMiniPage(app.session).catch(() => miniPage);
       await rotPage.moveOutside().catch(() => {});
       const rot1 = await h.getMiniRotorSample(rotPage);
