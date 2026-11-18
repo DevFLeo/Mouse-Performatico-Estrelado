@@ -222,8 +222,10 @@ const tier3Tests = [
       assert.strictEqual(pausedRotor.playState, 'paused');
 
       const vis = (await h.getMiniHubAndSlots(mini)).slots.filter((s) => s.visible);
-      assert.strictEqual(vis.length, 1);
-      await mini.clickAt(vis[0].rect.cx, vis[0].rect.cy);
+      // O M.P.E injeta a estrela 'Organizar Arquivos' (CFG-02); o atalho do teste e o 'Hook'.
+      const hookSlot = vis.find((v) => /Hook/.test(v.title) || /Hook/.test(v.text));
+      assert.ok(hookSlot, `Botao Hook nao encontrado entre ${vis.length} botoes`);
+      await mini.clickAt(hookSlot.rect.cx, hookSlot.rect.cy);
       await mock.waitForRequest((r) => r.path === '/hook', 4000);
       await mini.moveOutside();
       await sleep(250);

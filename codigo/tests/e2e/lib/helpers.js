@@ -304,6 +304,9 @@ async function clickConsentDecision(mainPage, accept, opts = {}) {
     .waitForFunction(() => {
       const splash = document.getElementById('splash-screen');
       if (splash && !splash.classList.contains('hidden')) splash.click();
+      // Depois de uma recusa o modal so volta pelo botao 'Autorizar Agora' (caminho real do usuario)
+      const reopen = document.getElementById('btn-reopen-consent');
+      if (reopen && reopen.offsetParent !== null) reopen.click();
       const modal = document.querySelector('#modal-consent, [data-consent-modal], .consent-modal');
       if (!modal) return false;
       const cs = getComputedStyle(modal);
