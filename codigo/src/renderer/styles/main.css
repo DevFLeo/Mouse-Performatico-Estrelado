@@ -2672,6 +2672,9 @@ body.mode-organizer-open .central-black-dot-hub {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Ponto preto de verdade: fundo opaco atras do nucleo (contraste do rotulo M.P.E) */
+  background-color: #040406;
+  border-radius: 50%;
 }
 
 .central-dot-svg {

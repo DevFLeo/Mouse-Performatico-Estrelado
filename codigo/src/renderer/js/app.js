@@ -9,6 +9,8 @@
 (function () {
   let currentConfig = null;
   let astrolabe = null;
+  // Exposto (somente leitura) para diagnostico e testes automatizados.
+  Object.defineProperty(window, 'astrolabe', { get: () => astrolabe, configurable: true });
   let areaSelector = null;
   let organizerUI = null;
   let editingPointId = null;
