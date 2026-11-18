@@ -35,60 +35,222 @@ process.on('exit', (code) => {
   logDebug(`[PROCESS EXIT] code=${code}`);
 });
 
-app.on('before-quit', () => {
-  logDebug(`[APP BEFORE-QUIT]`);
-  // Encerra o servidor llamafile para liberar a RAM do modelo
-  try {
-    localAiService.shutdown();
-  } catch (_) {}
-});
-
-app.on('will-quit', () => {
-  logDebug(`[APP WILL-QUIT]`);
-});
-
 // Identificador unico do aplicativo no Windows para agrupar e fixar na Barra de Tarefas com o icone do M.P.E
 const APP_USER_MODEL_ID = 'DevFLeo.MousePerformaticoEstrelado';
 app.setAppUserModelId(APP_USER_MODEL_ID);
 app.name = 'M.P.E - Mouse Performatico Estrelado';
 
-const ConfigManager = require('./configManager');
-const StartupManager = require('./startupManager');
-const HookBridge = require('./hookBridge');
-const ActionExecutor = require('./actionExecutor');
-const LocalAiService = require('./localAiService');
-const FileOrganizer = require('./fileOrganizer');
-
-const CODE_DIR = path.resolve(__dirname, '..', '..');
-const ROOT_DIR = path.resolve(CODE_DIR, '..');
-
 // Otimizacoes de GPU e memoria para maxima fluidez do motor 2D e 3D
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('disable-http-cache');
 
-let mainWindow = null;
-let tray = null;
-let isQuitting = false;
+function getCliArgValue(argv, flagName) {
+  if (!Array.isArray(argv)) return '';
+  const prefix = `${flagName}=`;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = String(argv[i] || '');
+    if (arg.startsWith(prefix)) {
+      return arg.slice(prefix.length).replace(/^["']|["']$/g, '').trim();
+    }
+    if (arg === flagName && i + 1 < argv.length) {
+      return String(argv[i + 1] || '').replace(/^["']|["']$/g, '').trim();
+    }
+  }
+  return '';
+}
 
-const configManager = new ConfigManager(ROOT_DIR, CODE_DIR);
-const startupManager = new StartupManager(ROOT_DIR, CODE_DIR);
-const hookBridge = new HookBridge(CODE_DIR);
-const actionExecutor = new ActionExecutor(configManager, hookBridge);
-const localAiService = new LocalAiService(ROOT_DIR, configManager, CODE_DIR);
-const fileOrganizer = new FileOrganizer(ROOT_DIR, CODE_DIR, configManager);
+const cliConfigPath = getCliArgValue(process.argv, '--config-path');
+const envConfigPath = String(process.env.MPE_CONFIG_PATH || '').trim();
+const customConfigPath = cliConfigPath || envConfigPath || '';
+const isCleanState = process.argv.includes('--clean-state');
+const forceCleanConsent = process.env.MPE_FORCE_CLEAN_CONSENT === '1';
+const isSelfTest = process.argv.includes('--self-test');
+const isIsolatedConfig = Boolean(customConfigPath || isCleanState);
 
 const gotTheLock = app.requestSingleInstanceLock();
 logDebug(`[LOCK] gotTheLock=${gotTheLock}`);
 if (!gotTheLock) {
-  logDebug(`[LOCK FAILED] Exiting because another instance has the lock`);
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    logDebug(`[SECOND INSTANCE] Second instance launched`);
-    // Quando o usuario clica novamente no icone executavel MPE.exe, abre imediatamente no Modo Edicao Completo
-    summonHud({ playIntro: false, mode: 'executable-editor', source: 'executable' });
+  logDebug(`[LOCK FAILED] Exiting immediately because another instance has the lock`);
+  app.exit(0);
+  return;
+}
+
+const ConfigManager = require('./configManager');
+const ConsentManager = require('./consentManager');
+const StartupManager = require('./startupManager');
+const HookBridge = require('./hookBridge');
+const ActionExecutor = require('./actionExecutor');
+const FileOrganizer = require('./fileOrganizer');
+
+function tryRequireOptional(relPath) {
+  try {
+    return require(relPath);
+  } catch (err) {
+    const modName = relPath.replace(/^\.\//, '');
+    if (err && err.code === 'MODULE_NOT_FOUND' && err.message && err.message.includes(modName)) {
+      return null;
+    }
+    logDebug(`[OPTIONAL MODULE ERROR] ${relPath}: ${err && err.message ? err.message : err}`);
+    return null;
+  }
+}
+
+const MiniAstrolabeManager = tryRequireOptional('./miniAstrolabeManager');
+const PythonRecorder = tryRequireOptional('./pythonRecorder');
+const PythonScheduler = tryRequireOptional('./pythonScheduler');
+
+const CODE_DIR = path.resolve(__dirname, '..', '..');
+const ROOT_DIR = path.resolve(CODE_DIR, '..');
+
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+let cleanupExecuted = false;
+let hookTriggerBound = false;
+let backgroundServicesActive = false;
+
+const configManager = new ConfigManager(ROOT_DIR, CODE_DIR, {
+  configPath: customConfigPath || undefined,
+  cleanState: isCleanState,
+  forceCleanConsent
+});
+const consentManager = new ConsentManager(configManager);
+const startupManager = new StartupManager(ROOT_DIR, CODE_DIR, {
+  consentManager,
+  configManager
+});
+const hookBridge = new HookBridge(CODE_DIR);
+const actionExecutor = new ActionExecutor(configManager, hookBridge);
+const fileOrganizer = new FileOrganizer(ROOT_DIR, CODE_DIR, configManager);
+
+let miniAstrolabeManager = null;
+let pythonRecorder = null;
+let pythonScheduler = null;
+
+const windowRegistry = new Map();
+
+function registerWindow(name, win) {
+  if (!win || win.isDestroyed()) return;
+  windowRegistry.set(name, win);
+  win.on('closed', () => {
+    if (windowRegistry.get(name) === win) {
+      windowRegistry.delete(name);
+    }
+    if (name === 'main' && mainWindow === win) {
+      mainWindow = null;
+    }
   });
 }
+
+function getSourceWindowName(event) {
+  const sender = event && event.sender;
+  if (!sender) return 'main-process';
+  for (const [name, win] of windowRegistry.entries()) {
+    if (win && !win.isDestroyed() && win.webContents && win.webContents.id === sender.id) {
+      return name;
+    }
+  }
+  return 'unknown';
+}
+
+function broadcastToAllWindows(channel, payload) {
+  const targets = new Set();
+  for (const win of windowRegistry.values()) {
+    if (win && !win.isDestroyed()) targets.add(win);
+  }
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win && !win.isDestroyed()) targets.add(win);
+  }
+  for (const win of targets) {
+    try {
+      if (win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.send(channel, payload);
+      }
+    } catch (_) {}
+  }
+}
+
+function broadcastConfigUpdated(savedConfig, sourceEvent = null) {
+  broadcastToAllWindows('mpe:config-updated', {
+    config: savedConfig,
+    sourceWindow: getSourceWindowName(sourceEvent)
+  });
+}
+
+function getConsentBlockedResponse() {
+  if (typeof consentManager.getBlockedResponse === 'function') {
+    return consentManager.getBlockedResponse();
+  }
+  return {
+    ok: false,
+    blockedByConsent: true,
+    message: 'Aceite de primeiro acesso necessario.'
+  };
+}
+
+function cleanupSubsystems(reason = 'quit') {
+  if (cleanupExecuted) return;
+  cleanupExecuted = true;
+  isQuitting = true;
+  backgroundServicesActive = false;
+  logDebug(`[SHUTDOWN CLEANUP] reason=${reason}`);
+  try { globalShortcut.unregisterAll(); } catch (_) {}
+  try {
+    if (pythonRecorder && typeof pythonRecorder.stop === 'function') {
+      pythonRecorder.stop();
+    }
+  } catch (_) {}
+  try {
+    if (pythonScheduler && typeof pythonScheduler.stop === 'function') {
+      pythonScheduler.stop();
+    }
+  } catch (_) {}
+  try {
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.destroy === 'function') {
+      miniAstrolabeManager.destroy();
+    }
+  } catch (_) {}
+  try {
+    if (hookBridge && typeof hookBridge.stop === 'function') {
+      hookBridge.stop();
+    }
+  } catch (_) {}
+  try {
+    if (tray && !tray.isDestroyed()) {
+      tray.destroy();
+      tray = null;
+    }
+  } catch (_) {}
+}
+
+function handleProcessSignal(signal) {
+  logDebug(`[SIGNAL] Received ${signal}`);
+  cleanupSubsystems(signal);
+  try { app.quit(); } catch (_) {}
+  const forceTimer = setTimeout(() => {
+    try { app.exit(0); } catch (_) {}
+  }, 500);
+  if (forceTimer.unref) forceTimer.unref();
+}
+
+process.on('SIGINT', () => handleProcessSignal('SIGINT'));
+process.on('SIGTERM', () => handleProcessSignal('SIGTERM'));
+
+app.on('before-quit', () => {
+  logDebug(`[APP BEFORE-QUIT]`);
+  cleanupSubsystems('before-quit');
+});
+
+app.on('will-quit', () => {
+  logDebug(`[APP WILL-QUIT]`);
+  cleanupSubsystems('will-quit');
+});
+
+app.on('second-instance', () => {
+  logDebug(`[SECOND INSTANCE] Second instance launched`);
+  // Quando o usuario clica novamente no icone executavel MPE.exe, abre imediatamente no Modo Edicao Completo
+  summonHud({ playIntro: false, mode: 'executable-editor', source: 'executable' });
+});
 
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -137,11 +299,12 @@ function createWindow() {
 
   const indexHtmlPath = path.join(__dirname, '..', 'renderer', 'index.html');
   mainWindow.loadFile(indexHtmlPath);
+  registerWindow('main', mainWindow);
 
   mainWindow.webContents.once('did-finish-load', async () => {
-    logDebug(`[DID-FINISH-LOAD] isSilentStartup=${process.argv.includes('--startup')} isSelfTest=${process.argv.includes('--self-test')}`);
+    logDebug(`[DID-FINISH-LOAD] isSilentStartup=${process.argv.includes('--startup')} isSelfTest=${isSelfTest}`);
     const isSilentStartup = process.argv.includes('--startup');
-    if (!isSilentStartup) {
+    if (!isSilentStartup || !consentManager.isActionAllowed('backgroundExecution')) {
       // Ao abrir pelo executavel MPE.exe, inicia com Intro e Modo de Edicao habilitado
       summonHud({ playIntro: true, mode: 'executable-editor', source: 'startup' });
     } else {
@@ -150,8 +313,8 @@ function createWindow() {
       if (tray && typeof tray.displayBalloon === 'function') {
         try {
           tray.displayBalloon({
-            title: 'M.P.E - Mouse Performático Estrelado',
-            content: 'Ativo em segundo plano. Shift+Ctrl+Alt+Botão Direito para Astrolábio ou Shift+Ctrl+Botão Direito para Mini Assistente.',
+            title: 'M.P.E - Mouse Performatico Estrelado',
+            content: 'Ativo em segundo plano. Use Shift+Ctrl+Alt+Botao Direito para invocar o Astrolabio.',
             iconType: 'info'
           });
         } catch (_) {}
@@ -248,63 +411,10 @@ function createWindow() {
           document.getElementById('modal-text-selection').classList.add('hidden');
         `);
 
-        // Teste 8: Mini Assistente Flutuante (AI Kataros 3D) com I.A Local & Onde Enviar
-        const miniRes = await mainWindow.webContents.executeJavaScript(`
-          (async () => {
-            document.body.classList.add('mode-mini-assistant');
-            const overlay = document.getElementById('mini-assistant-overlay');
-            overlay.classList.remove('hidden');
-            const txtArea = document.getElementById('mini-ai-textarea');
-            txtArea.value = 'este e um texto de teste para revisar com a ai kataros do mpe e salvar no obsidian';
-            document.getElementById('mini-note-title').value = 'Nota Teste MPE AI';
-            document.getElementById('mini-send-target').value = 'obsidian';
-            document.getElementById('btn-mini-review').click();
-            await new Promise(r => setTimeout(r, 350));
-            document.getElementById('btn-mini-send').click();
-            await new Promise(r => setTimeout(r, 250));
-            const statusDuring = document.getElementById('kataros-node-status').textContent;
-            await new Promise(r => setTimeout(r, 1600));
-            const statusAfter = document.getElementById('kataros-node-status').textContent;
-            return {
-              previewOpen: !document.getElementById('mini-review-preview').classList.contains('hidden'),
-              reviewText: document.getElementById('mini-review-text').textContent,
-              statusDuring,
-              statusAfter
-            };
-          })()
-        `);
-        console.log('MPE_MINI_AI_TEST:', JSON.stringify(miniRes));
-        await new Promise((r) => setTimeout(r, 300));
-        const imgMini = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'verify_8_mini_assistant.png'), imgMini.toPNG());
-
-        // Teste 9: Chat Lateral com AI Kataros (Drawer)
-        const chatRes = await mainWindow.webContents.executeJavaScript(`
-          (async () => {
-            document.getElementById('side-chat-drawer').classList.remove('hidden');
-            const chatInput = document.getElementById('side-chat-input');
-            chatInput.value = 'Como estruturar minhas notas de projetos no Obsidian?';
-            document.getElementById('btn-side-chat-send').click();
-            await new Promise(r => setTimeout(r, 300));
-            const statusDuring = document.getElementById('kataros-node-status').textContent;
-            await new Promise(r => setTimeout(r, 1600));
-            const statusAfter = document.getElementById('kataros-node-status').textContent;
-            const msgs = Array.from(document.querySelectorAll('#side-chat-messages .side-msg-content')).map(el => el.textContent);
-            return { statusDuring, statusAfter, lastReply: msgs[msgs.length - 1] };
-          })()
-        `);
-        console.log('MPE_CHAT_AI_TEST:', JSON.stringify(chatRes));
-        await new Promise((r) => setTimeout(r, 350));
-        const imgChat = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'verify_9_side_chat.png'), imgChat.toPNG());
-
-        // Teste 10: Painel Organizador (Arquithon M.P.E)
+        // Teste 8: Painel Organizador (Arquithon M.P.E)
         mainWindow.setBounds(screen.getPrimaryDisplay().bounds);
         const orgRes = await mainWindow.webContents.executeJavaScript(`
           (async () => {
-            document.body.classList.remove('mode-mini-assistant');
-            document.getElementById('mini-assistant-overlay').classList.add('hidden');
-            document.getElementById('side-chat-drawer').classList.add('hidden');
             const tabOrg = document.getElementById('btn-tab-organizer');
             if (tabOrg) tabOrg.click();
             await new Promise(r => setTimeout(r, 450));
@@ -321,9 +431,9 @@ function createWindow() {
         console.log('MPE_ORGANIZER_TEST:', JSON.stringify(orgRes));
         await new Promise((r) => setTimeout(r, 350));
         const imgOrg = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'verify_10_organizer.png'), imgOrg.toPNG());
+        fs.writeFileSync(path.join(outDir, 'verify_8_organizer.png'), imgOrg.toPNG());
 
-        // Teste 11: Guia Rapido, /boost & Kits Minimos
+        // Teste 9: Guia Rapido & Atalhos do M.P.E
         const guideRes = await mainWindow.webContents.executeJavaScript(`
           (async () => {
             const backBtn = document.getElementById('btn-org-back-astrolabe');
@@ -333,35 +443,33 @@ function createWindow() {
             if (openGuide) openGuide.click();
             await new Promise(r => setTimeout(r, 350));
             return {
-              guideOpen: !document.getElementById('modal-guide').classList.contains('hidden'),
-              kitsCount: document.querySelectorAll('#guide-kits-grid .kit-card').length,
-              perfTextLen: (document.getElementById('guide-perf-metrics').textContent || '').length
+              guideOpen: !document.getElementById('modal-guide').classList.contains('hidden')
             };
           })()
         `);
-        console.log('MPE_GUIDE_BOOST_TEST:', JSON.stringify(guideRes));
+        console.log('MPE_GUIDE_TEST:', JSON.stringify(guideRes));
         await new Promise((r) => setTimeout(r, 250));
         const imgGuide = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'verify_11_guide_boost.png'), imgGuide.toPNG());
+        fs.writeFileSync(path.join(outDir, 'verify_9_guide.png'), imgGuide.toPNG());
 
         console.log('MPE_SELF_TEST_PASSED');
-        isQuitting = true;
-        hookBridge.stop();
+        cleanupSubsystems('self-test-pass');
         app.quit();
       } catch (err) {
         console.error('MPE_SELF_TEST_FAILED:', err);
-        isQuitting = true;
-        hookBridge.stop();
+        cleanupSubsystems('self-test-fail');
         app.exit(1);
       }
     }
   });
 
   mainWindow.on('close', (e) => {
-    if (!isQuitting) {
+    if (!isQuitting && consentManager.isActionAllowed('backgroundExecution')) {
       e.preventDefault();
       mainWindow.hide();
+      return;
     }
+    isQuitting = true;
   });
 
   // Garante em nivel nativo que a tecla ESC sempre minimize/oculte o HUD sem encerrar o projeto
@@ -372,19 +480,28 @@ function createWindow() {
   });
 }
 
-// Impede encerramento do processo quando a janela estiver minimizada em segundo plano
+// Impede encerramento do processo apenas quando consentido e rodando em segundo plano
 app.on('window-all-closed', (e) => {
-  if (e && typeof e.preventDefault === 'function') {
-    e.preventDefault();
+  if (!isQuitting && consentManager.isActionAllowed('backgroundExecution')) {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    return;
   }
+  cleanupSubsystems('window-all-closed');
+  app.quit();
 });
 
 async function summonHud({ x, y, playIntro = false, mode = 'hud-only', source = 'shortcut' } = {}) {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
 
   // Se nao foi acionado pelo hook de mouse que ja capturou o hwnd,
   // captura o foreground atual antes do mainWindow.show() roubar o foco
-  if (source !== 'mouse-hook' && (!hookBridge.lastHwnd || hookBridge.lastHwnd === '0')) {
+  if (
+    consentManager.isActionAllowed('backgroundExecution') &&
+    source !== 'mouse-hook' &&
+    (!hookBridge.lastHwnd || hookBridge.lastHwnd === '0')
+  ) {
     await hookBridge.refreshForegroundWindow();
   }
 
@@ -410,91 +527,6 @@ async function summonHud({ x, y, playIntro = false, mode = 'hud-only', source = 
   });
 }
 
-const MINI_DEFAULT_SIZE = { width: 576, height: 215 };
-let miniDragTimer = null;
-
-function stopMiniDrag() {
-  if (miniDragTimer) {
-    clearInterval(miniDragTimer);
-    miniDragTimer = null;
-  }
-}
-
-// Arrasto da janela compacta: segue o cursor nativo enquanto o botao estiver pressionado
-function startMiniDrag() {
-  if (!mainWindow) return;
-  stopMiniDrag();
-  const start = screen.getCursorScreenPoint();
-  const [wx, wy] = mainWindow.getPosition();
-  const offX = start.x - wx;
-  const offY = start.y - wy;
-  miniDragTimer = setInterval(() => {
-    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) {
-      stopMiniDrag();
-      return;
-    }
-    const p = screen.getCursorScreenPoint();
-    const [w, h] = mainWindow.getSize();
-    mainWindow.setBounds({ x: p.x - offX, y: p.y - offY, width: w, height: h });
-  }, 8);
-  // Salvaguarda caso o evento de soltura se perca
-  const timerRef = miniDragTimer;
-  setTimeout(() => {
-    if (miniDragTimer === timerRef) stopMiniDrag();
-  }, 30000);
-}
-
-function resizeMiniWindow({ width, height } = {}) {
-  if (!mainWindow || typeof width !== 'number' || typeof height !== 'number') return;
-  const b = mainWindow.getBounds();
-  const display = screen.getDisplayMatching(b);
-  const wa = display.workArea;
-  const w = Math.max(260, Math.min(Math.round(width), wa.width));
-  const h = Math.max(120, Math.min(Math.round(height), wa.height));
-  const x = Math.max(wa.x, Math.min(b.x, wa.x + wa.width - w));
-  const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - h));
-  mainWindow.setBounds({ x, y, width: w, height: h });
-}
-
-async function summonMiniAssistant({ x, y, source = 'mouse-hook', openChat = false } = {}) {
-  if (!mainWindow) return;
-
-  if (source !== 'mouse-hook' && (!hookBridge.lastHwnd || hookBridge.lastHwnd === '0')) {
-    await hookBridge.refreshForegroundWindow();
-  }
-
-  const cursor = screen.getCursorScreenPoint();
-  const targetX = typeof x === 'number' ? x : cursor.x;
-  const targetY = typeof y === 'number' ? y : cursor.y;
-
-  // Janela compacta e flutuante proxima ao cursor (nao ocupa a tela inteira)
-  stopMiniDrag();
-  const currentDisplay = screen.getDisplayNearestPoint({ x: targetX, y: targetY });
-  const wa = currentDisplay.workArea;
-  const w = MINI_DEFAULT_SIZE.width;
-  const h = MINI_DEFAULT_SIZE.height;
-  let winX = targetX + 18;
-  let winY = targetY + 18;
-  if (winX + w > wa.x + wa.width) winX = targetX - w - 18;
-  if (winY + h > wa.y + wa.height) winY = targetY - h - 18;
-  winX = Math.max(wa.x, Math.min(winX, wa.x + wa.width - w));
-  winY = Math.max(wa.y, Math.min(winY, wa.y + wa.height - h));
-  mainWindow.setBounds({ x: Math.round(winX), y: Math.round(winY), width: w, height: h });
-
-  mainWindow.show();
-  mainWindow.focus();
-  mainWindow.setAlwaysOnTop(true, 'screen-saver');
-
-  mainWindow.webContents.send('mpe:mini-assistant-summoned', {
-    x: targetX - winX,
-    y: targetY - winY,
-    source,
-    openChat: Boolean(openChat),
-    originSystem: hookBridge.getOriginSystemInfo(),
-    config: configManager.get()
-  });
-}
-
 function createSystemTray() {
   const pngPath = path.join(CODE_DIR, 'assets', 'icon.png');
 
@@ -513,10 +545,6 @@ function createSystemTray() {
     {
       label: 'Abrir Circulo 3D Rapido (Modo Atalho)',
       click: () => summonHud({ playIntro: false, mode: 'hud-only', source: 'tray-hud' })
-    },
-    {
-      label: 'Abrir AI Kataros (Mini Assistente)',
-      click: () => summonMiniAssistant({ source: 'tray-mini' })
     },
     {
       label: 'Reproduzir Inicializacao Cinematografica',
@@ -539,8 +567,7 @@ function createSystemTray() {
     {
       label: 'Encerrar M.P.E Completamente',
       click: () => {
-        isQuitting = true;
-        hookBridge.stop();
+        cleanupSubsystems('tray-quit');
         app.quit();
       }
     }
@@ -553,18 +580,21 @@ function createSystemTray() {
   });
 }
 
-function setupHooksAndShortcuts() {
-  hookBridge.on('trigger', ({ x, y }) => {
-    // Quando acionado via Shift + Ctrl + Alt + Botao Direito do Mouse:
-    // Abre o Circulo 3D/2D Astrolabio Estrelado com animacao de pulso estelar reforçada
-    summonHud({ x, y, playIntro: false, mode: 'hud-only', source: 'mouse-hook' });
-  });
+function ensureTrayCreated() {
+  if (tray && !tray.isDestroyed()) return;
+  createSystemTray();
+}
 
-  hookBridge.on('trigger-mini', ({ x, y }) => {
-    // Quando acionado via Shift + Ctrl + Botao Direito do Mouse:
-    // Abre o Mini Assistente Flutuante (Lower Third Sci-Fi) com revisao e acoes ageis
-    summonMiniAssistant({ x, y, source: 'mouse-hook' });
-  });
+function setupHooksAndShortcuts() {
+  if (!hookTriggerBound) {
+    hookTriggerBound = true;
+    hookBridge.on('trigger', ({ x, y }) => {
+      if (!consentManager.isActionAllowed('backgroundExecution')) return;
+      // Quando acionado via Shift + Ctrl + Alt + Botao Direito do Mouse:
+      // Abre o Circulo 3D/2D Astrolabio Estrelado com animacao de pulso estelar reforcada
+      summonHud({ x, y, playIntro: false, mode: 'hud-only', source: 'mouse-hook' });
+    });
+  }
 
   hookBridge.start();
 
@@ -573,58 +603,168 @@ function setupHooksAndShortcuts() {
     (cfg.system && cfg.system.fallbackKeyboardShortcut) || 'CommandOrControl+Shift+Alt+M';
   try {
     globalShortcut.register(fallbackKey, () => {
+      if (!consentManager.isActionAllowed('backgroundExecution')) return;
       summonHud({ playIntro: false, mode: 'hud-only', source: 'keyboard-shortcut' });
     });
   } catch (err) {
     console.warn('[M.P.E Shortcut] Atalho complementar nao pode ser registrado:', err.message);
   }
+}
 
-  try {
-    globalShortcut.register('CommandOrControl+Shift+J', () => {
-      summonMiniAssistant({ source: 'keyboard-shortcut' });
-    });
-  } catch (err) {
-    console.warn('[M.P.E Shortcut] Atalho Mini Assistente nao pode ser registrado:', err.message);
+function activateBackgroundServices() {
+  if (!consentManager.isActionAllowed('backgroundExecution')) return;
+  ensureTrayCreated();
+  if (!backgroundServicesActive) {
+    backgroundServicesActive = true;
+    setupHooksAndShortcuts();
   }
+  if (pythonScheduler && typeof pythonScheduler.start === 'function') {
+    pythonScheduler.start();
+  }
+  if (miniAstrolabeManager && typeof miniAstrolabeManager.syncWithConsent === 'function') {
+    miniAstrolabeManager.syncWithConsent(true);
+  }
+}
+
+async function deactivateBackgroundServices() {
+  backgroundServicesActive = false;
+  try { globalShortcut.unregisterAll(); } catch (_) {}
+  try {
+    if (hookBridge && typeof hookBridge.stop === 'function') {
+      await hookBridge.stop();
+    }
+  } catch (_) {}
+  try {
+    if (pythonRecorder && typeof pythonRecorder.stop === 'function') {
+      pythonRecorder.stop();
+    }
+  } catch (_) {}
+  try {
+    if (pythonScheduler && typeof pythonScheduler.stop === 'function') {
+      pythonScheduler.stop();
+    }
+  } catch (_) {}
+  try {
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.syncWithConsent === 'function') {
+      miniAstrolabeManager.syncWithConsent(false);
+    }
+  } catch (_) {}
+  try {
+    if (tray && !tray.isDestroyed()) {
+      tray.destroy();
+      tray = null;
+    }
+  } catch (_) {}
 }
 
 function setupIpcHandlers() {
   ipcMain.handle('mpe:get-config', async () => {
     const cfg = configManager.get();
-    const isStartupEnabled = await startupManager.checkStartup();
-    cfg.system.startWithWindows = isStartupEnabled;
+    const consentStatus = consentManager.getConsentStatus();
+    if (!isIsolatedConfig && consentManager.isActionAllowed('backgroundExecution')) {
+      const isStartupEnabled = await startupManager.checkStartup();
+      cfg.system.startWithWindows = isStartupEnabled;
+    } else if (!isIsolatedConfig) {
+      cfg.system.startWithWindows = false;
+    }
+    cfg.consent = consentStatus;
     cfg.originSystem = hookBridge.getOriginSystemInfo();
     return cfg;
   });
 
-  ipcMain.handle('mpe:save-config', async (_event, newConfig) => {
-    if (newConfig && newConfig.system && typeof newConfig.system.startWithWindows === 'boolean') {
-      await startupManager.setStartup(newConfig.system.startWithWindows);
+  ipcMain.handle('mpe:save-config', async (event, newConfig) => {
+    const safeNewConfig = newConfig && typeof newConfig === 'object' ? Object.assign({}, newConfig) : {};
+    // Protege estado de consentimento contra sobrescrita acidental via mpe:save-config
+    delete safeNewConfig.consent;
+
+    if (
+      safeNewConfig.system &&
+      typeof safeNewConfig.system.startWithWindows === 'boolean'
+    ) {
+      if (safeNewConfig.system.startWithWindows === true) {
+        if (!consentManager.isActionAllowed('backgroundExecution')) {
+          safeNewConfig.system = Object.assign({}, safeNewConfig.system, {
+            startWithWindows: false
+          });
+        } else if (!isIsolatedConfig) {
+          const startupRes = await startupManager.setStartup(true);
+          if (!startupRes || !startupRes.ok || startupRes.blockedByConsent) {
+            safeNewConfig.system = Object.assign({}, safeNewConfig.system, {
+              startWithWindows: false
+            });
+          }
+        }
+      } else if (!isIsolatedConfig) {
+        await startupManager.setStartup(false);
+      }
     }
-    const saved = configManager.save(newConfig);
-    if (mainWindow) {
-      mainWindow.webContents.send('mpe:config-updated', saved);
-    }
+
+    const saved = configManager.save(safeNewConfig);
+    broadcastConfigUpdated(saved, event);
     return saved;
   });
 
+  ipcMain.handle('mpe:reorder-point', async (event, payload = {}) => {
+    const res = configManager.reorderPoint(payload.fromIndex, payload.toIndex);
+    if (res && res.ok) {
+      broadcastConfigUpdated(res.config || configManager.get(), event);
+    }
+    return res;
+  });
+
+  ipcMain.handle('mpe:get-consent', async () => {
+    return consentManager.getConsentStatus();
+  });
+
+  ipcMain.handle('mpe:set-consent', async (event, payload = {}) => {
+    const accepted = Boolean(payload && payload.accepted);
+    const permissions = payload && payload.permissions ? payload.permissions : {};
+    const decision = consentManager.setConsentDecision(accepted, permissions);
+    const consent = decision.consent;
+
+    if (consent.accepted && consentManager.isActionAllowed('backgroundExecution')) {
+      await deactivateBackgroundServices();
+      activateBackgroundServices();
+      const cfg = configManager.get();
+      if (!isIsolatedConfig && !isSelfTest && cfg.system && cfg.system.startWithWindows) {
+        await startupManager.setStartup(true);
+      }
+    } else {
+      await deactivateBackgroundServices();
+      if (!isIsolatedConfig && !isSelfTest) {
+        await startupManager.setStartup(false);
+      }
+    }
+
+    broadcastToAllWindows('mpe:consent-updated', consent);
+    broadcastConfigUpdated(configManager.get(), event);
+    return { ok: true, consent };
+  });
+
   ipcMain.handle('mpe:execute-point', async (_event, point) => {
+    if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
+      return getConsentBlockedResponse();
+    }
     return await actionExecutor.executePoint(point, mainWindow);
   });
 
   ipcMain.handle('mpe:complete-area-crop', async (_event, payload) => {
+    if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
+      return getConsentBlockedResponse();
+    }
     return await actionExecutor.completeAreaCrop(
       Object.assign({}, payload, { mainWindow })
     );
   });
 
   ipcMain.handle('mpe:save-named-print', async (_event, payload) => {
-    return actionExecutor.saveNamedPrint(
-      Object.assign({}, payload, { localAiService })
-    );
+    return actionExecutor.saveNamedPrint(payload || {});
   });
 
   ipcMain.handle('mpe:send-text-telegram', async (_event, { text, target, keepOpen }) => {
+    if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
+      return getConsentBlockedResponse();
+    }
     const wasVisible = mainWindow && mainWindow.isVisible();
     if (wasVisible) {
       mainWindow.hide();
@@ -641,6 +781,9 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('mpe:send-to-system', async (_event, { text, targetSystem, autoSendEnter, keepOpen }) => {
+    if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
+      return getConsentBlockedResponse();
+    }
     const wasVisible = mainWindow && mainWindow.isVisible();
     if (wasVisible) {
       mainWindow.hide();
@@ -667,100 +810,14 @@ function setupIpcHandlers() {
     return { ok: true };
   });
 
-  // I.A Local & Obsidian Handlers
-  ipcMain.handle('mpe:ai-review', async (_event, { text }) => {
-    return await localAiService.reviewText(text);
-  });
-
-  ipcMain.handle('mpe:ai-draft', async (_event, { prompt, context }) => {
-    return await localAiService.draftText(prompt, context);
-  });
-
-  ipcMain.handle('mpe:ai-classify-obsidian', async (_event, { text, title }) => {
-    return await localAiService.classifyForObsidian(text, title);
-  });
-
-  ipcMain.handle('mpe:save-to-obsidian', async (_event, { title, text, folder, tags }) => {
-    return await localAiService.saveToObsidian({ title, text, folder, tags });
-  });
-
-  ipcMain.handle('mpe:ai-save-document', async (_event, payload) => {
-    return localAiService.saveDocumentFile(payload);
-  });
-
-  ipcMain.handle('mpe:ai-list-documents', async (_event, { category } = {}) => {
-    return {
-      ok: true,
-      documents: localAiService.listDocuments(category || ''),
-      documentsDir: localAiService.documents.getDocumentsFolder()
-    };
-  });
-
-  ipcMain.handle('mpe:ai-remove-document', async (_event, { idOrIndex } = {}) => {
-    return {
-      ok: true,
-      removed: localAiService.removeDocument(idOrIndex)
-    };
-  });
-
-  ipcMain.handle('mpe:select-document-file', async () => {
-    const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Selecionar Arquivo ou Extrato para I.A Local (M.P.E)',
-      filters: [
-        {
-          name: 'Documentos e Extratos',
-          extensions: ['ofx', 'qfx', 'csv', 'txt', 'md', 'json', 'log', 'tsv', 'html', 'pdf']
-        },
-        { name: 'Todos os Arquivos', extensions: ['*'] }
-      ],
-      properties: ['openFile']
-    });
-    if (res.canceled || !res.filePaths.length) return null;
-    return res.filePaths[0];
-  });
-
-  // Chat lateral: comandos, memoria, treino e geracao com streaming
-  ipcMain.handle('mpe:ai-chat', async (event, { message, mode, tone, requestId } = {}) => {
-    const sender = event.sender;
-    const send = (channel, data) => {
-      if (!sender.isDestroyed()) sender.send(channel, Object.assign({ requestId }, data));
-    };
-    return await localAiService.chat(
-      { message, mode, tone },
-      {
-        onChunk: (delta) => send('mpe:ai-chat-chunk', { delta }),
-        onStatus: (status) => send('mpe:ai-chat-status', { status })
-      }
-    );
-  });
-
-  ipcMain.handle('mpe:ai-status', async (_event, { warmUp } = {}) => {
-    if (warmUp) localAiService.warmUp();
-    return await localAiService.getStatus();
-  });
-
-  ipcMain.handle('mpe:get-perf-profile', async () => {
-    return localAiService.getPerformanceProfile();
-  });
-
-  ipcMain.handle('mpe:set-boost-mode', async (_event, mode) => {
-    const profile = await localAiService.setBoostMode(mode, { restartIfOnline: true });
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('mpe:config-updated', configManager.get());
-    }
-    return profile;
-  });
-
-  ipcMain.handle('mpe:open-mini-assistant', async (_event, payload = {}) => {
-    await summonMiniAssistant({ source: 'ui-button', openChat: Boolean(payload && payload.openChat) });
-    return { ok: true };
-  });
-
   ipcMain.handle('mpe:ensure-shortcuts', async () => {
     return await startupManager.createAppShortcuts();
   });
 
   ipcMain.handle('mpe:open-path', async (_event, targetPath) => {
+    if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
+      return getConsentBlockedResponse();
+    }
     const resolved = configManager.resolvePath(targetPath);
     await shell.openPath(resolved);
     return { ok: true, path: resolved };
@@ -784,12 +841,7 @@ function setupIpcHandlers() {
     return res.filePaths[0];
   });
 
-  ipcMain.on('mpe:mini-drag-start', () => startMiniDrag());
-  ipcMain.on('mpe:mini-drag-end', () => stopMiniDrag());
-  ipcMain.on('mpe:mini-resize', (_e, size) => resizeMiniWindow(size));
-
   ipcMain.handle('mpe:hide-hud', () => {
-    stopMiniDrag();
     if (mainWindow) {
       mainWindow.hide();
     }
@@ -797,10 +849,170 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('mpe:quit-app', () => {
-    isQuitting = true;
-    hookBridge.stop();
+    cleanupSubsystems('ipc-quit');
     app.quit();
     return { ok: true };
+  });
+
+  // Mini Astrolabio (M1 stub / M4 delegate)
+  ipcMain.handle('mpe:mini-toggle', async (event, payload = {}) => {
+    if (!consentManager.isActionAllowed('backgroundExecution')) {
+      return Object.assign(getConsentBlockedResponse(), { enabled: false });
+    }
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.toggle === 'function') {
+      return await miniAstrolabeManager.toggle(payload.enabled);
+    }
+    const cfg = configManager.get();
+    const cur = (cfg && cfg.miniAstrolabe) || {};
+    const nextEnabled =
+      typeof payload.enabled === 'boolean' ? payload.enabled : !Boolean(cur.enabled);
+    const saved = configManager.save({
+      miniAstrolabe: Object.assign({}, cur, { enabled: nextEnabled })
+    });
+    broadcastConfigUpdated(saved, event);
+    broadcastToAllWindows('mpe:mini-state-changed', saved.miniAstrolabe);
+    return { ok: true, enabled: nextEnabled, miniAstrolabe: saved.miniAstrolabe, stub: true };
+  });
+
+  ipcMain.handle('mpe:mini-get-state', async () => {
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.getState === 'function') {
+      return await miniAstrolabeManager.getState();
+    }
+    const cfg = configManager.get();
+    return Object.assign(
+      {
+        ok: true,
+        windowOpen: false,
+        blockedByConsent: !consentManager.isActionAllowed('backgroundExecution'),
+        stub: true
+      },
+      (cfg && cfg.miniAstrolabe) || {}
+    );
+  });
+
+  ipcMain.handle('mpe:mini-update-layout', async (event, payload = {}) => {
+    if (!consentManager.isActionAllowed('backgroundExecution')) {
+      return getConsentBlockedResponse();
+    }
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.updateLayout === 'function') {
+      return await miniAstrolabeManager.updateLayout(payload || {});
+    }
+    const cfg = configManager.get();
+    const cur = (cfg && cfg.miniAstrolabe) || {};
+    const allowedKeys = ['x', 'y', 'size', 'scale', 'fanRadius', 'enabled'];
+    const patch = {};
+    for (const k of allowedKeys) {
+      if (k in payload && payload[k] !== undefined) {
+        patch[k] = payload[k];
+      }
+    }
+    const saved = configManager.save({
+      miniAstrolabe: Object.assign({}, cur, patch)
+    });
+    broadcastConfigUpdated(saved, event);
+    broadcastToAllWindows('mpe:mini-state-changed', saved.miniAstrolabe);
+    return { ok: true, miniAstrolabe: saved.miniAstrolabe, stub: true };
+  });
+
+  ipcMain.on('mpe:mini-ignore-mouse', (_event, payload = {}) => {
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.setIgnoreMouse === 'function') {
+      miniAstrolabeManager.setIgnoreMouse(Boolean(payload.ignore), Boolean(payload.forward));
+    }
+  });
+
+  ipcMain.handle('mpe:mini-set-expanded', async (_event, payload = {}) => {
+    if (!consentManager.isActionAllowed('backgroundExecution')) {
+      return getConsentBlockedResponse();
+    }
+    if (miniAstrolabeManager && typeof miniAstrolabeManager.setExpanded === 'function') {
+      return await miniAstrolabeManager.setExpanded(Boolean(payload.expanded));
+    }
+    return { ok: true, expanded: Boolean(payload.expanded), stub: true };
+  });
+
+  // Auto-Script Python (M1 stub / M5 delegate)
+  ipcMain.handle('mpe:py-record-start', async (_event, options = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonRecorder && typeof pythonRecorder.startRecording === 'function') {
+      return await pythonRecorder.startRecording(options);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
+  });
+
+  ipcMain.handle('mpe:py-record-stop', async (_event, options = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonRecorder && typeof pythonRecorder.stopRecording === 'function') {
+      return await pythonRecorder.stopRecording(options);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
+  });
+
+  ipcMain.handle('mpe:py-save-script', async (_event, payload = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonRecorder && typeof pythonRecorder.saveScript === 'function') {
+      return await pythonRecorder.saveScript(payload);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
+  });
+
+  ipcMain.handle('mpe:py-run-script', async (_event, payload = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonScheduler && typeof pythonScheduler.runScript === 'function') {
+      return await pythonScheduler.runScript(payload);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
+  });
+
+  ipcMain.handle('mpe:py-schedule-script', async (_event, payload = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonScheduler && typeof pythonScheduler.scheduleScript === 'function') {
+      return await pythonScheduler.scheduleScript(payload.scriptId, payload.schedule);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
+  });
+
+  ipcMain.handle('mpe:py-delete-script', async (_event, payload = {}) => {
+    if (!consentManager.isActionAllowed('pythonAutomation')) {
+      return getConsentBlockedResponse();
+    }
+    if (pythonScheduler && typeof pythonScheduler.deleteScript === 'function') {
+      return await pythonScheduler.deleteScript(payload.scriptId);
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      message: 'Modulo Python Auto-Script ainda nao carregado.'
+    };
   });
 
   // Organizador de Arquivos & Prints (Estilo Arquithon)
@@ -840,7 +1052,8 @@ function setupIpcHandlers() {
       if (cfg.organizer) {
         cfg.organizer.criterion = payload.criterion || cfg.organizer.criterion;
         cfg.organizer.defaultTarget = payload.targetScope || cfg.organizer.defaultTarget;
-        configManager.save(cfg);
+        const saved = configManager.save(cfg);
+        broadcastConfigUpdated(saved, event);
       }
     }
     return result;
@@ -886,20 +1099,44 @@ app.whenReady().then(async () => {
   fileOrganizer.ensureScopeDir('arquivos');
   fileOrganizer.ensureScopeDir('prints');
   const cfg = configManager.load();
-  if (cfg.system && cfg.system.startWithWindows) {
-    await startupManager.setStartup(true);
-  } else {
-    await startupManager.createAppShortcuts();
+
+  const managerCtx = {
+    configManager,
+    consentManager,
+    actionExecutor,
+    hookBridge,
+    registerWindow,
+    broadcastToAllWindows,
+    broadcastConfigUpdated,
+    codeDir: CODE_DIR,
+    rootDir: ROOT_DIR
+  };
+  if (typeof MiniAstrolabeManager === 'function') {
+    miniAstrolabeManager = new MiniAstrolabeManager(managerCtx);
+  }
+  if (typeof PythonRecorder === 'function') {
+    pythonRecorder = new PythonRecorder(managerCtx);
+  }
+  if (typeof PythonScheduler === 'function') {
+    pythonScheduler = new PythonScheduler(managerCtx);
+  }
+
+  if (!isIsolatedConfig && !isSelfTest) {
+    if (
+      consentManager.isActionAllowed('backgroundExecution') &&
+      cfg.system &&
+      cfg.system.startWithWindows
+    ) {
+      await startupManager.setStartup(true);
+    } else {
+      await startupManager.createAppShortcuts();
+    }
   }
 
   setupIpcHandlers();
   createWindow();
-  createSystemTray();
-  setupHooksAndShortcuts();
-  logDebug(`[APP WHEN-READY DONE] All subsystems loaded`);
-});
-
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-  hookBridge.stop();
+  if (consentManager.isActionAllowed('backgroundExecution')) {
+    activateBackgroundServices();
+  }
+  logDebug(`[APP WHEN-READY DONE] All subsystems loaded consentAccepted=${consentManager.isAccepted()}`);
 });

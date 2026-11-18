@@ -3,6 +3,112 @@ const path = require('path');
 const os = require('os');
 const { app } = require('electron');
 
+function parseCliFlagValue(argv, flagName) {
+  if (!Array.isArray(argv)) return '';
+  const prefix = `${flagName}=`;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = String(argv[i] || '');
+    if (arg.startsWith(prefix)) {
+      return arg.slice(prefix.length).replace(/^["']|["']$/g, '').trim();
+    }
+    if (arg === flagName && i + 1 < argv.length) {
+      return String(argv[i + 1] || '').replace(/^["']|["']$/g, '').trim();
+    }
+  }
+  return '';
+}
+
+function createDefaultConsent() {
+  return {
+    accepted: false,
+    decidedAt: null,
+    version: '1.0',
+    permissions: {
+      backgroundExecution: false,
+      launchAppsAndLinks: false,
+      pythonAutomation: false
+    }
+  };
+}
+
+function normalizeConsent(rawConsent) {
+  const src = rawConsent && typeof rawConsent === 'object' ? rawConsent : {};
+  const accepted = src.accepted === true;
+  const perms = src.permissions && typeof src.permissions === 'object' ? src.permissions : {};
+  return {
+    accepted,
+    decidedAt: src.decidedAt || null,
+    version: typeof src.version === 'string' && src.version ? src.version : '1.0',
+    permissions: accepted
+      ? {
+          backgroundExecution: perms.backgroundExecution !== false,
+          launchAppsAndLinks: perms.launchAppsAndLinks !== false,
+          pythonAutomation: perms.pythonAutomation !== false
+        }
+      : {
+          backgroundExecution: false,
+          launchAppsAndLinks: false,
+          pythonAutomation: false
+        }
+  };
+}
+
+function createDefaultMiniAstrolabe() {
+  return {
+    enabled: true,
+    x: null,
+    y: null,
+    size: 68,
+    scale: 1.0,
+    fanRadius: 140
+  };
+}
+
+function createCleanDefaultPoints() {
+  return [
+    {
+      id: 'star-01-1',
+      code: '01 1',
+      title: 'Bloco de Notas',
+      description: 'Abre o Bloco de Notas do Windows.',
+      actionType: 'launch_app_project',
+      orbit: 2,
+      angle: 330,
+      elevation: 12,
+      vectorStyle: 'gold',
+      glyph: 'Δ',
+      hasArrow: true,
+      slotIndex: 0,
+      slotNumber: 1,
+      params: {
+        appName: 'notepad',
+        targetPath: 'notepad.exe',
+        projectPath: ''
+      }
+    },
+    {
+      id: 'star-02-2',
+      code: '02 2',
+      title: 'Projeto VS Code',
+      description: 'Abre o projeto configurado no Visual Studio Code.',
+      actionType: 'launch_app_project',
+      orbit: 2,
+      angle: 30,
+      elevation: 12,
+      vectorStyle: 'blue',
+      glyph: 'C',
+      hasArrow: true,
+      slotIndex: 1,
+      slotNumber: 2,
+      params: {
+        appName: 'vscode',
+        targetPath: 'code',
+        projectPath: 'c:\\Projetos\\MousePerformaticoEstrelado'
+      }
+    }
+  ];
+}
+
 /**
  * Gerenciador Hibrido de Configuracao (Portatil + Por Maquina)
  * - Le e grava o `mpe.config.json` na raiz do projeto (permitindo migracao instantanea entre maquinas).
@@ -10,18 +116,75 @@ const { app } = require('electron');
  * - Mantem tambem o cache especifico da maquina em `%APPDATA%/MPE/machine-<HOSTNAME>.json` e na chave `machines[hostname]`.
  */
 class ConfigManager {
-  constructor(rootDir, codeDir) {
+  constructor(rootDir, codeDir, options = {}) {
     this.rootDir = rootDir;
     this.codeDir = codeDir || rootDir;
-    this.rootConfigPath = path.join(this.codeDir, 'mpe.config.json');
-    this.legacyRootConfigPath = path.join(this.rootDir, 'mpe.config.json');
-    this.dataDir = path.join(this.codeDir, 'data');
-    this.backupConfigPath = path.join(this.dataDir, 'mpe.config.backup.json');
+
+    const ignoreArgs = Boolean(options.ignoreProcessArgs);
+    const cliConfigPath = ignoreArgs ? '' : parseCliFlagValue(process.argv, '--config-path');
+    const envConfigPath = ignoreArgs ? '' : String(process.env.MPE_CONFIG_PATH || '').trim();
+    const explicitConfigPath =
+      options.configPath !== undefined
+        ? String(options.configPath || '').trim()
+        : cliConfigPath || envConfigPath;
+
+    this.cleanState = Boolean(
+      options.cleanState ||
+        (!ignoreArgs && Array.isArray(process.argv) && process.argv.includes('--clean-state'))
+    );
+    this.forceCleanConsent = Boolean(
+      options.forceCleanConsent ||
+        (!ignoreArgs && process.env.MPE_FORCE_CLEAN_CONSENT === '1') ||
+        this.cleanState
+    );
+    this.enableIsolatedBackup = Boolean(
+      options.enableIsolatedBackup ||
+        (!ignoreArgs && process.env.MPE_ENABLE_ISOLATED_BACKUP === '1')
+    );
+    const explicitDataDir =
+      options.dataDir !== undefined
+        ? String(options.dataDir || '').trim()
+        : !ignoreArgs
+        ? String(process.env.MPE_DATA_DIR || '').trim()
+        : '';
+
     this.machineId = os.hostname() || 'DEFAULT-MACHINE';
-    this.userDataDir = app ? app.getPath('userData') : path.join(os.homedir(), '.mpe');
-    this.machineConfigPath = path.join(this.userDataDir, `machine-${this.machineId}.json`);
+    this.userDataDir =
+      options.userDataDir || (app ? app.getPath('userData') : path.join(os.homedir(), '.mpe'));
+    this.isIsolated = Boolean(explicitConfigPath || this.cleanState);
+
+    if (explicitConfigPath) {
+      this.rootConfigPath = path.resolve(explicitConfigPath);
+    } else if (this.cleanState) {
+      this.rootConfigPath = path.join(this.userDataDir, 'mpe.clean-state.config.json');
+    } else {
+      this.rootConfigPath = path.join(this.codeDir, 'mpe.config.json');
+    }
+
+    this.legacyRootConfigPath = this.isIsolated
+      ? this.rootConfigPath
+      : path.join(this.rootDir, 'mpe.config.json');
+    if (this.isIsolated) {
+      this.dataDir = this.enableIsolatedBackup
+        ? explicitDataDir
+          ? path.resolve(explicitDataDir)
+          : path.join(path.dirname(this.rootConfigPath), 'data')
+        : path.join(path.dirname(this.rootConfigPath), '.mpe-data');
+    } else {
+      this.dataDir = path.join(this.codeDir, 'data');
+    }
+    this.backupConfigPath =
+      !this.isIsolated || this.enableIsolatedBackup
+        ? path.join(this.dataDir, 'mpe.config.backup.json')
+        : null;
+    this.machineConfigPath = this.isIsolated
+      ? null
+      : path.join(this.userDataDir, `machine-${this.machineId}.json`);
+
     this.config = null;
     this.lastLoadedMtimeMs = 0;
+    this._cleanStateApplied = false;
+    this._cleanConsentApplied = false;
   }
 
   readJsonSafe(filePath) {
@@ -40,15 +203,23 @@ class ConfigManager {
   load() {
     let rootData = {};
     let parseFailed = false;
+    const isInitialCleanState = this.cleanState && !this._cleanStateApplied;
 
-    if (!fs.existsSync(this.rootConfigPath) && this.legacyRootConfigPath !== this.rootConfigPath && fs.existsSync(this.legacyRootConfigPath)) {
+    if (
+      !this.isIsolated &&
+      !isInitialCleanState &&
+      !fs.existsSync(this.rootConfigPath) &&
+      this.legacyRootConfigPath !== this.rootConfigPath &&
+      fs.existsSync(this.legacyRootConfigPath)
+    ) {
       try {
         fs.mkdirSync(path.dirname(this.rootConfigPath), { recursive: true });
         fs.renameSync(this.legacyRootConfigPath, this.rootConfigPath);
       } catch (_) {}
     }
 
-    if (fs.existsSync(this.rootConfigPath)) {
+    const fileExisted = !isInitialCleanState && fs.existsSync(this.rootConfigPath);
+    if (fileExisted) {
       let raw = '';
       try {
         raw = fs.readFileSync(this.rootConfigPath, 'utf-8');
@@ -56,7 +227,7 @@ class ConfigManager {
       } catch (err) {
         parseFailed = true;
         console.error('[M.P.E Config] Erro ao ler mpe.config.json da raiz:', err);
-        if (raw) this.saveCorruptedSnapshot(raw);
+        if (raw && (!this.isIsolated || this.enableIsolatedBackup)) this.saveCorruptedSnapshot(raw);
       }
     }
 
@@ -68,7 +239,13 @@ class ConfigManager {
         rootData.points.length === 0 &&
         !(rootData.profile && rootData.profile.isRegistered));
 
-    if (looksReset && fs.existsSync(this.backupConfigPath)) {
+    if (
+      (!this.isIsolated || this.enableIsolatedBackup) &&
+      !isInitialCleanState &&
+      looksReset &&
+      this.backupConfigPath &&
+      fs.existsSync(this.backupConfigPath)
+    ) {
       try {
         const backupData = this.readJsonSafe(this.backupConfigPath);
         if (backupData && Array.isArray(backupData.points) && backupData.points.length > 0) {
@@ -81,7 +258,7 @@ class ConfigManager {
     }
 
     let localMachineData = {};
-    if (fs.existsSync(this.machineConfigPath)) {
+    if (!this.isIsolated && this.machineConfigPath && fs.existsSync(this.machineConfigPath)) {
       try {
         const rawMachine = fs.readFileSync(this.machineConfigPath, 'utf-8');
         localMachineData = JSON.parse(rawMachine);
@@ -89,6 +266,8 @@ class ConfigManager {
         console.error('[M.P.E Config] Erro ao ler config local da maquina:', err);
       }
     }
+
+    const wasRegistered = Boolean(rootData.profile && rootData.profile.isRegistered);
 
     // Garante estrutura base caso o arquivo tenha sido editado manualmente
     if (!rootData.profile) {
@@ -109,7 +288,7 @@ class ConfigManager {
     }
     if (!rootData.system) {
       rootData.system = {
-        startWithWindows: true,
+        startWithWindows: false,
         triggerShortcut: 'Shift + Ctrl + Alt + Botao Direito',
         fallbackKeyboardShortcut: 'CommandOrControl+Shift+Alt+M',
         sensitivity3D: 1.0,
@@ -134,17 +313,13 @@ class ConfigManager {
     if (!rootData.machines) {
       rootData.machines = {};
     }
-    if (!rootData.obsidian) {
-      rootData.obsidian = { vaultPath: './arquivos/Obsidian_Vault', defaultFolder: 'Notas' };
-    }
     if (!rootData.captures) {
       rootData.captures = {
         organizationMode: 'system_date',
         namingPattern: '{prefix}_{system}_{date}_{time}',
         defaultPrefix: 'MPE',
         defaultCategory: 'Geral',
-        documentsFolder: './arquivos',
-        autoIndexNamedPrints: true
+        documentsFolder: './arquivos'
       };
     } else {
       rootData.captures = Object.assign(
@@ -153,8 +328,7 @@ class ConfigManager {
           namingPattern: '{prefix}_{system}_{date}_{time}',
           defaultPrefix: 'MPE',
           defaultCategory: 'Geral',
-          documentsFolder: './arquivos',
-          autoIndexNamedPrints: true
+          documentsFolder: './arquivos'
         },
         rootData.captures
       );
@@ -185,24 +359,27 @@ class ConfigManager {
         rootData.organizer
       );
     }
-    if (!rootData.ai) {
-      rootData.ai = { provider: 'auto', port: 18080, modelsDir: './codigo/models', contextSize: 4096, boostMode: 'balanced' };
+
+    if (this.forceCleanConsent && !this._cleanConsentApplied) {
+      rootData.consent = createDefaultConsent();
+      this._cleanConsentApplied = true;
     } else {
-      if (!rootData.ai.provider || rootData.ai.provider === 'builtin') {
-        rootData.ai.provider = 'auto';
-      }
-      if (!rootData.ai.port || parseInt(rootData.ai.port, 10) === 8080) {
-        rootData.ai.port = 18080;
-      }
-      if (!rootData.ai.modelsDir || rootData.ai.modelsDir === './models' || rootData.ai.modelsDir === 'models') {
-        rootData.ai.modelsDir = './codigo/models';
-      }
-      if (!rootData.ai.contextSize) {
-        rootData.ai.contextSize = 4096;
-      }
-      if (!['eco', 'balanced', 'turbo'].includes(rootData.ai.boostMode)) {
-        rootData.ai.boostMode = 'balanced';
-      }
+      rootData.consent = normalizeConsent(rootData.consent);
+    }
+
+    rootData.miniAstrolabe = Object.assign(
+      createDefaultMiniAstrolabe(),
+      rootData.miniAstrolabe && typeof rootData.miniAstrolabe === 'object'
+        ? rootData.miniAstrolabe
+        : {}
+    );
+
+    if (!Array.isArray(rootData.autoScripts)) {
+      rootData.autoScripts = [];
+    }
+
+    if (rootData.points.length === 0 && (!fileExisted || isInitialCleanState || !wasRegistered)) {
+      rootData.points = createCleanDefaultPoints();
     }
 
     // Garante ponto do Organizador de Arquivos visivel no Astrolabio
@@ -241,9 +418,6 @@ class ConfigManager {
     if (rootData.captures && rootData.captures.documentsFolder) {
       rootData.captures.documentsFolder = migrateDocs(rootData.captures.documentsFolder);
     }
-    if (rootData.obsidian && rootData.obsidian.vaultPath === './Obsidian_Vault') {
-      rootData.obsidian.vaultPath = './arquivos/Obsidian_Vault';
-    }
     rootData.points.forEach((pt) => {
       if (pt && pt.params) {
         if (pt.params.saveDir) pt.params.saveDir = migrateCap(pt.params.saveDir);
@@ -272,6 +446,10 @@ class ConfigManager {
     rootData.machines[this.machineId] = machineEntry;
     rootData.currentMachine = machineEntry;
 
+    if (isInitialCleanState) {
+      this._cleanStateApplied = true;
+    }
+
     this.config = rootData;
     this.save(this.config);
     return this.config;
@@ -294,12 +472,19 @@ class ConfigManager {
   }
 
   writeAtomic(filePath, content) {
-    const tmpPath = `${filePath}.tmp`;
-    fs.writeFileSync(tmpPath, content, 'utf-8');
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${filePath}.${process.pid}.tmp`;
     try {
-      fs.renameSync(tmpPath, filePath);
-    } catch (_) {
-      fs.writeFileSync(filePath, content, 'utf-8');
+      fs.writeFileSync(tmpPath, content, 'utf-8');
+      try {
+        fs.renameSync(tmpPath, filePath);
+      } catch (_) {
+        fs.writeFileSync(filePath, content, 'utf-8');
+      }
+    } finally {
       try {
         if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
       } catch (_) {}
@@ -312,10 +497,16 @@ class ConfigManager {
       if ('points' in safePatch && !Array.isArray(safePatch.points)) {
         delete safePatch.points;
       }
-      this.config = Object.assign({}, this.config, safePatch);
+      if ('autoScripts' in safePatch && !Array.isArray(safePatch.autoScripts)) {
+        delete safePatch.autoScripts;
+      }
+      this.config = Object.assign({}, this.config || {}, safePatch);
     }
     if (!this.config) return null;
 
+    if (!this.config.profile) {
+      this.config.profile = { userName: '', isRegistered: false, languageTone: 'amigavel' };
+    }
     this.config.profile.lastUpdated = new Date().toISOString();
 
     if (!this.config.machines) {
@@ -349,35 +540,78 @@ class ConfigManager {
     }
 
     // 2. Atualiza backup seguro sempre que houver pontos salvos ou perfil registrado
-    try {
-      if (
-        (Array.isArray(toWriteRoot.points) && toWriteRoot.points.length > 0) ||
-        (toWriteRoot.profile && toWriteRoot.profile.isRegistered)
-      ) {
-        if (!fs.existsSync(this.dataDir)) {
-          fs.mkdirSync(this.dataDir, { recursive: true });
+    if ((!this.isIsolated || this.enableIsolatedBackup) && this.backupConfigPath) {
+      try {
+        if (
+          (Array.isArray(toWriteRoot.points) && toWriteRoot.points.length > 0) ||
+          (toWriteRoot.profile && toWriteRoot.profile.isRegistered)
+        ) {
+          if (!fs.existsSync(this.dataDir)) {
+            fs.mkdirSync(this.dataDir, { recursive: true });
+          }
+          this.writeAtomic(this.backupConfigPath, serialized);
         }
-        this.writeAtomic(this.backupConfigPath, serialized);
+      } catch (err) {
+        console.warn('[M.P.E Config] Falha ao atualizar backup:', err.message);
       }
-    } catch (err) {
-      console.warn('[M.P.E Config] Falha ao atualizar backup:', err.message);
     }
 
     // 3. Salva no perfil local da maquina (%APPDATA%)
-    try {
-      if (!fs.existsSync(this.userDataDir)) {
-        fs.mkdirSync(this.userDataDir, { recursive: true });
+    if (!this.isIsolated && this.machineConfigPath) {
+      try {
+        if (!fs.existsSync(this.userDataDir)) {
+          fs.mkdirSync(this.userDataDir, { recursive: true });
+        }
+        fs.writeFileSync(
+          this.machineConfigPath,
+          JSON.stringify(machineSpecific, null, 2),
+          'utf-8'
+        );
+      } catch (err) {
+        console.error('[M.P.E Config] Falha ao gravar config da maquina local:', err);
       }
-      fs.writeFileSync(
-        this.machineConfigPath,
-        JSON.stringify(machineSpecific, null, 2),
-        'utf-8'
-      );
-    } catch (err) {
-      console.error('[M.P.E Config] Falha ao gravar config da maquina local:', err);
     }
 
     return this.config;
+  }
+
+  reorderPoint(fromIndex, toIndex) {
+    const cfg = this.get();
+    const points = Array.isArray(cfg && cfg.points) ? [...cfg.points] : [];
+
+    if (
+      typeof fromIndex !== 'number' ||
+      typeof toIndex !== 'number' ||
+      !Number.isInteger(fromIndex) ||
+      !Number.isInteger(toIndex) ||
+      fromIndex < 0 ||
+      fromIndex >= points.length ||
+      toIndex < 0 ||
+      toIndex >= points.length
+    ) {
+      return { ok: false, error: 'Indice de reordenacao invalido.' };
+    }
+
+    if (fromIndex !== toIndex) {
+      const [moved] = points.splice(fromIndex, 1);
+      points.splice(toIndex, 0, moved);
+    }
+
+    const updatedPoints = points.map((pt, idx) =>
+      Object.assign({}, pt, {
+        slotIndex: idx,
+        slotNumber: idx + 1
+      })
+    );
+
+    const saved = this.save({ points: updatedPoints });
+    return {
+      ok: true,
+      fromIndex,
+      toIndex,
+      points: saved ? saved.points : updatedPoints,
+      config: saved
+    };
   }
 
   resolvePath(relativeOrAbsPath) {

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -309,23 +311,400 @@ namespace MpeNative
             catch { }
         }
 
-        private static bool ShouldAutoEnableStartup(string baseDir)
+        private sealed class MiniJsonParser
+        {
+            private readonly string _src;
+            private int _pos;
+
+            private MiniJsonParser(string src)
+            {
+                _src = src ?? "";
+                _pos = 0;
+            }
+
+            public static Dictionary<string, object> ParseObject(string json)
+            {
+                if (string.IsNullOrEmpty(json)) return null;
+                MiniJsonParser parser = new MiniJsonParser(json);
+                parser.SkipWhitespace();
+                if (parser._pos < parser._src.Length && parser._src[parser._pos] == '\uFEFF')
+                {
+                    parser._pos++;
+                    parser.SkipWhitespace();
+                }
+                if (parser._pos >= parser._src.Length || parser._src[parser._pos] != '{')
+                {
+                    return null;
+                }
+                Dictionary<string, object> root = parser.ParseObjectValue();
+                parser.SkipWhitespace();
+                if (parser._pos != parser._src.Length)
+                {
+                    throw new FormatException("Trailing characters after JSON document.");
+                }
+                return root;
+            }
+
+            private void SkipWhitespace()
+            {
+                while (_pos < _src.Length)
+                {
+                    char c = _src[_pos];
+                    if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+                    {
+                        _pos++;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
+            private char Peek()
+            {
+                if (_pos >= _src.Length) throw new FormatException("Unexpected end of JSON.");
+                return _src[_pos];
+            }
+
+            private object ParseValue()
+            {
+                SkipWhitespace();
+                char c = Peek();
+                if (c == '{') return ParseObjectValue();
+                if (c == '[') return ParseArrayValue();
+                if (c == '"') return ParseString();
+                if (c == 't') return ParseLiteral("true", true);
+                if (c == 'f') return ParseLiteral("false", false);
+                if (c == 'n') return ParseLiteral("null", null);
+                if (c == '-' || (c >= '0' && c <= '9')) return ParseNumber();
+                throw new FormatException("Unexpected token in JSON.");
+            }
+
+            private Dictionary<string, object> ParseObjectValue()
+            {
+                if (_src[_pos] != '{') throw new FormatException("Expected '{'.");
+                _pos++;
+                Dictionary<string, object> dict = new Dictionary<string, object>(StringComparer.Ordinal);
+                SkipWhitespace();
+                if (_pos < _src.Length && _src[_pos] == '}')
+                {
+                    _pos++;
+                    return dict;
+                }
+
+                while (true)
+                {
+                    SkipWhitespace();
+                    if (Peek() != '"') throw new FormatException("Expected string key.");
+                    string key = ParseString();
+                    SkipWhitespace();
+                    if (Peek() != ':') throw new FormatException("Expected ':'.");
+                    _pos++;
+                    object val = ParseValue();
+                    dict[key] = val;
+                    SkipWhitespace();
+                    char next = Peek();
+                    if (next == '}')
+                    {
+                        _pos++;
+                        return dict;
+                    }
+                    if (next != ',') throw new FormatException("Expected ',' or '}'.");
+                    _pos++;
+                }
+            }
+
+            private List<object> ParseArrayValue()
+            {
+                if (_src[_pos] != '[') throw new FormatException("Expected '['.");
+                _pos++;
+                List<object> list = new List<object>();
+                SkipWhitespace();
+                if (_pos < _src.Length && _src[_pos] == ']')
+                {
+                    _pos++;
+                    return list;
+                }
+
+                while (true)
+                {
+                    object val = ParseValue();
+                    list.Add(val);
+                    SkipWhitespace();
+                    char next = Peek();
+                    if (next == ']')
+                    {
+                        _pos++;
+                        return list;
+                    }
+                    if (next != ',') throw new FormatException("Expected ',' or ']'.");
+                    _pos++;
+                }
+            }
+
+            private string ParseString()
+            {
+                if (_src[_pos] != '"') throw new FormatException("Expected '\"'.");
+                _pos++;
+                StringBuilder sb = new StringBuilder();
+                while (_pos < _src.Length)
+                {
+                    char c = _src[_pos++];
+                    if (c == '"') return sb.ToString();
+                    if (c < 0x20) throw new FormatException("Unescaped control char in JSON string.");
+                    if (c == '\\')
+                    {
+                        if (_pos >= _src.Length) throw new FormatException("Unterminated escape.");
+                        char esc = _src[_pos++];
+                        switch (esc)
+                        {
+                            case '"': sb.Append('"'); break;
+                            case '\\': sb.Append('\\'); break;
+                            case '/': sb.Append('/'); break;
+                            case 'b': sb.Append('\b'); break;
+                            case 'f': sb.Append('\f'); break;
+                            case 'n': sb.Append('\n'); break;
+                            case 'r': sb.Append('\r'); break;
+                            case 't': sb.Append('\t'); break;
+                            case 'u':
+                                if (_pos + 4 > _src.Length) throw new FormatException("Invalid unicode escape.");
+                                string hex = _src.Substring(_pos, 4);
+                                int codePoint;
+                                if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out codePoint))
+                                {
+                                    throw new FormatException("Invalid unicode hex.");
+                                }
+                                sb.Append((char)codePoint);
+                                _pos += 4;
+                                break;
+                            default:
+                                throw new FormatException("Invalid escape character.");
+                        }
+                    }
+                    else
+                    {
+                        sb.Append(c);
+                    }
+                }
+                throw new FormatException("Unterminated JSON string.");
+            }
+
+            private object ParseLiteral(string literal, object value)
+            {
+                if (_pos + literal.Length > _src.Length ||
+                    string.Compare(_src, _pos, literal, 0, literal.Length, StringComparison.Ordinal) != 0)
+                {
+                    throw new FormatException("Invalid JSON literal.");
+                }
+                _pos += literal.Length;
+                return value;
+            }
+
+            private object ParseNumber()
+            {
+                int start = _pos;
+                if (_src[_pos] == '-') _pos++;
+                if (_pos >= _src.Length) throw new FormatException("Invalid JSON number.");
+                if (_src[_pos] == '0')
+                {
+                    _pos++;
+                }
+                else if (_src[_pos] >= '1' && _src[_pos] <= '9')
+                {
+                    while (_pos < _src.Length && _src[_pos] >= '0' && _src[_pos] <= '9') _pos++;
+                }
+                else
+                {
+                    throw new FormatException("Invalid JSON number.");
+                }
+
+                bool isFloat = false;
+                if (_pos < _src.Length && _src[_pos] == '.')
+                {
+                    isFloat = true;
+                    _pos++;
+                    if (_pos >= _src.Length || _src[_pos] < '0' || _src[_pos] > '9')
+                    {
+                        throw new FormatException("Invalid JSON fraction.");
+                    }
+                    while (_pos < _src.Length && _src[_pos] >= '0' && _src[_pos] <= '9') _pos++;
+                }
+
+                if (_pos < _src.Length && (_src[_pos] == 'e' || _src[_pos] == 'E'))
+                {
+                    isFloat = true;
+                    _pos++;
+                    if (_pos < _src.Length && (_src[_pos] == '+' || _src[_pos] == '-')) _pos++;
+                    if (_pos >= _src.Length || _src[_pos] < '0' || _src[_pos] > '9')
+                    {
+                        throw new FormatException("Invalid JSON exponent.");
+                    }
+                    while (_pos < _src.Length && _src[_pos] >= '0' && _src[_pos] <= '9') _pos++;
+                }
+
+                string rawNum = _src.Substring(start, _pos - start);
+                if (!isFloat)
+                {
+                    long lVal;
+                    if (long.TryParse(rawNum, NumberStyles.Integer, CultureInfo.InvariantCulture, out lVal))
+                    {
+                        return lVal;
+                    }
+                }
+                double dVal;
+                if (double.TryParse(rawNum, NumberStyles.Float, CultureInfo.InvariantCulture, out dVal))
+                {
+                    return dVal;
+                }
+                throw new FormatException("Invalid JSON number value.");
+            }
+        }
+
+        private static string QuoteWindowsArg(string arg)
+        {
+            if (string.IsNullOrEmpty(arg)) return "\"\"";
+            bool needsQuotes = false;
+            for (int i = 0; i < arg.Length; i++)
+            {
+                char c = arg[i];
+                if (c == ' ' || c == '\t' || c == '"')
+                {
+                    needsQuotes = true;
+                    break;
+                }
+            }
+            if (!needsQuotes) return arg;
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append('"');
+            int backslashes = 0;
+            for (int i = 0; i < arg.Length; i++)
+            {
+                char c = arg[i];
+                if (c == '\\')
+                {
+                    backslashes++;
+                }
+                else if (c == '"')
+                {
+                    sb.Append('\\', backslashes * 2 + 1);
+                    sb.Append('"');
+                    backslashes = 0;
+                }
+                else
+                {
+                    if (backslashes > 0)
+                    {
+                        sb.Append('\\', backslashes);
+                        backslashes = 0;
+                    }
+                    sb.Append(c);
+                }
+            }
+            if (backslashes > 0)
+            {
+                sb.Append('\\', backslashes * 2);
+            }
+            sb.Append('"');
+            return sb.ToString();
+        }
+
+        private static string FormatCommandLineArgs(string[] args)
+        {
+            if (args == null || args.Length == 0) return "--launch-ui";
+            string[] quoted = new string[args.Length];
+            for (int i = 0; i < args.Length; i++)
+            {
+                quoted[i] = QuoteWindowsArg(args[i]);
+            }
+            return string.Join(" ", quoted);
+        }
+
+        private static string ResolveConfigPath(string baseDir, string[] args)
+        {
+            if (args != null)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    string arg = args[i] ?? "";
+                    if (arg.StartsWith("--config-path=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return arg.Substring("--config-path=".Length).Trim('"', '\'');
+                    }
+                    if (string.Equals(arg, "--config-path", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                    {
+                        return (args[i + 1] ?? "").Trim('"', '\'');
+                    }
+                }
+            }
+
+            string envPath = Environment.GetEnvironmentVariable("MPE_CONFIG_PATH");
+            if (!string.IsNullOrEmpty(envPath))
+            {
+                return envPath.Trim('"', '\'');
+            }
+
+            string cleanBase = (baseDir ?? "").TrimEnd('\\');
+            string cfgPath = Path.Combine(cleanBase, "codigo", "mpe.config.json");
+            if (File.Exists(cfgPath)) return cfgPath;
+            cfgPath = Path.Combine(cleanBase, "mpe.config.json");
+            return cfgPath;
+        }
+
+        private static bool ShouldAutoEnableStartup(string baseDir, string[] args)
         {
             try
             {
-                string cfgPath = Path.Combine(baseDir.TrimEnd('\\'), "codigo", "mpe.config.json");
-                if (!File.Exists(cfgPath))
+                string cfgPath = ResolveConfigPath(baseDir, args);
+                if (string.IsNullOrEmpty(cfgPath) || !File.Exists(cfgPath)) return false;
+
+                string raw = File.ReadAllText(cfgPath, Encoding.UTF8);
+                Dictionary<string, object> root = MiniJsonParser.ParseObject(raw);
+                if (root == null) return false;
+
+                object consentObj;
+                if (!root.TryGetValue("consent", out consentObj)) return false;
+                Dictionary<string, object> consentDict = consentObj as Dictionary<string, object>;
+                if (consentDict == null) return false;
+
+                object acceptedObj;
+                if (!consentDict.TryGetValue("accepted", out acceptedObj)) return false;
+                if (!(acceptedObj is bool) || !(bool)acceptedObj) return false;
+
+                object permsObj;
+                if (consentDict.TryGetValue("permissions", out permsObj))
                 {
-                    cfgPath = Path.Combine(baseDir.TrimEnd('\\'), "mpe.config.json");
+                    Dictionary<string, object> permsDict = permsObj as Dictionary<string, object>;
+                    if (permsDict != null)
+                    {
+                        object bgObj;
+                        if (permsDict.TryGetValue("backgroundExecution", out bgObj))
+                        {
+                            if (!(bgObj is bool) || !(bool)bgObj) return false;
+                        }
+                    }
                 }
-                if (!File.Exists(cfgPath)) return true;
-                string raw = File.ReadAllText(cfgPath);
-                if (raw.Contains("\"startWithWindows\": false")) return false;
+
+                object systemObj;
+                if (root.TryGetValue("system", out systemObj))
+                {
+                    Dictionary<string, object> systemDict = systemObj as Dictionary<string, object>;
+                    if (systemDict != null)
+                    {
+                        object startObj;
+                        if (systemDict.TryGetValue("startWithWindows", out startObj))
+                        {
+                            if (startObj is bool && !(bool)startObj) return false;
+                        }
+                    }
+                }
+
                 return true;
             }
             catch
             {
-                return true;
+                return false;
             }
         }
 
@@ -356,7 +735,7 @@ namespace MpeNative
                 }
 
                 // Ao abrir o MPE.exe, garante o registro em "Aplicativos de inicializacao" e atalho com AppUserModelID
-                if (ShouldAutoEnableStartup(baseDir))
+                if (ShouldAutoEnableStartup(baseDir, args))
                 {
                     ConfigureWindowsStartup(baseDir, true);
                 }
@@ -373,9 +752,7 @@ namespace MpeNative
                     electronExe = Path.Combine(baseDir.TrimEnd('\\'), "node_modules", "electron", "dist", "electron.exe");
                 }
 
-                string passedArgs = args != null && args.Length > 0
-                    ? string.Join(" ", args)
-                    : "--launch-ui";
+                string passedArgs = FormatCommandLineArgs(args);
 
                 try
                 {

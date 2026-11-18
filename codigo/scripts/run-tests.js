@@ -35,10 +35,9 @@ Module._load = function patchedLoad(request, parent, isMain) {
 };
 
 const ConfigManager = require('../src/main/configManager');
-const LlamafileManager = require('../src/main/llamafileManager');
-const LocalAiService = require('../src/main/localAiService');
 const FileOrganizer = require('../src/main/fileOrganizer');
 const ActionExecutor = require('../src/main/actionExecutor');
+const { runM1Suite } = require('./m1-tests');
 
 const results = [];
 
@@ -89,7 +88,7 @@ async function main() {
     return `lastActiveTab=${realCfg.organizer.lastActiveTab}, rememberWindowState=${realCfg.organizer.rememberWindowState}`;
   });
 
-  await runCase('Config & Migracoes', 'CFG-02', 'Migracao automatica de porta 8080 e provider builtin legado', () => {
+  await runCase('Config & Migracoes', 'CFG-02', 'Injecao automatica da estrela open_organizer e migracao de caminhos', () => {
     const tmpRoot = makeTempDir('mpe-cfg-');
     const tmpCode = path.join(tmpRoot, 'codigo');
     fs.mkdirSync(tmpCode, { recursive: true });
@@ -97,7 +96,8 @@ async function main() {
       path.join(tmpCode, 'mpe.config.json'),
       JSON.stringify({
         profile: { userName: 'Teste', isRegistered: true },
-        ai: { provider: 'builtin', port: 8080, modelsDir: './models' },
+        telegram: { savedScreenshotsFolder: './Capturas_MPE' },
+        captures: { documentsFolder: './documentos' },
         points: [{ id: 'p1', code: '01 1', title: 'Print', actionType: 'print' }]
       }),
       'utf8'
@@ -105,12 +105,11 @@ async function main() {
     const cm = new ConfigManager(tmpRoot, tmpCode);
     const loaded = cm.load();
     try {
-      assert.strictEqual(loaded.ai.provider, 'auto');
-      assert.strictEqual(loaded.ai.port, 18080);
-      assert.strictEqual(loaded.ai.modelsDir, './codigo/models');
+      assert.strictEqual(loaded.telegram.savedScreenshotsFolder, './prints');
+      assert.strictEqual(loaded.captures.documentsFolder, './arquivos');
       const hasOrgStar = loaded.points.some((p) => p.actionType === 'open_organizer');
       assert.ok(hasOrgStar, 'Estrela open_organizer deveria ser injetada automaticamente');
-      return `provider=${loaded.ai.provider}, port=${loaded.ai.port}, estrelaOrganizador=${hasOrgStar}`;
+      return `prints=${loaded.telegram.savedScreenshotsFolder}, docs=${loaded.captures.documentsFolder}, estrelaOrganizador=${hasOrgStar}`;
     } finally {
       rmSafe(tmpRoot);
     }
@@ -120,248 +119,6 @@ async function main() {
     const star = (realCfg.points || []).find((p) => p.actionType === 'open_organizer' || p.actionType === 'organize_files_quick');
     assert.ok(star, 'Ponto de organizador nao encontrado em mpe.config.json');
     return `id=${star.id}, code=${star.code}, title=${star.title}, orbit=${star.orbit}, angle=${star.angle}`;
-  });
-
-  // =========================================================================
-  // SUITE B: Motor I.A Local (Mozilla llamafile + LocalAiService)
-  // =========================================================================
-  await runCase('I.A Local (llamafile)', 'AI-01', 'Binario llamafile.exe e modelo GGUF presentes e <= 15 GB', () => {
-    const modelsDir = path.join(CODE_DIR, 'models');
-    const files = fs.readdirSync(modelsDir).filter((f) => fs.statSync(path.join(modelsDir, f)).isFile());
-    const totalBytes = files.reduce((acc, f) => acc + fs.statSync(path.join(modelsDir, f)).size, 0);
-    const totalGb = totalBytes / (1024 ** 3);
-    const mgr = new LlamafileManager(ROOT_DIR, CODE_DIR);
-    const found = mgr.findModel(realCfg.ai);
-    assert.ok(found && found.exe && found.gguf, 'Par llamafile.exe + .gguf nao detectado');
-    assert.ok(totalGb > 0.5 && totalGb <= 15, `Tamanho fora do limite: ${totalGb.toFixed(2)} GB`);
-    return `${found.name} + llamafile.exe (${totalGb.toFixed(2)} GB <= 15 GB)`;
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-02', 'ping() rejeita HTML 404 (protecao contra servidor Apache/IIS na porta)', async () => {
-    const srv = http.createServer((_req, res) => {
-      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN"><html><head><title>404 Not Found</title></head><body>Not Found</body></html>');
-    });
-    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-    const port = srv.address().port;
-    try {
-      const mgr = new LlamafileManager(ROOT_DIR, CODE_DIR);
-      const status = await mgr.ping(port, 1200);
-      assert.strictEqual(status, 'fail', `ping deveria retornar fail para HTML 404, retornou ${status}`);
-      return `Porta mock ${port} (HTML 404) rejeitada como '${status}'`;
-    } finally {
-      srv.close();
-    }
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-03', 'findFreePort() ignora porta ocupada e seleciona porta livre', async () => {
-    const blocker = http.createServer((_req, res) => res.end('busy'));
-    await new Promise((r) => blocker.listen(0, '127.0.0.1', r));
-    const busyPort = blocker.address().port;
-    try {
-      const mgr = new LlamafileManager(ROOT_DIR, CODE_DIR);
-      const chosen = await mgr.findFreePort(busyPort);
-      assert.notStrictEqual(chosen, busyPort);
-      assert.strictEqual(await mgr.isPortAvailable(chosen), true);
-      return `Ocupada=${busyPort} -> Livre escolhida=${chosen}`;
-    } finally {
-      blocker.close();
-    }
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-04', 'cleanModelOutput() remove blocos internos <think>...</think>', () => {
-    const svc = new LocalAiService(ROOT_DIR, realCm, CODE_DIR);
-    const cleaned = svc.cleanModelOutput('<think>raciocinio oculto</think>\n\nResposta final objetiva.');
-    assert.strictEqual(cleaned, 'Resposta final objetiva.');
-    return `Output limpo: "${cleaned}"`;
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-05', 'Comandos slash (/ajuda, /status) e revisao offline (< 50ms)', async () => {
-    const svc = new LocalAiService(ROOT_DIR, realCm, CODE_DIR);
-    const helpRes = await svc.chat({ message: '/ajuda' });
-    assert.ok(helpRes.ok && helpRes.source === 'command' && helpRes.text.includes('COMANDOS'));
-    const rev = svc.builtinGrammarAndStyleReview('este e um texto de teste sem ponto');
-    assert.ok(rev.ok && rev.revised.startsWith('Este') && rev.revised.endsWith('.'));
-    const obs = svc.classifyForObsidian('Ata de reuniao sobre meta do projeto');
-    assert.ok(obs.ok && obs.suggestedFolder === 'Reunioes');
-    return `Help OK, Revisao="${rev.revised}", ObsidianFolder=${obs.suggestedFolder}`;
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-06', 'Inferencia LLM real via llamafile + Qwen2.5-7B-Instruct (/v1/chat/completions)', async () => {
-    const svc = new LocalAiService(ROOT_DIR, realCm, CODE_DIR);
-    try {
-      const res = await svc.chat({ message: 'Responda em uma frase curta: do que a agua e feita?', tone: 'amigavel', mode: 'chat' });
-      assert.ok(res.ok, 'Resposta de chat falhou');
-      assert.strictEqual(res.source, 'llm', `Esperado source=llm, obtido ${res.source}: ${res.text}`);
-      assert.ok(/hidrog|H2O|oxig/i.test(res.text), `Conteudo inesperado: ${res.text}`);
-      const status = await svc.getStatus(false);
-      assert.strictEqual(status.ready, true);
-      assert.strictEqual(status.engine, 'online');
-      return `source=${res.source}, modelo=${status.modelName}, resposta="${res.text.slice(0, 85).replace(/\s+/g, ' ')}"`;
-    } finally {
-      svc.shutdown();
-    }
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-07', 'Calculo de memoria/velocidade, kits minimos e comando /boost', async () => {
-    const tmpRoot = makeTempDir('mpe-boost-');
-    const tmpCode = path.join(tmpRoot, 'codigo');
-    fs.mkdirSync(tmpCode, { recursive: true });
-    const cm = new ConfigManager(tmpRoot, tmpCode);
-    cm.load();
-    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
-    try {
-      const kitsRes = await svc.chat({ message: '/kits' });
-      assert.ok(kitsRes.ok && kitsRes.source === 'command');
-      assert.ok(kitsRes.text.includes('CALCULO DE MEMORIA RAM') && kitsRes.text.includes('KITS MINIMOS'));
-
-      const ecoProf = await svc.setBoostMode('eco', { restartIfOnline: false });
-      assert.strictEqual(ecoProf.boostMode, 'eco');
-      assert.strictEqual(ecoProf.tuning.contextSize, 2048);
-
-      const turboRes = await svc.chat({ message: '/boost turbo' });
-      assert.ok(turboRes.ok && turboRes.text.includes('Turbo (/boost)'));
-      const turboProf = svc.getPerformanceProfile();
-      assert.strictEqual(turboProf.boostMode, 'turbo');
-      assert.strictEqual(turboProf.speed.lastLoadMs, 0);
-      assert.ok(Array.isArray(turboProf.kits) && turboProf.kits.length === 4);
-      assert.strictEqual(typeof svc.engine.stopAsync, 'function');
-      return `eco(ctx=${ecoProf.tuning.contextSize}), turbo(threads=${turboProf.tuning.threads}/${turboProf.tuning.threadsBatch}), kits=${turboProf.kits.length}, RAM=${turboProf.hardware.totalRamGb}GB`;
-    } finally {
-      rmSafe(tmpRoot);
-    }
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-08', 'Roteador de comandos / (aliases, fuzzy, /status termo, /revise referencia doc e /organizar)', async () => {
-    const tmpRoot = makeTempDir('mpe-slash-');
-    const tmpCode = path.join(tmpRoot, 'codigo');
-    fs.mkdirSync(tmpCode, { recursive: true });
-    const cm = new ConfigManager(tmpRoot, tmpCode);
-    const cfg = cm.load();
-    cfg.ai.provider = 'offline';
-    cm.save(cfg);
-
-    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
-    try {
-      // Salva documento "bolo do jorge" simulando o cenario real
-      svc.saveDocumentFile({ title: 'bolo do jorge', category: 'Geral', text: 'quero uma ravisão de bolo' });
-
-      // 1. Fuzzy & prefixo
-      const rAjud = LocalAiService.resolveSlashCommand('ajud');
-      assert.strictEqual(rAjud.matched, 'ajuda');
-      assert.strictEqual(rAjud.autoCorrected, true);
-
-      const rTypo = LocalAiService.resolveSlashCommand('stauts');
-      assert.strictEqual(rTypo.matched, 'status');
-      assert.strictEqual(rTypo.autoCorrected, true);
-
-      // Comandos destrutivos nao devem rodar por fuzzy automatico
-      const rDest = LocalAiService.resolveSlashCommand('par');
-      assert.strictEqual(rDest.matched, null);
-
-      // 2. /status do bolo inclui busca rapida pelo termo
-      const stBolo = await svc.chat({ message: '/status do bolo' });
-      assert.ok(stBolo.ok && stBolo.text.includes('BUSCA RAPIDA PARA "do bolo"') && stBolo.text.includes('bolo do jorge'));
-
-      // 3. /revise o que foi enviado para o jorge encontra o documento e revisa o conteudo dele
-      const revJorge = await svc.chat({ message: '/revise o que foi enviado para o jorge' });
-      assert.ok(revJorge.ok, 'Falha em /revise referencial');
-      assert.ok(revJorge.text.includes('bolo do jorge'), 'Deveria informar origem do documento');
-      assert.ok(revJorge.text.includes('ravisão') || revJorge.text.includes('Quero uma'), 'Deveria revisar o texto do documento');
-
-      // 4. /buscar unificado e /organizar arquivos com acao
-      const buscar = await svc.chat({ message: '/buscar bolo' });
-      assert.ok(buscar.ok && buscar.text.includes('DOCUMENTOS') && buscar.text.includes('bolo do jorge'));
-
-      const orgCmd = await svc.chat({ message: '/organizar arquivos' });
-      assert.ok(orgCmd.ok && orgCmd.action && orgCmd.action.type === 'open-organizer');
-
-      // 5. /tom e /perfil
-      const tomRes = await svc.chat({ message: '/tom neutra' });
-      assert.ok(tomRes.ok && tomRes.action && tomRes.action.type === 'set-tone' && tomRes.action.tone === 'neutra');
-
-      const unkRes = await svc.chat({ message: '/revissarx algo' });
-      assert.ok(unkRes.ok && unkRes.text.includes('Voce quis dizer:'));
-
-      return 'Aliases, fuzzy (/ajud, /stauts), /status termo, /revise referencia doc, /buscar, /organizar e /tom validados';
-    } finally {
-      rmSafe(tmpRoot);
-    }
-  });
-
-  await runCase('I.A Local (llamafile)', 'AI-09', 'Parametros de resposta (top_p, repeat_penalty, /perfil) + retry HTTP 503 sem fallback indevido', async () => {
-    const tmpRoot = makeTempDir('mpe-params-');
-    const tmpCode = path.join(tmpRoot, 'codigo');
-    fs.mkdirSync(tmpCode, { recursive: true });
-    let hits = 0;
-    let lastPayload = null;
-
-    const srv = http.createServer((req, res) => {
-      if (req.url === '/v1/models') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ object: 'list', data: [{ id: 'mock-qwen' }] }));
-        return;
-      }
-      if (req.url === '/v1/chat/completions') {
-        let body = '';
-        req.on('data', (c) => (body += c));
-        req.on('end', () => {
-          hits++;
-          lastPayload = JSON.parse(body);
-          if (hits === 1) {
-            // Simula 503 transitorio (ex: slot ocupado apos /boost) na 1a tentativa
-            res.writeHead(503, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: { message: 'Loading model' } }));
-            return;
-          }
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              choices: [{ message: { content: 'Receita de bolo pronta para o Jorge com cobertura de chocolate.' } }]
-            })
-          );
-        });
-        return;
-      }
-      res.writeHead(404);
-      res.end();
-    });
-
-    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-    const port = srv.address().port;
-
-    const cm = new ConfigManager(tmpRoot, tmpCode);
-    const cfg = cm.load();
-    cfg.ai.provider = 'lmstudio';
-    cfg.ai.endpoint = `http://127.0.0.1:${port}/v1/chat/completions`;
-    cm.save(cfg);
-
-    const svc = new LocalAiService(tmpRoot, cm, tmpCode);
-    try {
-      const pRes = await svc.chat({ message: '/param perfil criativo' });
-      assert.ok(pRes.ok && pRes.text.includes('Criativo'), 'Perfil criativo falhou');
-
-      const aliasRes = await svc.chat({ message: '/param repeticao 1.18' });
-      assert.ok(aliasRes.ok && aliasRes.text.includes('repeat_penalty = 1.18'), 'Alias repeticao falhou');
-
-      // Simula provider auto com retry transitorio mudando temporariamente para mock em porta local
-      svc.engine.ping = async () => 'ok';
-      cfg.ai.provider = 'auto';
-      cfg.ai.port = port;
-      cm.save(cfg);
-
-      const reply = await svc.chat({ message: 'pode adaptar', tone: 'neutra', mode: 'free' });
-      assert.strictEqual(reply.source, 'llm', `Esperado source=llm apos retry, obtido ${reply.source}`);
-      assert.strictEqual(hits, 2, `Esperado 2 tentativas (503 -> 200), obteve ${hits}`);
-      assert.strictEqual(lastPayload.repeat_penalty, 1.18);
-      assert.strictEqual(lastPayload.top_p, 0.95);
-      assert.strictEqual(lastPayload.max_tokens, 1400);
-      assert.ok(lastPayload.messages[0].content.includes('neutro, equilibrado'), 'Tone neutra ausente no system prompt');
-      return `Retry 503->200 OK, payload top_p=${lastPayload.top_p}, repeat_penalty=${lastPayload.repeat_penalty}, max_tokens=${lastPayload.max_tokens}`;
-    } finally {
-      srv.close();
-      rmSafe(tmpRoot);
-    }
   });
 
   // =========================================================================
@@ -511,10 +268,9 @@ async function main() {
     return `${jsFiles.length} arquivos JS validados com node -c`;
   });
 
-  await runCase('Integridade & AGENTS.md', 'SYS-02', 'Zero emojis em codigo, HTML, CSS, JSON e documentacao tecnica', () => {
+  await runCase('Integridade & AGENTS.md', 'SYS-02', 'Zero emojis em codigo, HTML, CSS e JSON', () => {
     const files = walkJs(path.join(CODE_DIR, 'src')).concat([
-      path.join(CODE_DIR, 'mpe.config.json'),
-      path.join(CODE_DIR, 'models', 'README.txt')
+      path.join(CODE_DIR, 'mpe.config.json')
     ]);
     const emojiRe = /\p{Extended_Pictographic}/gu;
     let hits = 0;
@@ -526,33 +282,32 @@ async function main() {
     return `${files.length} arquivos auditados com 0 emojis`;
   });
 
-  await runCase('Integridade & AGENTS.md', 'SYS-03', 'AppUserModelId, setAppDetails e binarios Win32 presentes', () => {
+  await runCase('Integridade & AGENTS.md', 'SYS-03', 'AppUserModelId, setAppDetails, hook exclusivo Astrolabio e binarios Win32 presentes', () => {
     const mainJs = fs.readFileSync(path.join(CODE_DIR, 'src', 'main', 'main.js'), 'utf8');
     const launcherCs = fs.readFileSync(path.join(CODE_DIR, 'src', 'native', 'MpeLauncher.cs'), 'utf8');
+    const hookCs = fs.readFileSync(path.join(CODE_DIR, 'src', 'native', 'MpeHook.cs'), 'utf8');
     const hasAumidConst = mainJs.includes("'DevFLeo.MousePerformaticoEstrelado'");
     const aumidIdx = mainJs.indexOf('app.setAppUserModelId(');
     const winIdx = mainJs.indexOf('new BrowserWindow');
     assert.ok(hasAumidConst && aumidIdx > 0 && aumidIdx < winIdx, 'AUMID deve vir antes de createWindow/BrowserWindow');
     assert.ok(mainJs.includes('mainWindow.setAppDetails(') && mainJs.includes('relaunchCommand'), 'setAppDetails com relaunchCommand obrigatorio para Fixar na Barra de Tarefas');
     assert.ok(launcherCs.includes('IPropertyStore') && launcherCs.includes('DevFLeo.MousePerformaticoEstrelado'), 'MpeLauncher.cs deve gravar PKEY_AppUserModel_ID no .lnk');
+    assert.ok(!hookCs.includes('TRIGGER_MINI'), 'MPE MpeHook.cs nao deve interceptar Shift+Ctrl+Botao Direito (exclusivo do Katharos AI)');
     assert.ok(fs.existsSync(path.join(CODE_DIR, 'src', 'native', 'bin', 'MpeHook.exe')), 'MpeHook.exe ausente');
     assert.ok(fs.existsSync(path.join(ROOT_DIR, 'MPE.exe')), 'MPE.exe ausente');
     assert.ok(fs.existsSync(path.join(CODE_DIR, 'assets', 'icon.ico')), 'icon.ico ausente');
-    return 'AUMID + setAppDetails + IPropertyStore .lnk configurados; MPE.exe, MpeHook.exe e icon.ico presentes';
+    return 'AUMID + setAppDetails + IPropertyStore .lnk + hook exclusivo HUD configurados; MPE.exe, MpeHook.exe e icon.ico presentes';
   });
 
-  await runCase('Integridade & AGENTS.md', 'SYS-04', 'DOM completo do assistente interativo, topbar, guia /boost e IDs do Astrolabio', () => {
+  await runCase('Integridade & AGENTS.md', 'SYS-04', 'DOM completo do Astrolabio, Wizard e Organizador sem acoplamento de IA', () => {
     const html = fs.readFileSync(path.join(CODE_DIR, 'src', 'renderer', 'index.html'), 'utf8');
     const requiredIds = [
       'btn-tab-astrolabe',
       'btn-tab-organizer',
       'btn-dock-organizer',
-      'btn-dock-kataros',
       'btn-open-guide',
-      'btn-guide-open-chat',
       'btn-guide-repair-shortcut',
       'modal-guide',
-      'cfg-ai-boost',
       'btn-org-back-astrolabe',
       'btn-add-star',
       'btn-dock-add-point',
@@ -564,16 +319,16 @@ async function main() {
       'btn-test-point',
       'pt-angle',
       'pt-orbit',
-      'pt-action-type',
-      'side-chat-drawer',
-      'side-ai-preset',
-      'mini-assistant-overlay'
+      'pt-action-type'
     ];
     for (const id of requiredIds) {
       assert.ok(html.includes(`id="${id}"`), `ID obrigatorio ausente no HTML: ${id}`);
     }
-    return `Todos os ${requiredIds.length} IDs estruturais, guia /boost e assistente presentes`;
+    assert.ok(!html.includes('mini-assistant-overlay'), 'DOM MPE nao deve conter Mini Assistente');
+    return `Todos os ${requiredIds.length} IDs estruturais do M.P.E presentes`;
   });
+
+  await runM1Suite({ runCase, makeTempDir, rmSafe, CODE_DIR, ROOT_DIR });
 
   const passed = results.filter((r) => r.status === 'PASS').length;
   const failed = results.filter((r) => r.status === 'FAIL').length;

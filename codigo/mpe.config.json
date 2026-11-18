@@ -6,17 +6,17 @@
     "userName": "Leonardo",
     "isRegistered": true,
     "languageTone": "amigavel",
-    "lastUpdated": "2026-11-12T17:49:34.389Z"
+    "lastUpdated": "2026-11-18T12:44:57.223Z"
   },
   "theme": {
     "preset": "gold-obsidian",
-    "bgPrimary": "#050304",
-    "bgSecondary": "#1e090c",
-    "goldPrimary": "#d9a74a",
-    "goldSecondary": "#ffd584",
+    "bgPrimary": "#040406",
+    "bgSecondary": "#171206",
+    "goldPrimary": "#e5b84b",
+    "goldSecondary": "#ffe08a",
     "goldDim": "#7A5B18",
-    "vectorAccent": "#b84a5c",
-    "nexusRed": "#e63946",
+    "vectorAccent": "#5c73b8",
+    "nexusRed": "#9e2a2b",
     "glowIntensity": 0.85
   },
   "system": {
@@ -219,9 +219,9 @@
       "description": "Comando programado: Novo Atalho Estelar",
       "actionType": "system_to_system_print",
       "orbit": 2,
-      "angle": 344,
+      "angle": 91,
       "elevation": -90,
-      "customRadius": 0.38,
+      "customRadius": 0.643,
       "vectorStyle": "gold",
       "glyph": "Π",
       "hasArrow": false,
@@ -284,14 +284,39 @@
       "title": "Organizar Arquivos",
       "description": "Abre o Organizador Inteligente de Arquivos e Prints direto pelo Astrolabio.",
       "actionType": "open_organizer",
-      "orbit": 3,
-      "angle": 72,
+      "orbit": 2,
+      "angle": 163,
       "elevation": 10,
       "vectorStyle": "gold",
       "glyph": "Δ",
       "hasArrow": true,
       "params": {
         "targetScope": "arquivos"
+      },
+      "customRadius": 0.423
+    },
+    {
+      "id": "star-1794522083649",
+      "code": "14 7",
+      "title": "Recorte -> WhatsApp",
+      "description": "Você risca um pedaço da tela e o M.P.E envia a imagem direto para \"WhatsApp\".",
+      "actionType": "area_print_system",
+      "orbit": 3,
+      "angle": 211,
+      "elevation": 18,
+      "customRadius": 0.864,
+      "vectorStyle": "gold",
+      "glyph": "Π",
+      "hasArrow": false,
+      "params": {
+        "captureScope": "area",
+        "saveDir": "./prints",
+        "targetSystem": "WhatsApp",
+        "telegramTarget": "Eu | Você | Leonardo",
+        "targetPath": "",
+        "url": "",
+        "command": "",
+        "autoSendEnter": true
       }
     }
   ],
@@ -303,7 +328,16 @@
       "startWithWindows": true,
       "savedScreenshotsFolder": "./prints",
       "themePreset": "gold-obsidian",
-      "lastActive": "2026-11-12T17:49:34.389Z"
+      "lastActive": "2026-11-18T12:44:57.223Z"
+    },
+    "claude": {
+      "hostname": "claude",
+      "platform": "linux",
+      "arch": "x64",
+      "startWithWindows": true,
+      "savedScreenshotsFolder": "./prints",
+      "themePreset": "gold-obsidian",
+      "lastActive": "2026-11-18T04:09:04.994Z"
     }
   },
   "originSystem": {
@@ -312,17 +346,6 @@
     "windowRect": null,
     "fullSnapPath": "",
     "winSnapPath": ""
-  },
-  "obsidian": {
-    "vaultPath": "./arquivos/Obsidian_Vault",
-    "defaultFolder": "Notas"
-  },
-  "ai": {
-    "provider": "auto",
-    "port": 18080,
-    "modelsDir": "./codigo/models",
-    "contextSize": 4096,
-    "boostMode": "balanced"
   },
   "organizer": {
     "criterion": "type",
@@ -333,5 +356,24 @@
     "uiMode": "dark",
     "rememberWindowState": false,
     "lastActiveTab": "astrolabe"
-  }
+  },
+  "consent": {
+    "accepted": false,
+    "decidedAt": null,
+    "version": "1.0",
+    "permissions": {
+      "backgroundExecution": false,
+      "launchAppsAndLinks": false,
+      "pythonAutomation": false
+    }
+  },
+  "miniAstrolabe": {
+    "enabled": true,
+    "x": null,
+    "y": null,
+    "size": 68,
+    "scale": 1,
+    "fanRadius": 140
+  },
+  "autoScripts": []
 }

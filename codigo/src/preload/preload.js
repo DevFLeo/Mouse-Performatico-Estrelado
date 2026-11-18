@@ -18,45 +18,83 @@ contextBridge.exposeInMainWorld('mpeApi', {
   openExternalPath: (targetPath) => ipcRenderer.invoke('mpe:open-path', targetPath),
   selectFolder: () => ipcRenderer.invoke('mpe:select-folder'),
   selectFile: () => ipcRenderer.invoke('mpe:select-file'),
-  selectDocumentFile: () => ipcRenderer.invoke('mpe:select-document-file'),
   hideHud: () => ipcRenderer.invoke('mpe:hide-hud'),
   quitApp: () => ipcRenderer.invoke('mpe:quit-app'),
-
-  // I.A Local & Mini Assistente Flutuante (Lower Third Sci-Fi)
-  reviewText: (payload) => ipcRenderer.invoke('mpe:ai-review', payload),
-  draftText: (payload) => ipcRenderer.invoke('mpe:ai-draft', payload),
-  classifyObsidian: (payload) => ipcRenderer.invoke('mpe:ai-classify-obsidian', payload),
-  saveToObsidian: (payload) => ipcRenderer.invoke('mpe:save-to-obsidian', payload),
-  saveDocumentFile: (payload) => ipcRenderer.invoke('mpe:ai-save-document', payload),
-  listDocuments: (payload) => ipcRenderer.invoke('mpe:ai-list-documents', payload || {}),
-  removeDocument: (payload) => ipcRenderer.invoke('mpe:ai-remove-document', payload || {}),
-  aiChat: (payload) => ipcRenderer.invoke('mpe:ai-chat', payload),
-  aiStatus: (payload) => ipcRenderer.invoke('mpe:ai-status', payload || {}),
-  getPerfProfile: () => ipcRenderer.invoke('mpe:get-perf-profile'),
-  setBoostMode: (mode) => ipcRenderer.invoke('mpe:set-boost-mode', mode),
-  openMiniAssistant: (opts) => ipcRenderer.invoke('mpe:open-mini-assistant', opts || {}),
   ensureShortcuts: () => ipcRenderer.invoke('mpe:ensure-shortcuts'),
-  onAiChatChunk: (callback) => {
-    ipcRenderer.on('mpe:ai-chat-chunk', (_event, data) => callback(data));
-  },
-  onAiChatStatus: (callback) => {
-    ipcRenderer.on('mpe:ai-chat-status', (_event, data) => callback(data));
-  },
-  miniDragStart: () => ipcRenderer.send('mpe:mini-drag-start'),
-  miniDragEnd: () => ipcRenderer.send('mpe:mini-drag-end'),
-  miniResize: (size) => ipcRenderer.send('mpe:mini-resize', size),
 
   onHudSummoned: (callback) => {
     ipcRenderer.on('mpe:hud-summoned', (_event, data) => callback(data));
   },
-  onMiniAssistantSummoned: (callback) => {
-    ipcRenderer.on('mpe:mini-assistant-summoned', (_event, data) => callback(data));
-  },
   onConfigUpdated: (callback) => {
-    ipcRenderer.on('mpe:config-updated', (_event, data) => callback(data));
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:config-updated', listener);
+    return () => ipcRenderer.removeListener('mpe:config-updated', listener);
   },
   onEscapePressed: (callback) => {
     ipcRenderer.on('mpe:escape-pressed', () => callback());
+  },
+
+  // Config & Slot Sync
+  reorderPoint: (fromIndex, toIndex) => {
+    const payload =
+      fromIndex && typeof fromIndex === 'object'
+        ? { fromIndex: fromIndex.fromIndex, toIndex: fromIndex.toIndex }
+        : { fromIndex, toIndex };
+    return ipcRenderer.invoke('mpe:reorder-point', payload);
+  },
+
+  // Consentimento de Primeiro Acesso (ConsentManager)
+  getConsentStatus: () => ipcRenderer.invoke('mpe:get-consent'),
+  setConsentDecision: (accepted, permissions) =>
+    ipcRenderer.invoke('mpe:set-consent', { accepted, permissions }),
+  onConsentUpdated: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:consent-updated', listener);
+    return () => ipcRenderer.removeListener('mpe:consent-updated', listener);
+  },
+
+  // Mini Astrolabio (MiniAstrolabeManager)
+  toggleMiniAstrolabe: (enabled) => ipcRenderer.invoke('mpe:mini-toggle', { enabled }),
+  getMiniAstrolabeState: () => ipcRenderer.invoke('mpe:mini-get-state'),
+  updateMiniAstrolabeLayout: (payload) =>
+    ipcRenderer.invoke('mpe:mini-update-layout', payload || {}),
+  setMiniIgnoreMouse: (ignore, forward) =>
+    ipcRenderer.send('mpe:mini-ignore-mouse', { ignore, forward }),
+  setMiniExpandedBounds: (expanded) =>
+    ipcRenderer.invoke('mpe:mini-set-expanded', { expanded }),
+  onMiniStateChanged: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:mini-state-changed', listener);
+    return () => ipcRenderer.removeListener('mpe:mini-state-changed', listener);
+  },
+
+  // Auto-Script Python (PythonRecorder & PythonScheduler)
+  startPythonRecording: (options) =>
+    ipcRenderer.invoke('mpe:py-record-start', options || {}),
+  stopPythonRecording: (options) =>
+    ipcRenderer.invoke('mpe:py-record-stop', options || {}),
+  savePythonScript: (payload) =>
+    ipcRenderer.invoke('mpe:py-save-script', payload || {}),
+  runPythonScript: (scriptIdOrPath, options) => {
+    const payload =
+      scriptIdOrPath && typeof scriptIdOrPath === 'object'
+        ? Object.assign({}, scriptIdOrPath)
+        : Object.assign({}, options || {}, { scriptIdOrPath });
+    return ipcRenderer.invoke('mpe:py-run-script', payload);
+  },
+  schedulePythonScript: (scriptId, schedule) =>
+    ipcRenderer.invoke('mpe:py-schedule-script', { scriptId, schedule }),
+  deletePythonScript: (scriptId) =>
+    ipcRenderer.invoke('mpe:py-delete-script', { scriptId }),
+  onPythonRecordingState: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:py-recording-state', listener);
+    return () => ipcRenderer.removeListener('mpe:py-recording-state', listener);
+  },
+  onPythonScriptExecuted: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:py-script-executed', listener);
+    return () => ipcRenderer.removeListener('mpe:py-script-executed', listener);
   },
 
   // Organizador de Arquivos & Prints (Estilo Arquithon)

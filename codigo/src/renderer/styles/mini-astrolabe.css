@@ -1,0 +1,361 @@
+:root {
+  --bg-primary: #040406;
+  --bg-secondary: #171206;
+  --gold-primary: #E5B84B;
+  --gold-secondary: #FFE08A;
+  --gold-dim: #7A5B18;
+  --vector-accent: #5C73B8;
+  --nexus-red: #9E2A2B;
+  --text-light: #F7F3E8;
+  --text-muted: #A99E86;
+
+  --hub-size: 68px;
+  --hub-x: 50%;
+  --hub-y: 50%;
+  --btn-dia: 48px;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+.mini-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Disc hitplate prevents transparent-window hover flicker between hub and fan buttons */
+.mini-fan-hitplate {
+  position: absolute;
+  left: var(--hub-x);
+  top: var(--hub-y);
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    rgba(4, 4, 6, 0.56) 0%,
+    rgba(12, 10, 8, 0.34) 55%,
+    rgba(4, 4, 6, 0.04) 88%,
+    rgba(4, 4, 6, 0.015) 97%,
+    transparent 100%
+  );
+  transition: opacity 140ms ease;
+}
+
+.mini-root.is-expanded .mini-fan-hitplate {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.mini-fan-guides {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.mini-root.is-expanded .mini-fan-guides {
+  opacity: 1;
+}
+
+.mini-fan-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.mini-root.is-expanded .mini-fan-layer {
+  opacity: 1;
+}
+
+/* Centralized Black-Dot Hub */
+.mini-hub {
+  position: absolute;
+  left: var(--hub-x);
+  top: var(--hub-y);
+  width: var(--hub-size);
+  height: var(--hub-size);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #171206 0%, #050508 68%, #040406 100%);
+  border: 2px solid var(--gold-primary);
+  cursor: pointer;
+  pointer-events: auto;
+  contain: strict;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  z-index: 20;
+}
+
+.mini-hub:focus-visible {
+  outline: 3px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.mini-root.is-dragging .mini-hub {
+  cursor: grabbing;
+  border-color: var(--gold-secondary);
+}
+
+/* Pure GPU-composited rotation: zero rAF, zero animated box-shadow/filter, low compositor wakeups */
+.mini-rotator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  animation: mpeMiniSpin 24s steps(240, end) infinite;
+  animation-play-state: running;
+  pointer-events: none;
+}
+
+@keyframes mpeMiniSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mini-hub:hover .mini-rotator,
+.mini-root.is-paused .mini-rotator,
+.mini-root.is-expanded .mini-rotator {
+  animation-play-state: paused;
+}
+
+.mini-core-dot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* Radial Fan Slot Medallions */
+.fan-slot-btn {
+  position: absolute;
+  width: var(--btn-dia);
+  height: var(--btn-dia);
+  transform: translate(-50%, -50%);
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  background: #050508;
+  border: 2.5px solid var(--gold-primary);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: none;
+  outline: none;
+  z-index: 15;
+  transition: transform 110ms ease, background-color 110ms ease, border-color 110ms ease, color 110ms ease;
+}
+
+.mini-root.is-expanded .fan-slot-btn {
+  pointer-events: auto;
+}
+
+.fan-slot-btn[data-vector-style="blue"] {
+  border-color: #9BB0F0;
+}
+
+.fan-slot-halo {
+  position: absolute;
+  inset: -7px;
+  width: calc(100% + 14px);
+  height: calc(100% + 14px);
+  pointer-events: none;
+}
+
+.fan-slot-num {
+  position: relative;
+  z-index: 2;
+  font-family: "Segoe UI", Consolas, sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+}
+
+.fan-slot-btn.is-two-digits .fan-slot-num {
+  font-size: 16px;
+}
+
+.fan-slot-btn:hover,
+.fan-slot-btn:focus-visible {
+  background: var(--gold-secondary);
+  border-color: #FFFFFF;
+  color: #040406;
+  transform: translate(-50%, -50%) scale(1.08);
+  z-index: 25;
+}
+
+.fan-slot-btn:hover .fan-slot-num,
+.fan-slot-btn:focus-visible .fan-slot-num {
+  color: #040406;
+}
+
+.fan-slot-btn:focus-visible {
+  outline: 3px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.fan-slot-btn.is-empty-cta {
+  border-style: dashed;
+  border-color: var(--gold-secondary);
+}
+
+.fan-slot-label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(5, 5, 8, 0.94);
+  border: 1px solid rgba(229, 184, 75, 0.7);
+  color: #F7F3E8;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.fan-slot-label.align-left {
+  left: 0;
+  transform: translateX(0);
+}
+
+.fan-slot-label.align-right {
+  left: auto;
+  right: 0;
+  transform: translateX(0);
+}
+
+/* Compact Resize Toolbar */
+.mini-controls {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(5, 5, 8, 0.95);
+  border: 1.5px solid var(--gold-primary);
+  z-index: 22;
+  pointer-events: none;
+}
+
+.mini-root.is-expanded .mini-controls {
+  display: flex;
+  pointer-events: auto;
+}
+
+.mini-ctrl-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(229, 184, 75, 0.75);
+  background: #050508;
+  color: #FFE08A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.mini-ctrl-btn:hover,
+.mini-ctrl-btn:focus-visible {
+  background: var(--gold-secondary);
+  color: #040406;
+  border-color: #FFFFFF;
+}
+
+.mini-ctrl-btn:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 1px;
+}
+
+.mini-scale-badge {
+  min-width: 34px;
+  text-align: center;
+  font-family: Consolas, "Segoe UI", sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #F7F3E8;
+  background: rgba(5, 5, 8, 0.95);
+}
+
+/* Concise Inline Feedback Pill */
+.mini-status {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(5, 5, 8, 0.95);
+  border: 1px solid var(--gold-primary);
+  color: #F7F3E8;
+  font-size: 12px;
+  font-weight: 700;
+  max-width: calc(100% - 16px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.mini-status.is-error {
+  background: #9E2A2B;
+  border-color: #FFE08A;
+  color: #FFFFFF;
+}
+
+.mini-status.hidden {
+  display: none;
+}

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
-  <title>M.P.E — Mouse Performatico Estrelado</title>
+  <title>M.P.E - Mouse Performatico Estrelado</title>
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
@@ -42,8 +42,79 @@
   <!-- 2. CANVAS 2D / 3D INTERATIVO DO ASTROLABIO ESTELAR -->
   <canvas id="astrolabe-canvas"></canvas>
 
+  <!-- 2B. NUCLEO CENTRALIZADO PONTO PRETO, ORGANIZADOR 1-CLIQUE, SLOTS & MINI ASTROLABIO -->
+  <section id="central-black-dot-hub" class="central-black-dot-hub" aria-label="Nucleo Central M.P.E">
+    <div id="central-black-dot-core" class="central-black-dot-core" aria-hidden="true">
+      <svg class="central-dot-svg" viewBox="0 0 220 220">
+        <circle cx="110" cy="110" r="102" fill="none" stroke="#E5B84B" stroke-width="1" stroke-dasharray="2 5" opacity="0.45" />
+        <circle cx="110" cy="110" r="84" fill="none" stroke="#FFE08A" stroke-width="1.1" opacity="0.32" />
+        <circle cx="110" cy="110" r="64" fill="none" stroke="#E5B84B" stroke-width="1.2" stroke-dasharray="6 4" opacity="0.55" />
+        <circle cx="110" cy="110" r="44" fill="#040406" stroke="#E5B84B" stroke-width="2" />
+        <circle cx="110" cy="110" r="36" fill="#050508" stroke="#9E2A2B" stroke-width="1.4" />
+        <text x="110" y="114" text-anchor="middle" fill="#FFE08A" font-size="11" font-weight="800" letter-spacing="2">M.P.E</text>
+      </svg>
+    </div>
+
+    <div id="consent-blocked-banner" class="consent-blocked-banner hidden" role="status">
+      <span id="consent-blocked-text">Segundo plano e automacoes aguardando aceite de primeiro acesso.</span>
+      <button type="button" id="btn-reopen-consent" class="hud-btn primary small">Autorizar Agora</button>
+      <button type="button" id="btn-dismiss-consent-banner" class="hud-btn subtle small">Ocultar</button>
+    </div>
+
+    <div id="central-primary-actions" class="central-primary-actions">
+      <button type="button" id="btn-main-organize-1click" class="hud-btn primary central-main-btn" title="Abrir Organizador de Arquivos em 1 clique">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Organizar Arquivos</span>
+      </button>
+      <button type="button" id="btn-main-organize-quick" class="hud-btn central-main-btn" title="Selecionar arquivos e organizar imediatamente">
+        <span>Escolher e Organizar</span>
+      </button>
+      <button type="button" id="btn-open-python-scripts" class="hud-btn central-main-btn" title="Gravar, executar e agendar auto-scripts Python">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+        <span>Auto-Script Python</span>
+      </button>
+      <button type="button" id="btn-consent-status" class="hud-btn danger small hidden" title="Revisar aceite de primeiro acesso">
+        <span>Segundo plano bloqueado | Aceitar</span>
+      </button>
+    </div>
+
+    <aside id="central-slots-panel" class="central-slots-panel" aria-label="Atalhos Numerados e Mini Astrolabio">
+      <div class="slots-panel-head">
+        <div>
+          <div class="slots-panel-title">Atalhos &amp; Mini Astrolábio</div>
+          <div class="slots-panel-sub">Sincronizado 1:1 com teclas 1 a 9</div>
+        </div>
+        <button type="button" id="btn-toggle-slots-panel" class="hud-btn subtle small">Recolher</button>
+      </div>
+
+      <div id="slots-panel-body" class="slots-panel-body">
+        <div id="mini-astrolabe-controls" class="mini-astrolabe-controls">
+          <div class="mini-ctrl-row">
+            <button type="button" id="btn-toggle-mini-astrolabe" class="hud-btn primary small">Ativar Mini Astrolábio</button>
+            <span id="mini-astrolabe-status" class="mini-status-pill">Inativo</span>
+          </div>
+          <div class="mini-range-grid">
+            <label class="mini-range-item" for="mini-size-range">
+              <span>Tamanho: <strong id="mini-size-value">68px</strong></span>
+              <input type="range" id="mini-size-range" min="48" max="112" step="4" value="68" class="field-range" />
+            </label>
+            <label class="mini-range-item" for="mini-scale-range">
+              <span>Escala: <strong id="mini-scale-value">1.00x</strong></span>
+              <input type="range" id="mini-scale-range" min="0.75" max="1.40" step="0.05" value="1.00" class="field-range" />
+            </label>
+          </div>
+        </div>
+
+        <div id="slots-list" class="slots-list"></div>
+      </div>
+    </aside>
+  </section>
+
   <!-- CONTROLE FLUTUANTE RAPIDO 2D / 3D, ORGANIZADOR E EDICAO DE PONTOS (Sempre acessivel) -->
   <div id="floating-dimension-dock" class="floating-dimension-dock">
+    <button type="button" id="dock-brand-trigger" class="dock-brand-trigger" title="Arraste para flutuar | Clique no botão Cascata para recolher">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+    </button>
     <div class="dock-segment">
       <button id="btn-mode-2d" class="dim-pill" data-dim="2d" title="Modo 2D">2D</button>
       <button id="btn-mode-3d" class="dim-pill active" data-dim="3d" title="Modo 3D">3D</button>
@@ -57,10 +128,6 @@
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       <span>Organizar</span>
     </button>
-    <button id="btn-dock-kataros" class="dim-pill" title="Abrir Mini Assistente AI Kataros (Shift+Ctrl+Botao Direito)">
-      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      <span>AI Kataros</span>
-    </button>
     <button id="btn-toggle-move-points" class="dim-pill move-pts-btn" title="Arrastar botoes para mudar de lugar">
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
       <span>Mover Pontos</span>
@@ -69,6 +136,10 @@
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       <span>Automação</span>
     </button>
+    <button type="button" id="btn-dock-cascade" class="dim-pill icon-only" title="Modo Cascata no Dock: mostrar apenas ícone">
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+    </button>
+    <span id="hud-dock-resizer" class="hud-resizer" title="Arraste para redimensionar"></span>
   </div>
 
   <!-- BANNER DE POSICIONAMENTO VISUAL NO CIRCULO -->
@@ -78,10 +149,10 @@
   </div>
 
   <!-- 3. BARRA SUPERIOR DO HUD -->
-  <header class="hud-topbar">
+  <header id="hud-topbar" class="hud-topbar">
     <div class="hud-topbar-left">
       <div class="hud-brand">
-        <div class="brand-emblem" title="M.P.E - Mouse Performatico Estrelado">
+        <div id="hud-brand-trigger" class="brand-emblem" title="Arraste para flutuar | Clique no modo cascata para recolher">
           <svg class="brand-emblem-svg" viewBox="0 0 64 64" aria-hidden="true">
             <defs>
               <radialGradient id="emb-bg" cx="50%" cy="50%" r="50%">
@@ -139,7 +210,7 @@
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           <span>Novo Botão</span>
         </button>
-        <button id="btn-named-print" class="hud-btn" title="Capturar tela, nomear e indexar na I.A">
+        <button id="btn-named-print" class="hud-btn" title="Capturar tela, nomear e salvar em categoria">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
           <span>Print Nomeado</span>
         </button>
@@ -150,7 +221,11 @@
       </div>
       <span class="topbar-divider" aria-hidden="true"></span>
       <div class="hud-btn-group compact">
-        <button id="btn-open-guide" class="hud-btn ghost" title="Atalhos, /boost e Kits Minimos">Guia &amp; /boost</button>
+        <button id="btn-open-guide" class="hud-btn ghost" title="Referência de Atalhos (F1 ou ?)">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h2M10 9h2M14 9h2M18 9h.01M6 13h.01M18 13h.01M9 13h6"/></svg>
+          <span>Atalhos</span>
+          <kbd class="topbar-kbd">F1</kbd>
+        </button>
         <button id="btn-open-register" class="hud-btn ghost" title="Perfil e linguagem">Perfil</button>
         <button id="btn-settings" class="hud-btn ghost" title="Configuracoes gerais">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -160,20 +235,40 @@
         <button id="btn-replay-intro" class="hud-btn ghost" title="Rever animacao inicial">Intro</button>
       </div>
       <button id="btn-hide-hud" class="hud-btn subtle close-hud-btn" title="Recolher para a bandeja (ESC)">Minimizar</button>
+      <div class="hud-float-controls">
+        <button type="button" id="btn-topbar-pos" class="hud-btn ghost icon-only" title="Alternar posição: Topo ou Lateral">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/></svg>
+        </button>
+        <button type="button" id="btn-cascade-mode" class="hud-btn ghost icon-only" title="Modo Cascata: mostrar apenas o ícone e expandir ao passar o mouse">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M14 8h7M14 12h7M14 16h7"/></svg>
+        </button>
+      </div>
     </div>
+    <span id="hud-topbar-resizer" class="hud-resizer" title="Arraste para redimensionar"></span>
   </header>
 
   <!-- 4. PAINEL INFERIOR DE TELEMETRIA E CONTROLE 3D -->
   <footer class="hud-bottombar">
     <div id="point-inspector" class="point-inspector">
-      <div class="inspector-default" id="inspector-default">
+      <div class="inspector-default" id="inspector-default" title="Clique para abrir a referência completa de atalhos (F1)">
         <span class="gold-dot"></span>
-        <span>Clique na estrela ou teclas <kbd>1-9</kbd> • <kbd>Tab</kbd> 2D/3D • <kbd>Shift+Ctrl+Botão Dir.</kbd> AI Kataros • <kbd>ESC</kbd> Minimizar</span>
+        <span class="insp-shortcut-item"><kbd>1</kbd>-<kbd>9</kbd> <span>Estrelas</span></span>
+        <span class="insp-sep">|</span>
+        <span class="insp-shortcut-item"><kbd>Tab</kbd> <span>2D/3D</span></span>
+        <span class="insp-sep">|</span>
+        <span class="insp-shortcut-item"><kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Botão Dir.</kbd> <span>Astrolábio</span></span>
+        <span class="insp-sep">|</span>
+        <span class="insp-shortcut-item"><kbd>F1</kbd> <span>Atalhos</span></span>
+        <span class="insp-sep">|</span>
+        <span class="insp-shortcut-item"><kbd>ESC</kbd> <span>Minimizar</span></span>
       </div>
       <div class="inspector-detail hidden" id="inspector-detail">
         <div class="inspector-code" id="insp-code">08 7</div>
         <div class="inspector-info">
-          <div class="inspector-title" id="insp-title">Print + Telegram</div>
+          <div class="inspector-title-row">
+            <div class="inspector-title" id="insp-title">Print + Telegram</div>
+            <kbd id="insp-hotkey" class="insp-hotkey-badge hidden">Tecla 1</kbd>
+          </div>
           <div class="inspector-desc" id="insp-desc">Descricao</div>
         </div>
         <div class="inspector-buttons">
@@ -226,7 +321,7 @@
       <div class="modal-header wiz-header-row">
         <div>
           <h2 id="point-modal-heading">Criar Botão Automático no Astrolábio</h2>
-          <p id="point-modal-subtitle">Siga os 3 passos simples — sem precisar programar nada.</p>
+          <p id="point-modal-subtitle">Siga os 3 passos simples - sem precisar programar nada.</p>
         </div>
         <div class="wiz-steps-nav" role="tablist">
           <button type="button" class="wiz-step-pill active" data-wiz-step="1">1. O que fazer</button>
@@ -244,19 +339,40 @@
       <div class="modal-body wiz-body">
         <!-- PASSO 1: ESCOLHA VISUAL DA TAREFA + MODELOS PRONTOS -->
         <div id="wiz-pane-1" class="wiz-pane">
-          <div class="wiz-section-title">Modelos Prontos (1 Clique — já vem tudo preenchido)</div>
+          <div class="wiz-section-title">Modelos Prontos (1 Clique - já vem tudo preenchido)</div>
           <div class="wiz-presets-row">
             <button type="button" class="wiz-preset-chip" data-preset="org_open">Organizar Arquivos</button>
+            <button type="button" class="wiz-preset-chip" data-preset="notepad_slot">Bloco de Notas (Slot 1)</button>
+            <button type="button" class="wiz-preset-chip" data-preset="vscode_slot">Projeto VS Code (Slot 2)</button>
+            <button type="button" class="wiz-preset-chip" data-preset="open_url_preset">Abrir Link / Site</button>
+            <button type="button" class="wiz-preset-chip" data-preset="send_link_preset">Enviar Link p/ Chat/Bot</button>
+            <button type="button" class="wiz-preset-chip" data-preset="py_script_preset">Auto-Script Python</button>
             <button type="button" class="wiz-preset-chip" data-preset="print_tg">Print para Telegram</button>
             <button type="button" class="wiz-preset-chip" data-preset="print_wpp">Print para WhatsApp</button>
             <button type="button" class="wiz-preset-chip" data-preset="crop_paint">Recortar e Abrir no Paint</button>
-            <button type="button" class="wiz-preset-chip" data-preset="named_ai">Print Nomeado p/ I.A</button>
+            <button type="button" class="wiz-preset-chip" data-preset="named_ai">Print Nomeado</button>
             <button type="button" class="wiz-preset-chip" data-preset="open_downloads">Abrir Pasta Downloads</button>
             <button type="button" class="wiz-preset-chip" data-preset="toggle_3d">Alternar 2D / 3D</button>
           </div>
 
           <div class="wiz-section-title" style="margin-top:14px;">Ou escolha o tipo de tarefa:</div>
           <div class="wiz-goal-grid">
+            <button type="button" class="wiz-goal-card" data-goal="launch_app_project">
+              <div class="wiz-goal-title">Abrir Aplicativo ou Projeto</div>
+              <div class="wiz-goal-desc">Abre Bloco de Notas, projeto no VS Code ou qualquer programa com 1 clique.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="open_url">
+              <div class="wiz-goal-title">Abrir Link / Site</div>
+              <div class="wiz-goal-desc">Abre um endereco URL no navegador imediatamente pelo Astrolabio.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="send_link_chat">
+              <div class="wiz-goal-title">Enviar Link para Chat / Bot</div>
+              <div class="wiz-goal-desc">Dispara link configurado para Telegram Bot, Webhook, WhatsApp ou Discord.</div>
+            </button>
+            <button type="button" class="wiz-goal-card" data-goal="run_python_script">
+              <div class="wiz-goal-title">Executar Auto-Script Python</div>
+              <div class="wiz-goal-desc">Dispara uma sequencia gravada de cliques (.py) direto deste botao.</div>
+            </button>
             <button type="button" class="wiz-goal-card selected" data-goal="print_app">
               <div class="wiz-goal-title">Tirar Print e Enviar p/ App</div>
               <div class="wiz-goal-desc">Fotografa a tela e já cola no WhatsApp, Telegram, Paint, Word...</div>
@@ -266,8 +382,8 @@
               <div class="wiz-goal-desc">Você risca um quadrado na tela e escolhe se salva ou envia.</div>
             </button>
             <button type="button" class="wiz-goal-card" data-goal="save_print">
-              <div class="wiz-goal-title">Salvar Print com Nome / I.A</div>
-              <div class="wiz-goal-desc">Salva organizado em pasta com opção de nomear e guardar na I.A.</div>
+              <div class="wiz-goal-title">Salvar Print com Nome</div>
+              <div class="wiz-goal-desc">Salva organizado em subpasta com opção de nome e anotações.</div>
             </button>
             <button type="button" class="wiz-goal-card" data-goal="text_move">
               <div class="wiz-goal-title">Pegar Texto e Transferir</div>
@@ -380,6 +496,80 @@
             <input type="text" id="pt-url" class="field-input" placeholder="https://www.google.com" />
           </div>
 
+          <div id="group-send-link-chat" class="wiz-field-block hidden">
+            <label class="field-label" for="pt-chat-link-url">Link a Enviar (URL)</label>
+            <input type="text" id="pt-chat-link-url" class="field-input" placeholder="https://exemplo.com/documento" />
+            <div class="subgrid-2" style="margin-top:8px;">
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-chat-channel">Canal de Entrega</label>
+                <select id="pt-chat-channel" class="field-input">
+                  <option value="telegram_bot">Telegram Bot API</option>
+                  <option value="telegram_desktop">Telegram Desktop</option>
+                  <option value="whatsapp">WhatsApp Desktop</option>
+                  <option value="discord">Discord</option>
+                  <option value="webhook">Webhook HTTP/JSON</option>
+                  <option value="system">Outro Aplicativo de Chat</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-chat-target-system">Janela / Destino</label>
+                <input type="text" id="pt-chat-target-system" class="field-input" placeholder="Telegram | WhatsApp | Discord" />
+              </div>
+            </div>
+            <div class="subgrid-2" style="margin-top:8px;">
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-chat-bot-token">Bot Token (se Bot API)</label>
+                <input type="password" id="pt-chat-bot-token" class="field-input" placeholder="Opcional (usa global se vazio)" />
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-chat-id">Chat ID (se Bot API)</label>
+                <input type="text" id="pt-chat-id" class="field-input" placeholder="Ex: 987654321" />
+              </div>
+            </div>
+            <label class="field-label" for="pt-chat-webhook-url">Webhook URL (se Webhook)</label>
+            <input type="text" id="pt-chat-webhook-url" class="field-input" placeholder="https://hooks.exemplo.com/..." />
+            <label class="field-label" for="pt-chat-message-template">Modelo de Mensagem</label>
+            <input type="text" id="pt-chat-message-template" class="field-input" placeholder="Link: {url}" />
+            <label class="checkbox-row" style="margin-top:6px;">
+              <input type="checkbox" id="pt-chat-auto-enter" checked />
+              <span>Enviar automaticamente (Enter) ao colar no chat desktop</span>
+            </label>
+          </div>
+
+          <div id="group-launch-app" class="wiz-field-block hidden">
+            <label class="field-label">Predefinições Rápidas de Aplicativo</label>
+            <div class="target-system-pills" style="margin-bottom:8px;">
+              <button type="button" class="system-pill wiz-launch-preset" data-app-preset="notepad">Bloco de Notas (notepad.exe)</button>
+              <button type="button" class="system-pill wiz-launch-preset" data-app-preset="vscode">Projeto VS Code (code)</button>
+            </div>
+            <div class="subgrid-2">
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-launch-app-name">Nome do App</label>
+                <input type="text" id="pt-launch-app-name" class="field-input" placeholder="notepad | vscode | custom" />
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0;" for="pt-launch-target-path">Executável / Comando</label>
+                <input type="text" id="pt-launch-target-path" class="field-input" placeholder="notepad.exe | code" />
+              </div>
+            </div>
+            <label class="field-label" for="pt-launch-project-path">Pasta do Projeto (Opcional - ex: projeto VS Code)</label>
+            <div class="input-with-btn">
+              <input type="text" id="pt-launch-project-path" class="field-input" placeholder="c:\Projetos\MeuProjeto" />
+              <button type="button" id="btn-browse-launch-project" class="hud-btn small">Escolher Pasta...</button>
+            </div>
+            <label class="field-label" for="pt-launch-args">Argumentos Extras (Opcional)</label>
+            <input type="text" id="pt-launch-args" class="field-input" placeholder="--new-window" />
+          </div>
+
+          <div id="group-python-script" class="wiz-field-block hidden">
+            <label class="field-label" for="pt-python-script-select">Auto-Script Python Gravado</label>
+            <select id="pt-python-script-select" class="field-input">
+              <option value="">-- Selecione um Auto-Script salvo --</option>
+            </select>
+            <label class="field-label" for="pt-python-script-path">Caminho do Script .py (Opcional se selecionado acima)</label>
+            <input type="text" id="pt-python-script-path" class="field-input" placeholder="codigo/data/scripts/meu_auto_script.py" />
+          </div>
+
           <div id="group-organizer-opts" class="wiz-field-block hidden">
             <label class="field-label">Como deseja organizar seus arquivos?</label>
             <div class="wiz-choice-row" id="wiz-org-mode-choices">
@@ -442,7 +632,7 @@
                 <option value="print_telegram">Print -> Telegram</option>
                 <option value="area_print_telegram">Recorte -> Telegram</option>
                 <option value="print">Print Instantâneo (Pasta + Clipboard)</option>
-                <option value="named_print">Print Nomeado (Nome + Pasta + I.A)</option>
+                <option value="named_print">Print Nomeado (Nome + Categoria)</option>
                 <option value="area_print">Recorte de Tela (Pasta + Clipboard)</option>
                 <option value="text_selection">Seleção de Texto (Captura Ativa)</option>
                 <option value="text_to_system">Seleção de Texto -> Outro Sistema</option>
@@ -451,6 +641,9 @@
                 <option value="organize_files_quick">Escolher e Organizar Arquivos Agora</option>
                 <option value="open_path">Abrir Pasta ou Aplicativo</option>
                 <option value="open_url">Abrir URL</option>
+                <option value="send_link_chat">Enviar Link -&gt; Chat / Bot</option>
+                <option value="launch_app_project">Abrir Aplicativo / Projeto (Notepad, VS Code)</option>
+                <option value="run_python_script">Executar Auto-Script Python</option>
                 <option value="command">Executar Comando do Windows</option>
                 <option value="macro_sequence">Rotina Combinada (2 Ações)</option>
                 <option value="action_2d_scan">Ação 2D: Varredura + Captura</option>
@@ -495,7 +688,7 @@
           </div>
 
           <details class="wiz-advanced" style="margin-top:12px;">
-            <summary>Ajustes Visuais (Cor, Código, 3D — Opcional)</summary>
+            <summary>Ajustes Visuais (Cor, Código, 3D - Opcional)</summary>
             <div class="wiz-advanced-body">
               <div class="subgrid-2">
                 <div>
@@ -624,41 +817,11 @@
             <button type="button" id="btn-cfg-browse-docs" class="hud-btn small">Escolher...</button>
           </div>
 
-          <label class="checkbox-row">
-            <input type="checkbox" id="cfg-cap-auto-index" checked />
-            <span>Indexar Prints Nomeados na I.A Local</span>
-          </label>
-
           <label class="field-label">Bot Token (Opcional)</label>
           <input type="password" id="cfg-tg-token" class="field-input" placeholder="123456789:ABCdef..." />
 
           <label class="field-label">Chat ID (Opcional)</label>
           <input type="text" id="cfg-tg-chatid" class="field-input" placeholder="Ex: 987654321" />
-
-          <h3 class="section-subtitle">Obsidian & I.A Local</h3>
-          <label class="field-label">Pasta do Cofre Obsidian (Vault)</label>
-          <div class="input-with-btn">
-            <input type="text" id="cfg-obsidian-vault" class="field-input" placeholder="./arquivos/Obsidian_Vault" />
-            <button type="button" id="btn-cfg-browse-obsidian" class="hud-btn small">Escolher...</button>
-          </div>
-
-          <label class="field-label">Pasta Padrão dentro do Vault</label>
-          <input type="text" id="cfg-obsidian-folder" class="field-input" placeholder="Notas" />
-
-          <label class="field-label">Motor de I.A</label>
-          <select id="cfg-ai-provider" class="field-input">
-            <option value="auto">Auto (Mozilla llamafile + AI Kataros)</option>
-            <option value="builtin">Motor Embutido Offline Kataros</option>
-            <option value="ollama">Ollama Local (127.0.0.1:11434)</option>
-            <option value="lmstudio">LM Studio Local (127.0.0.1:1234)</option>
-          </select>
-
-          <label class="field-label">Perfil de Desempenho (/boost)</label>
-          <select id="cfg-ai-boost" class="field-input">
-            <option value="balanced">Balanceado (4096 ctx, KV Q8_0)</option>
-            <option value="turbo">Turbo /boost (Prioridade Alta + Max Threads)</option>
-            <option value="eco">Eco (2048 ctx, Menor Uso de RAM)</option>
-          </select>
         </div>
 
         <div>
@@ -746,8 +909,6 @@
           <div class="machine-info-box">
             <div><strong>Máquina:</strong> <span id="info-machine-name">-</span></div>
             <div><strong>Config:</strong> <code>./codigo/mpe.config.json</code></div>
-            <div id="info-perf-summary" style="margin-top:6px; color: var(--gold-secondary);">Calculando memória e velocidade...</div>
-            <button type="button" id="btn-cfg-open-guide" class="hud-btn small" style="margin-top:8px;">Ver Memória, Velocidade e Kits (/boost)</button>
           </div>
         </div>
       </div>
@@ -802,7 +963,7 @@
   <!-- 9. OVERLAY DE SELECAO DE AREA PARA RECORTE DE TELA -->
   <div id="area-selector-overlay" class="area-selector-overlay hidden">
     <div class="area-selector-banner">
-      Arraste com o botao esquerdo para selecionar a area do Print • Clique Direito ou ESC para cancelar
+      Arraste com o botao esquerdo para selecionar a area do Print | Clique Direito ou ESC para cancelar
     </div>
     <canvas id="area-selector-canvas"></canvas>
   </div>
@@ -813,151 +974,7 @@
     <span id="hud-toast-text">Acao executada!</span>
   </div>
 
-  <!-- 11. MINI ASSISTENTE FLUTUANTE (LOWER THIRDS SCI-FI) -->
-  <div id="mini-assistant-overlay" class="mini-assistant-overlay hidden">
-    <div class="mini-sci-hud" id="mini-sci-hud-card">
-      <!-- Mascote 3D Holografico Esquerdo (AI Kataros) -->
-      <div class="mini-node-ring" id="kataros-mascot-node" title="Arraste para mover">
-        <canvas id="kataros-mascot-canvas" class="kataros-mascot-canvas"></canvas>
-        <div class="kataros-label-box">
-          <div id="kataros-node-status" class="mini-node-status">AI KATAROS</div>
-          <div id="kataros-node-sub" class="mini-node-sub">LOCAL OK</div>
-        </div>
-      </div>
-
-      <!-- Capsula Sci-Fi (Lower Third) -->
-      <div class="mini-capsule-card">
-        <div class="mini-capsule-header" id="mini-drag-handle" title="Arraste para mover">
-          <div class="mini-header-title">
-            <span class="mini-tag">AI KATAROS</span>
-            <span class="mini-title-text">REVISAO & ENVIO</span>
-          </div>
-          <div class="mini-header-controls">
-            <button id="btn-mini-chat-toggle" class="mini-btn-icon" title="Abrir Chat Lateral">CHAT</button>
-            <button id="btn-mini-close" class="mini-btn-icon close" title="Fechar (ESC)">X</button>
-          </div>
-        </div>
-
-        <div class="mini-capsule-body">
-          <div class="mini-input-row">
-            <textarea id="mini-ai-textarea" class="mini-textarea" rows="2" placeholder="Cole (Ctrl+V) ou escreva um texto..."></textarea>
-          </div>
-
-          <div class="mini-controls-bar">
-            <div class="mini-meta-fields" id="mini-meta-fields">
-              <input type="text" id="mini-note-title" class="mini-field-small" placeholder="Titulo" />
-              <input type="text" id="mini-note-folder" class="mini-field-small" placeholder="Pasta" />
-              <input type="text" id="mini-note-tags" class="mini-field-small" placeholder="#tags" />
-            </div>
-            <div class="mini-action-row">
-              <div class="mini-action-btns">
-                <button id="btn-mini-paste" class="mini-btn" title="Colar texto da area de transferencia">Colar</button>
-                <button id="btn-mini-review" class="mini-btn primary" title="Revisar gramatica e estilo">Revisar</button>
-                <button id="btn-mini-copy" class="mini-btn" title="Copiar texto">Copiar</button>
-                <button id="btn-mini-save-file" class="mini-btn" title="Salvar arquivo ou documento na I.A local">Salvar Arquivo</button>
-              </div>
-              <div class="mini-send-group">
-                <label class="mini-send-label" for="mini-send-target">Enviar:</label>
-                <select id="mini-send-target" class="mini-select" title="Onde enviar">
-                  <option value="obsidian">Obsidian</option>
-                  <option value="ai_local">I.A Local (Arquivo)</option>
-                  <option value="notepad">Bloco de Notas</option>
-                  <option value="telegram">Telegram</option>
-                </select>
-                <button id="btn-mini-send" class="mini-btn gold" title="Enviar texto para o destino escolhido">Enviar</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="mini-review-preview" class="mini-review-preview hidden">
-            <div class="mini-review-header">
-              <span id="mini-review-summary">Revisao Concluida</span>
-              <button id="btn-mini-apply-review" class="mini-pill-btn">Substituir com Revisao</button>
-            </div>
-            <div id="mini-review-text" class="mini-review-content"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 12. CHAT LATERAL COM I.A LOCAL (DRAWER DESLIZANTE) -->
-  <div id="side-chat-drawer" class="side-chat-drawer hidden">
-    <div class="side-chat-header">
-      <div class="side-chat-title-group">
-        <div class="side-chat-tag">M.P.E INTELLIGENCE</div>
-        <div class="side-chat-title">CHAT // AI KATAROS</div>
-        <div id="side-ai-status" class="side-ai-status offline">Verificando motor...</div>
-      </div>
-      <button id="btn-close-side-chat" class="side-chat-close-btn" title="Recolher Chat Lateral">&times;</button>
-    </div>
-
-    <!-- Parametros da IA -->
-    <div class="side-chat-params">
-      <div class="side-param-item">
-        <label for="side-ai-mode">Modo</label>
-        <select id="side-ai-mode" class="side-select">
-          <option value="free">Conversa</option>
-          <option value="review">Revisar Texto</option>
-          <option value="code">Programacao</option>
-          <option value="draft">Redigir Texto</option>
-          <option value="obsidian">Organizar Nota</option>
-        </select>
-      </div>
-      <div class="side-param-item">
-        <label for="side-ai-tone">Tom</label>
-        <select id="side-ai-tone" class="side-select">
-          <option value="amigavel">Amigavel</option>
-          <option value="neutra">Neutra</option>
-          <option value="profissional">Profissional</option>
-          <option value="conciso">Conciso</option>
-          <option value="didatico">Didatico</option>
-        </select>
-      </div>
-      <div class="side-param-item">
-        <label for="side-ai-preset">Perfil</label>
-        <select id="side-ai-preset" class="side-select" title="Parametros de geracao (temperatura, top_p, tokens, detalhe)">
-          <option value="equilibrado">Equilibrado</option>
-          <option value="preciso">Preciso</option>
-          <option value="direto">Direto</option>
-          <option value="criativo">Criativo</option>
-          <option value="detalhado">Detalhado</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Area de Mensagens -->
-    <div id="side-chat-messages" class="side-chat-messages">
-      <div class="side-msg assistant">
-        <div class="side-msg-header">AI KATAROS <span class="side-msg-time">Agora</span></div>
-        <div class="side-msg-content">AI Kataros pronta para conversar, revisar textos, resumir documentos e redigir codigo com base na memoria e no Obsidian. Envie /ajuda para ver os comandos.</div>
-      </div>
-    </div>
-
-    <!-- Input e Acoes -->
-    <div class="side-chat-input-bar">
-      <div class="side-quick-cmds">
-        <button type="button" class="side-cmd-chip" data-cmd="/revisar " data-send="0">/revisar</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/resumir " data-send="0">/resumir</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/buscar " data-send="0">/buscar</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/extrato " data-send="0">/extrato</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/param" data-send="1">/param</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/boost" data-send="1">/boost</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/kits" data-send="1">/kits</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/status" data-send="1">/status</button>
-        <button type="button" class="side-cmd-chip" data-cmd="/ajuda" data-send="1">/ajuda</button>
-      </div>
-      <textarea id="side-chat-input" class="side-chat-textarea" rows="2" placeholder="Mensagem ou /ajuda (Enter envia, Shift+Enter quebra linha)"></textarea>
-      <div class="side-chat-footer-actions">
-        <button id="btn-side-chat-clear" class="side-action-btn subtle">Limpar</button>
-        <button id="btn-side-chat-save-file" class="side-action-btn" title="Importar ou salvar arquivo/extrato na I.A Local">Salvar Arquivo</button>
-        <button id="btn-side-chat-to-obsidian" class="side-action-btn gold" title="Salvar resposta atual no Obsidian">Salvar no Obsidian</button>
-        <button id="btn-side-chat-send" class="side-action-btn primary">Enviar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 13. MODAL PRINT NOMEADO -->
+  <!-- 11. MODAL PRINT NOMEADO -->
   <div id="modal-named-print" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -983,56 +1000,12 @@
           <option value="Contratos">Contratos</option>
         </select>
 
-        <label class="field-label">Dados / Observação para consulta na I.A (Opcional)</label>
-        <textarea id="named-print-notes" class="field-textarea" rows="2" placeholder="Ex: Recibo R$ 350,00 - Cliente Joao / Saldo R$ 2.400,00"></textarea>
-
-        <label class="checkbox-row">
-          <input type="checkbox" id="named-print-save-ai" checked />
-          <span><strong>Salvar arquivo na I.A local?</strong> (Indexa para consultas em /recibo e /extrato)</span>
-        </label>
+        <label class="field-label">Observações (Opcional - salva .txt ao lado da imagem)</label>
+        <textarea id="named-print-notes" class="field-textarea" rows="2" placeholder="Ex: Recibo R$ 350,00 - Cliente Joao"></textarea>
       </div>
       <div class="modal-footer between">
         <button id="btn-cancel-named-print" class="hud-btn subtle">Cancelar</button>
         <button id="btn-save-named-print" class="hud-btn primary">Salvar Print</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 14. MODAL SALVAR ARQUIVO NA I.A LOCAL -->
-  <div id="modal-save-ai-file" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2>Salvar arquivo na I.A local?</h2>
-        <p>Organiza em ./arquivos/&lt;Categoria&gt;/ e libera consultas de extratos, saldos e recibos na AI Kataros.</p>
-      </div>
-      <div class="modal-body">
-        <label class="field-label">Título / Nome do Arquivo</label>
-        <input type="text" id="ai-doc-title" class="field-input" placeholder="Ex: Extrato_Nubank_Nov2026" maxlength="80" />
-
-        <label class="field-label">Categoria do Documento</label>
-        <select id="ai-doc-category" class="field-input">
-          <option value="Auto">Auto (Detectar pelo conteúdo)</option>
-          <option value="Extratos">Extratos</option>
-          <option value="Recibos">Recibos</option>
-          <option value="Comprovantes">Comprovantes</option>
-          <option value="Financeiro">Financeiro</option>
-          <option value="Contratos">Contratos</option>
-          <option value="Geral">Geral</option>
-        </select>
-
-        <label class="field-label">Importar Arquivo do Computador (Opcional: .OFX, .CSV, .TXT, .MD, .PDF)</label>
-        <div class="input-with-btn">
-          <input type="text" id="ai-doc-filepath" class="field-input" placeholder="Nenhum arquivo selecionado (ou use o texto abaixo)" readonly />
-          <button type="button" id="btn-ai-doc-pick-file" class="hud-btn small">Arquivo...</button>
-          <button type="button" id="btn-ai-doc-clear-file" class="hud-btn subtle small">Limpar</button>
-        </div>
-
-        <label class="field-label">Conteúdo / Extrato / Recibo</label>
-        <textarea id="ai-doc-content" class="field-textarea" rows="4" placeholder="Cole aqui o extrato, recibo ou notas..."></textarea>
-      </div>
-      <div class="modal-footer between">
-        <button id="btn-cancel-ai-doc" class="hud-btn subtle">Cancelar</button>
-        <button id="btn-confirm-ai-doc" class="hud-btn primary">Salvar na I.A Local</button>
       </div>
     </div>
   </div>
@@ -1155,50 +1128,182 @@
     </div>
   </div>
 
-  <!-- 16. MODAL GUIA RAPIDO, /BOOST E KITS MINIMOS -->
+  <!-- 16. MODAL GUIA RAPIDO E ATALHOS -->
   <div id="modal-guide" class="modal-backdrop hidden">
-    <div class="modal-card wide">
-      <div class="modal-header">
-        <h2>Atalhos Rápidos, /boost &amp; Kits Mínimos</h2>
-        <p>Referência direta de uso, cálculo de memória RAM, velocidade e hardware recomendado.</p>
+    <div class="modal-card wide guide-modal-card">
+      <div class="modal-header guide-header-row">
+        <div>
+          <h2>Referência de Atalhos do M.P.E</h2>
+          <p>Comandos globais, navegação do Astrolábio 2D/3D, Organizador e teclas rápidas 1 a 9.</p>
+        </div>
+        <div class="guide-header-badge" title="Atalho para abrir ou fechar esta referência">
+          <kbd>F1</kbd>
+          <span class="kbd-plus">/</span>
+          <kbd>?</kbd>
+        </div>
       </div>
       <div class="modal-body">
         <div class="guide-grid">
           <div class="guide-box">
-            <h3>Atalhos Globais (Qualquer Tela)</h3>
+            <h3>Invocação &amp; Global</h3>
             <ul class="guide-list">
-              <li><kbd>Shift + Ctrl + Alt + Botão Dir.</kbd> <span>Abre o Astrolábio 2D/3D</span></li>
-              <li><kbd>Shift + Ctrl + Botão Dir.</kbd> <span>Abre AI Kataros (Revisar / Chat / Obsidian)</span></li>
-              <li><span><kbd>1</kbd> a <kbd>9</kbd></span> <span>Executa direto a estrela correspondente</span></li>
-              <li><span><kbd>Tab</kbd> / <kbd>ESC</kbd></span> <span>Alterna 2D/3D ou minimiza p/ bandeja</span></li>
+              <li>
+                <span class="kbd-combo"><kbd>Shift</kbd><span class="kbd-plus">+</span><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>Botão Dir.</kbd></span>
+                <span>Abre o Astrolábio sobre a janela ativa</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Shift</kbd><span class="kbd-plus">+</span><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>M</kbd></span>
+                <span>Atalho global alternativo de teclado</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>F1</kbd><span class="kbd-plus">ou</span><kbd>?</kbd></span>
+                <span>Abre ou fecha esta referência de atalhos</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>ESC</kbd></span>
+                <span>Fecha modal, cancela ação ou minimiza (0% CPU)</span>
+              </li>
             </ul>
-            <p class="machine-hint" style="margin-top:8px;">
-              Barra de Tarefas: fixe pelo atalho <strong>M.P.E - Mouse Performatico Estrelado</strong> ou diretamente pela janela aberta pelo <code>MPE.exe</code>.
-            </p>
           </div>
 
           <div class="guide-box">
-            <div class="guide-boost-head">
-              <h3>Desempenho &amp; Memória (/boost)</h3>
-              <div class="boost-pills">
-                <button type="button" class="boost-pill" data-boost="eco">Eco</button>
-                <button type="button" class="boost-pill" data-boost="balanced">Balanceado</button>
-                <button type="button" class="boost-pill" data-boost="turbo">Turbo /boost</button>
-              </div>
-            </div>
-            <div id="guide-perf-metrics" class="guide-perf-metrics">Carregando cálculo de hardware...</div>
+            <h3>Astrolábio 2D / 3D</h3>
+            <ul class="guide-list">
+              <li>
+                <span class="kbd-combo"><kbd>1</kbd><span class="kbd-plus">a</span><kbd>9</kbd></span>
+                <span>Executa a estrela pelo número de ordem</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Tab</kbd><span class="kbd-plus">ou</span><kbd>Nexus</kbd></span>
+                <span>Alterna projeção entre 2D e 3D</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Arrastar</kbd><span class="kbd-plus">/</span><kbd>Scroll</kbd><span class="kbd-plus">/</span><kbd>Seta Esq.</kbd><kbd>Seta Dir.</kbd></span>
+                <span>Gira a órbita com inércia</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Scroll</kbd></span>
+                <span>Ajusta o zoom do Astrolábio</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Clique Dir.</kbd><span class="kbd-plus">/</span><kbd>Shift+Arrastar</kbd></span>
+                <span>Edita ou move estrela no anel (MPE.exe)</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Modo Cascata</kbd></span>
+                <span>Ícone flutuante que expande ao passar o mouse (Topo ou Lateral)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="guide-box">
+            <h3>Organizador &amp; Capturas</h3>
+            <ul class="guide-list">
+              <li>
+                <span class="kbd-combo"><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>O</kbd></span>
+                <span>Seleciona arquivos para organizar</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>F</kbd></span>
+                <span>Foca busca por nome, pasta ou conteúdo</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Arrastar e Soltar</kbd></span>
+                <span>Organiza arquivos/pastas do Explorer</span>
+              </li>
+              <li>
+                <span class="kbd-combo"><kbd>Duplo Clique</kbd><span class="kbd-plus">/</span><kbd>Clique Dir.</kbd></span>
+                <span>Abre arquivo ou menu do Explorer</span>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <h3 class="section-subtitle" style="margin-top:16px;">Kits Mínimos e Estimativa de Velocidade</h3>
-        <div id="guide-kits-grid" class="guide-kits-grid"></div>
+        <div id="guide-hotkeys-section" class="guide-hotkeys-section">
+          <div class="guide-hotkeys-head">
+            <h3>Mapa Rápido das Estrelas (Teclas 1 a 9)</h3>
+            <span class="guide-hotkeys-hint">Clique em um atalho abaixo para executar imediatamente</span>
+          </div>
+          <div id="guide-hotkeys-grid" class="guide-hotkeys-grid"></div>
+        </div>
       </div>
       <div class="modal-footer between">
-        <div class="footer-right">
+        <div class="footer-right guide-footer-left">
           <button type="button" id="btn-guide-repair-shortcut" class="hud-btn small">Atualizar Atalho Windows</button>
-          <button type="button" id="btn-guide-open-chat" class="hud-btn small">Abrir Chat AI Kataros</button>
+          <span class="machine-hint guide-taskbar-hint">Fixe na Barra de Tarefas via <code>MPE.exe</code></span>
         </div>
-        <button type="button" id="btn-close-guide" class="hud-btn primary">Entendi</button>
+        <button type="button" id="btn-close-guide" class="hud-btn primary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 17. MODAL ACEITE DE PRIMEIRO ACESSO (CONSENTIMENTO) -->
+  <div id="modal-consent" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="consent-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="consent-modal-title">Termo de Primeiro Acesso - M.P.E</h2>
+        <p>Autorize as permissões necessárias para execução em segundo plano, atalhos e automações.</p>
+      </div>
+      <div class="modal-body">
+        <div class="consent-perm-list">
+          <label class="checkbox-row consent-perm-item">
+            <input type="checkbox" id="consent-toggle-bg" checked />
+            <span><strong>Execução em segundo plano</strong> (Bandeja do Windows, Mini Astrolábio e atalho global)</span>
+          </label>
+          <label class="checkbox-row consent-perm-item">
+            <input type="checkbox" id="consent-toggle-apps" checked />
+            <span><strong>Abrir aplicativos, projetos e links</strong> (Bloco de Notas, VS Code, URLs e envio p/ chat)</span>
+          </label>
+          <label class="checkbox-row consent-perm-item">
+            <input type="checkbox" id="consent-toggle-python" checked />
+            <span><strong>Auto-Scripts em Python</strong> (Gravação de cliques e agendamento por horário)</span>
+          </label>
+        </div>
+        <p class="machine-hint">Você pode revisar esta decisão a qualquer momento pelo botão de status na tela principal.</p>
+      </div>
+      <div class="modal-footer between">
+        <button type="button" id="btn-consent-decline" class="hud-btn danger">Recusar</button>
+        <button type="button" id="btn-consent-accept" class="hud-btn primary">Aceitar e Ativar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 18. MODAL GRAVADOR E AGENDADOR DE AUTO-SCRIPT PYTHON -->
+  <div id="modal-python-scripts" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="py-modal-title">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2 id="py-modal-title">Auto-Script Python (Gravação Manual &amp; Agendamento)</h2>
+        <p>Grave cliques na tela com intervalos reais, gere um arquivo .py executável e agende por horário.</p>
+      </div>
+      <div class="modal-body">
+        <div class="py-recorder-box">
+          <div class="subgrid-2">
+            <div>
+              <label class="field-label" style="margin-top:0;" for="py-script-name">Nome do Script</label>
+              <input type="text" id="py-script-name" class="field-input" placeholder="Ex: Rotina Matinal" maxlength="60" />
+            </div>
+            <div class="py-rec-actions">
+              <button type="button" id="btn-py-record-start" class="hud-btn primary">Gravar Cliques na Tela</button>
+              <button type="button" id="btn-py-record-stop" class="hud-btn danger hidden">Parar Gravação</button>
+              <button type="button" id="btn-py-save-script" class="hud-btn" disabled>Salvar Script .py</button>
+            </div>
+          </div>
+
+          <div id="py-recording-indicator" class="py-recording-indicator hidden">
+            <span class="py-rec-dot" aria-hidden="true"></span>
+            <span id="py-recording-status-text">GRAVANDO CLIQUES NA TELA</span>
+            <strong id="py-recording-count">0 clique(s)</strong>
+          </div>
+          <div id="py-recording-steps-preview" class="py-steps-preview hidden"></div>
+        </div>
+
+        <h3 class="section-subtitle">Scripts Salvos &amp; Agendamento</h3>
+        <div id="py-scripts-list" class="py-scripts-list">
+          <div class="org-empty">Nenhum auto-script Python salvo ainda.</div>
+        </div>
+      </div>
+      <div class="modal-footer end">
+        <button type="button" id="btn-close-python-scripts" class="hud-btn primary">Fechar</button>
       </div>
     </div>
   </div>
@@ -1206,7 +1311,6 @@
   <script src="js/i18n-tones.js"></script>
   <script src="js/astrolabe3d.js"></script>
   <script src="js/areaSelector.js"></script>
-  <script src="js/kataros3d.js"></script>
   <script src="js/organizer.js"></script>
   <script src="js/app.js"></script>
 </body>

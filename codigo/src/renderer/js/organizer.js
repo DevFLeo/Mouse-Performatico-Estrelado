@@ -18,11 +18,12 @@
   }
 
   class MpeOrganizerUI {
-    constructor({ getConfig, saveConfig, showToast, openSettings }) {
+    constructor({ getConfig, saveConfig, showToast, openSettings, onTabChange }) {
       this.getConfig = getConfig;
       this.saveConfig = saveConfig;
       this.showToast = showToast;
       this.openSettings = openSettings;
+      this.onTabChange = typeof onTabChange === 'function' ? onTabChange : null;
 
       this.activeTab = 'astrolabe';
       this.activeScope = 'arquivos';
@@ -352,6 +353,11 @@
           this.updateOrganizerPref({ lastActiveTab: this.activeTab });
         }
       }
+      if (this.onTabChange) {
+        try {
+          this.onTabChange(this.activeTab);
+        } catch (_) {}
+      }
     }
 
     setScope(scope) {
@@ -397,7 +403,7 @@
       if (moveInsteadOfCopy) {
         this.openConfirmModal({
           title: 'Mover Arquivos em Vez de Copiar',
-          desc: `Os arquivos selecionados (${paths.length} item(ns)) serao REMOVIDOS da pasta de origem e movidos para ./${this.activeScope}/. Deseja continuar?`,
+          desc: `Os arquivos selecionados (${paths.length} item(ns)) serão REMOVIDOS da pasta de origem e movidos para ./${this.activeScope}/. Deseja continuar?`,
           okLabel: 'Mover Arquivos',
           onConfirm: () => this.executeOrganize(paths, true)
         });
@@ -468,7 +474,7 @@
         : await window.mpeApi.orgScan({ scope: this.activeScope });
 
       if (!data || !data.ok) {
-        this.els.treeList.innerHTML = '<div class="org-empty">Nao foi possivel ler a pasta selecionada.</div>';
+        this.els.treeList.innerHTML = '<div class="org-empty">Não foi possível ler a pasta selecionada.</div>';
         return;
       }
 
@@ -506,7 +512,7 @@
         header.innerHTML = `
           <span class="org-cat-arrow">${isOpen ? 'v' : '>'}</span>
           <span class="org-cat-name">${escapeHtml(cat.name)}</span>
-          <span class="org-cat-meta">${cat.count} arquivo(s) • ${escapeHtml(cat.totalSizeFormatted)}</span>
+          <span class="org-cat-meta">${cat.count} arquivo(s) | ${escapeHtml(cat.totalSizeFormatted)}</span>
         `;
 
         const list = document.createElement('div');
@@ -644,7 +650,7 @@
         this.els.resTitle.textContent = `${res.organizedCount} arquivo(s) ${actionWord}`;
       }
       if (this.els.resSubtitle) {
-        this.els.resSubtitle.textContent = `Destino: ./${res.targetScope}/ • Criterio: ${res.criterion}`;
+        this.els.resSubtitle.textContent = `Destino: ./${res.targetScope}/ | Critério: ${res.criterion}`;
       }
       if (this.els.resList) {
         if (!res.results || !res.results.length) {

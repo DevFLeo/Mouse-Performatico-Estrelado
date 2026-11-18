@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>M.P.E - Gravacao Ativa</title>
+  <link rel="stylesheet" href="styles/recorder-overlay.css" />
+</head>
+<body>
+  <div id="recorder-pill" class="recorder-pill" role="status" aria-live="polite">
+    <span class="rec-dot" aria-hidden="true"></span>
+    <span id="rec-status-text" class="rec-status-text">Gravando...</span>
+    <span id="rec-step-badge" class="rec-step-badge">0 cliques</span>
+    <button type="button" id="btn-stop-recording" class="rec-stop-btn">Parar (ESC)</button>
+  </div>
+  <script src="js/recorder-overlay.js"></script>
+</body>
+</html>

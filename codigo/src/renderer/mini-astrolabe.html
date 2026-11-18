@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M.P.E Mini Astrolabio</title>
+  <link rel="stylesheet" href="styles/mini-astrolabe.css" />
+</head>
+<body>
+  <div id="mini-root" class="mini-root" data-expanded="false" data-paused="false">
+    <div id="mini-fan-hitplate" class="mini-fan-hitplate" aria-hidden="true"></div>
+    <svg id="mini-fan-guides" class="mini-fan-guides" aria-hidden="true"></svg>
+    <div id="mini-fan-layer" class="mini-fan-layer" role="region" aria-label="Atalhos do Mini Astrolabio"></div>
+
+    <div id="mini-controls" class="mini-controls" role="toolbar" aria-label="Controles de tamanho e abertura">
+      <button id="btn-mini-scale-down" class="mini-ctrl-btn" type="button" title="Diminuir tamanho" aria-label="Diminuir tamanho do Mini Astrolabio">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+      </button>
+      <span id="mini-scale-badge" class="mini-scale-badge" aria-live="off">1.0x</span>
+      <button id="btn-mini-scale-up" class="mini-ctrl-btn" type="button" title="Aumentar tamanho" aria-label="Aumentar tamanho do Mini Astrolabio">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+          <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div
+      id="mini-hub"
+      class="mini-hub"
+      role="button"
+      tabindex="0"
+      aria-label="Mini Astrolabio M.P.E - passe o mouse para abrir atalhos ou arraste para mover"
+    >
+      <svg id="mini-rotator" class="mini-rotator" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="var(--gold-primary)" stroke-width="1.6" />
+        <path
+          id="mini-starburst-ticks"
+          d="M50 4 L50 10 M57.7 4.7 L56.8 9.2 M65.2 6.6 L63.5 11.4 M72.1 9.8 L69.8 14.1 M78.3 14.2 L75.2 18.2 M83.7 19.6 L80.1 22.8 M88.2 25.8 L84.0 28.5 M91.6 32.6 L87.0 34.4 M93.9 39.8 L89.1 40.9 M95.0 47.3 L90.0 47.6 M94.9 54.9 L89.9 54.4 M93.5 62.3 L88.7 60.9 M90.9 69.5 L86.3 67.3 M87.1 76.1 L82.9 73.2 M82.3 82.0 L78.6 78.4 M76.5 87.0 L73.4 82.9 M70.0 91.0 L67.6 86.5 M63.0 93.8 L61.4 89.0 M55.6 95.3 L54.9 90.4 M48.0 95.6 L48.3 90.6 M40.5 94.6 L41.5 89.7 M33.2 92.3 L35.0 87.6 M26.4 88.8 L28.9 84.5 M20.2 84.3 L23.4 80.5 M14.8 78.7 L18.6 75.5 M10.4 72.3 L14.8 69.7 M7.0 65.3 L11.7 63.5 M4.8 57.9 L9.7 56.9 M4.0 50.3 L9.0 50.2 M4.4 42.7 L9.3 43.4 M6.1 35.3 L10.9 36.9 M8.9 28.2 L13.4 30.5 M12.9 21.7 L17.0 24.7 M17.9 15.9 L21.5 19.5 M23.8 11.1 L26.9 15.2 M30.4 7.4 L32.8 12.0 M37.5 4.9 L39.1 9.7 M44.9 3.7 L45.6 8.7"
+          stroke="var(--gold-secondary)"
+          stroke-width="1.35"
+          stroke-linecap="round"
+        />
+        <circle cx="50" cy="50" r="34" fill="none" stroke="var(--gold-primary)" stroke-width="1.05" stroke-dasharray="2.2 3.4" opacity="0.85" />
+        <circle cx="55.5" cy="45.5" r="21" fill="none" stroke="var(--gold-primary)" stroke-width="1.15" opacity="0.78" />
+        <polygon points="50,19 77,66 23,66" fill="none" stroke="var(--gold-primary)" stroke-width="0.9" opacity="0.45" />
+        <line x1="20" y1="79" x2="80" y2="21" stroke="var(--gold-secondary)" stroke-width="1.1" opacity="0.72" />
+        <circle cx="50" cy="50" r="14.5" fill="none" stroke="var(--nexus-red)" stroke-width="2.1" />
+      </svg>
+
+      <svg class="mini-core-dot" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="10.2" fill="#040406" stroke="#FFFFFF" stroke-width="1.9" />
+        <circle cx="50" cy="50" r="2.4" fill="var(--gold-primary)" />
+      </svg>
+    </div>
+
+    <div id="mini-status" class="mini-status hidden" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="js/mini-astrolabe.js"></script>
+</body>
+</html>

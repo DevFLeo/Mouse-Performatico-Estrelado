@@ -180,12 +180,59 @@ function formatDateBr(ms) {
 }
 
 class FileOrganizer {
-  constructor(rootDir, codeDir, configManager) {
+  constructor(rootDir, codeDir, configManager, options = {}) {
     this.rootDir = path.resolve(rootDir);
     this.codeDir = path.resolve(codeDir || path.join(rootDir, 'codigo'));
     this.configManager = configManager;
-    this.dataDir = path.join(this.codeDir, 'data');
+
+    const opts = options && typeof options === 'object' ? options : {};
+    const explicitDataDir =
+      opts.dataDir !== undefined ? String(opts.dataDir || '').trim() : '';
+    const envDataDir = opts.ignoreProcessArgs
+      ? ''
+      : String(process.env.MPE_DATA_DIR || '').trim();
+    const cmDataDir =
+      this.configManager && this.configManager.dataDir
+        ? String(this.configManager.dataDir || '').trim()
+        : '';
+
+    this.dataDir = explicitDataDir
+      ? path.resolve(explicitDataDir)
+      : envDataDir
+      ? path.resolve(envDataDir)
+      : cmDataDir
+      ? path.resolve(cmDataDir)
+      : path.join(this.codeDir, 'data');
+
     this.undoFilePath = path.join(this.dataDir, 'organizer-undo.json');
+    this._scanCache = new Map();
+    this._contentCache = new Map();
+  }
+
+  invalidateCache(scope = null) {
+    if (scope) this._scanCache.delete(scope);
+    else this._scanCache.clear();
+  }
+
+  _readNormalizedContent(fileEntry) {
+    const cached = this._contentCache.get(fileEntry.fullPath);
+    if (cached && cached.mtimeMs === fileEntry.mtimeMs && cached.size === fileEntry.size) {
+      return cached;
+    }
+    const rawContent = fs.readFileSync(fileEntry.fullPath, 'utf8');
+    const normContent = normalizeText(rawContent);
+    const entry = {
+      mtimeMs: fileEntry.mtimeMs,
+      size: fileEntry.size,
+      rawContent,
+      normContent
+    };
+    if (this._contentCache.size >= 300) {
+      const oldestKey = this._contentCache.keys().next().value;
+      this._contentCache.delete(oldestKey);
+    }
+    this._contentCache.set(fileEntry.fullPath, entry);
+    return entry;
   }
 
   getScopeDir(scope = 'arquivos') {
@@ -451,6 +498,8 @@ class FileOrganizer {
       });
     }
 
+    this.invalidateCache(targetScope);
+
     return {
       ok: true,
       batchId,
@@ -517,6 +566,8 @@ class FileOrganizer {
     }
 
     this.saveUndoState(null);
+    this.invalidateCache(batch.targetScope || 'arquivos');
+
     return {
       ok: true,
       revertedCount,
@@ -525,7 +576,12 @@ class FileOrganizer {
     };
   }
 
-  scanScope(scope = 'arquivos') {
+  scanScope(scope = 'arquivos', { forceRefresh = false } = {}) {
+    const cacheKey = String(scope || 'arquivos').toLowerCase();
+    const cached = !forceRefresh && this._scanCache.get(cacheKey);
+    if (cached && (Date.now() - cached.ts) < 5000) {
+      return cached.data;
+    }
     const baseDir = this.ensureScopeDir(scope);
     const files = [];
 
@@ -558,7 +614,10 @@ class FileOrganizer {
               size: st.size,
               sizeFormatted: formatBytes(st.size),
               mtimeMs: st.mtimeMs,
-              mtimeFormatted: formatDateBr(st.mtimeMs)
+              mtimeFormatted: formatDateBr(st.mtimeMs),
+              nameNorm: normalizeText(entry.name),
+              catNorm: normalizeText(category),
+              relNorm: normalizeText(relPath)
             });
           } catch (_) {}
         }
@@ -586,7 +645,7 @@ class FileOrganizer {
         files: items.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
       }));
 
-    return {
+    const result = {
       ok: true,
       scope,
       baseDir,
@@ -594,13 +653,16 @@ class FileOrganizer {
       categories,
       files
     };
+
+    this._scanCache.set(cacheKey, { ts: Date.now(), data: result });
+    return result;
   }
 
   searchScope({ scope = 'arquivos', query = '', searchInContent = true } = {}) {
     const scan = this.scanScope(scope);
     const qRaw = String(query || '').trim();
     if (!qRaw) {
-      return Object.assign(scan, { query: '', searchResults: null });
+      return Object.assign({}, scan, { query: '', searchResults: null });
     }
 
     const qNorm = normalizeText(qRaw);
@@ -608,27 +670,26 @@ class FileOrganizer {
     const matches = [];
 
     for (const f of scan.files) {
-      const nameNorm = normalizeText(f.name);
-      const catNorm = normalizeText(f.category);
-      const relNorm = normalizeText(f.relPath);
+      const nameNorm = f.nameNorm || normalizeText(f.name);
+      const catNorm = f.catNorm || normalizeText(f.category);
+      const relNorm = f.relNorm || normalizeText(f.relPath);
 
       const allInName = tokens.every((t) => nameNorm.includes(t));
-      const allInFolder = tokens.every((t) => catNorm.includes(t) || relNorm.includes(t));
-
       if (allInName) {
         matches.push(Object.assign({}, f, { matchType: 'name', priority: 3, snippet: '' }));
         continue;
       }
 
+      const allInFolder = tokens.every((t) => catNorm.includes(t) || relNorm.includes(t));
       if (allInFolder) {
         matches.push(Object.assign({}, f, { matchType: 'folder', priority: 2, snippet: '' }));
         continue;
       }
 
       if (searchInContent && f.isText && f.size <= 512 * 1024) {
-        try {
-          const rawContent = fs.readFileSync(f.fullPath, 'utf8');
-          const normContent = normalizeText(rawContent);
+        const contentData = this._readNormalizedContent(f);
+        if (contentData) {
+          const { rawContent, normContent } = contentData;
           const firstIdx = normContent.indexOf(qNorm);
           const allTokensInContent = firstIdx !== -1 || tokens.every((t) => normContent.includes(t));
 
@@ -641,7 +702,7 @@ class FileOrganizer {
               .trim();
             matches.push(Object.assign({}, f, { matchType: 'content', priority: 1, snippet }));
           }
-        } catch (_) {}
+        }
       }
     }
 
@@ -678,6 +739,8 @@ class FileOrganizer {
     }
 
     fs.unlinkSync(fullPath);
+    this._contentCache.delete(fullPath);
+    this.invalidateCache(scope);
     this.removeEmptyParents(path.dirname(fullPath), baseDir);
     return { ok: true, deleted: relPath };
   }

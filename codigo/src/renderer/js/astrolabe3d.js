@@ -61,7 +61,10 @@ class Astrolabe3D {
     this.nexusScreenPos = { x: 0, y: 0, r: 18 };
 
     // Controle de ciclo de renderizacao para 0% de uso em segundo plano
-    this.isPaused = false;
+    this.isPaused =
+      callbacks.startPaused !== undefined
+        ? Boolean(callbacks.startPaused)
+        : Boolean(typeof document !== 'undefined' && document.hidden);
     this.rafId = null;
 
     // Dados e Tema
@@ -76,8 +79,8 @@ class Astrolabe3D {
       bgSecondary: '#171206',
       goldPrimary: '#E5B84B',
       goldSecondary: '#FFE08A',
-      goldDim: '#7A5B18',
-      vectorAccent: '#5C73B8',
+      goldDim: '#C89D3C',
+      vectorAccent: '#8FA8FF',
       nexusRed: '#9E2A2B',
       glowIntensity: 0.85
     };
@@ -90,13 +93,25 @@ class Astrolabe3D {
     this.bindEvents();
     this.resize();
     this.animate = this.animate.bind(this);
-    this.startLoop();
+    if (!this.isPaused) {
+      this.startLoop();
+    }
   }
 
   startLoop() {
     if (!this.rafId && !this.isPaused) {
       this.rafId = requestAnimationFrame(this.animate);
     }
+  }
+
+  start() {
+    this.resume();
+  }
+
+  stop() {
+    this.pause();
+    this.isDragging = false;
+    this.draggingPoint = null;
   }
 
   pause() {
@@ -111,6 +126,19 @@ class Astrolabe3D {
     if (!this.isPaused && this.rafId) return;
     this.isPaused = false;
     this.startLoop();
+  }
+
+  destroy() {
+    this.stop();
+    if (typeof window !== 'undefined') {
+      if (this._onResize) window.removeEventListener('resize', this._onResize);
+      if (this._onMouseMove) window.removeEventListener('mousemove', this._onMouseMove);
+      if (this._onMouseUp) window.removeEventListener('mouseup', this._onMouseUp);
+    }
+    if (this.canvas) {
+      if (this._onMouseDown) this.canvas.removeEventListener('mousedown', this._onMouseDown);
+      if (this._onWheel) this.canvas.removeEventListener('wheel', this._onWheel);
+    }
   }
 
   initStarfield(count) {
@@ -187,6 +215,9 @@ class Astrolabe3D {
         this.setProjectionMode(config.system.projectionMode, false);
       }
     }
+    if (this.isPaused && this.width > 0 && this.height > 0 && this.ctx) {
+      this.render();
+    }
   }
 
   setProjectionMode(mode, animateBurst = true) {
@@ -208,6 +239,11 @@ class Astrolabe3D {
         1.35
       );
       this.triggerAllVectorsBurst();
+    }
+
+    if (this.isPaused && this.width > 0 && this.height > 0 && this.ctx) {
+      this.modeBlend = this.targetModeBlend;
+      this.render();
     }
 
     if (this.callbacks.onModeChange) {
@@ -355,12 +391,19 @@ class Astrolabe3D {
     this.userHasPositioned = false;
     this.saveViewState();
     this.spawnShockwave(this.width / 2, this.height / 2, this.theme.goldPrimary, 1.1);
+    if (this.isPaused && this.width > 0 && this.height > 0 && this.ctx) {
+      this.tiltX = this.targetTiltX;
+      this.tiltY = this.targetTiltY;
+      this.zoom = this.targetZoom;
+      this.render();
+    }
   }
 
   bindEvents() {
-    window.addEventListener('resize', () => this.resize());
+    this._onResize = () => this.resize();
+    window.addEventListener('resize', this._onResize);
 
-    this.canvas.addEventListener('mousedown', (e) => {
+    this._onMouseDown = (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -391,9 +434,10 @@ class Astrolabe3D {
           this.draggingPoint = null;
         }
       }
-    });
+    };
+    this.canvas.addEventListener('mousedown', this._onMouseDown);
 
-    window.addEventListener('mousemove', (e) => {
+    this._onMouseMove = (e) => {
       if (this.isPaused) return;
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -438,9 +482,10 @@ class Astrolabe3D {
       } else {
         this.updateHover(mx, my);
       }
-    });
+    };
+    window.addEventListener('mousemove', this._onMouseMove);
 
-    window.addEventListener('mouseup', (e) => {
+    this._onMouseUp = (e) => {
       if (!this.isDragging) return;
       this.isDragging = false;
       this.wheelVelocity = 0;
@@ -485,24 +530,22 @@ class Astrolabe3D {
           }
         }
       }
-    });
+    };
+    window.addEventListener('mouseup', this._onMouseUp);
 
-    this.canvas.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        if (e.ctrlKey) {
-          this.targetZoom = Math.max(0.65, Math.min(1.45, this.targetZoom - e.deltaY * 0.001));
-        } else {
-          const step = (e.deltaY || e.deltaX) * 0.0018 * this.sensitivity;
-          this.wheelRotation += step;
-          this.wheelVelocity = 0;
-        }
-        this.userHasPositioned = true;
-        this.saveViewState();
-      },
-      { passive: false }
-    );
+    this._onWheel = (e) => {
+      e.preventDefault();
+      if (e.ctrlKey) {
+        this.targetZoom = Math.max(0.65, Math.min(1.45, this.targetZoom - e.deltaY * 0.001));
+      } else {
+        const step = (e.deltaY || e.deltaX) * 0.0018 * this.sensitivity;
+        this.wheelRotation += step;
+        this.wheelVelocity = 0;
+      }
+      this.userHasPositioned = true;
+      this.saveViewState();
+    };
+    this.canvas.addEventListener('wheel', this._onWheel, { passive: false });
   }
 
   resize() {
@@ -1322,17 +1365,63 @@ class Astrolabe3D {
       ctx.fill();
       ctx.restore();
 
-      // Codigo numerico superior (ex: 08 7 ϟ) exatamente como na imagem de referencia
+      // Numero de atalho e codigo com fundo opaco de alto contraste (>= 15:1)
+      const slotNum = Number(point.slotNumber) || item.idx + 1;
       const codeText = point.code || '00 1';
-      ctx.font = `700 ${Math.round(12.5 * sp.scale)}px "Consolas", "Orbitron", "Segoe UI", monospace`;
-      ctx.fillStyle = isHovered ? '#FFFFFF' : '#EBF0FF';
+      const badgeLabel = `${slotNum} | ${codeText}`;
+      const badgeFontPx = Math.max(12, Math.round(13.5 * sp.scale));
+      ctx.font = `800 ${badgeFontPx}px "Consolas", "Orbitron", "Segoe UI", monospace`;
+      const badgeMetrics = ctx.measureText(badgeLabel);
+      const badgeW = Math.max(44, badgeMetrics.width + 14);
+      const badgeH = Math.round(badgeFontPx + 8);
+      const badgeX = sp.x - badgeW / 2;
+      const badgeY = sp.y - nodeR - badgeH - 7 * sp.scale;
+
+      ctx.fillStyle = '#050508';
+      ctx.strokeStyle = isHovered ? '#FFE08A' : this.theme.goldPrimary || '#E5B84B';
+      ctx.lineWidth = isHovered ? 2.0 : 1.5;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
-      ctx.fillText(`${codeText} ϟ`, sp.x + 3, sp.y - nodeR - 9 * sp.scale);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeLabel, sp.x, badgeY + badgeH / 2 + 0.5);
+      ctx.textBaseline = 'alphabetic';
 
       if (point.title) {
-        ctx.font = `${isHovered ? '700' : '600'} ${Math.round((isHovered ? 12.2 : 10.5) * sp.scale)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = isHovered ? this.theme.goldSecondary : 'rgba(229, 184, 75, 0.90)';
-        ctx.fillText(point.title.toUpperCase(), sp.x, sp.y + nodeR + 16 * sp.scale);
+        const titleStr = point.title.toUpperCase();
+        const titleFontPx = Math.max(10, Math.round((isHovered ? 12.2 : 11.0) * sp.scale));
+        ctx.font = `700 ${titleFontPx}px "Segoe UI", sans-serif`;
+        const titleMetrics = ctx.measureText(titleStr);
+        const titleW = titleMetrics.width + 12;
+        const titleH = Math.round(titleFontPx + 7);
+        const titleX = sp.x - titleW / 2;
+        const titleY = sp.y + nodeR + 6 * sp.scale;
+
+        ctx.fillStyle = '#050508';
+        ctx.strokeStyle = isHovered ? '#FFE08A' : 'rgba(229, 184, 75, 0.72)';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(titleX, titleY, titleW, titleH, 5);
+        } else {
+          ctx.rect(titleX, titleY, titleW, titleH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = isHovered ? '#FFFFFF' : '#FFE08A';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(titleStr, sp.x, titleY + titleH / 2 + 0.5);
+        ctx.textBaseline = 'alphabetic';
       }
 
       if (this.draggingPoint && this.draggingPoint.id === point.id) {
@@ -1373,7 +1462,7 @@ class Astrolabe3D {
       ctx.fillStyle = '#73F3FF';
       ctx.textAlign = 'center';
       ctx.fillText(
-        `CLIQUE PARA COLOCAR AQUI (${pc.angle}° • Orbita ${pc.orbit})`,
+        `CLIQUE PARA COLOCAR AQUI (${pc.angle} graus | Orbita ${pc.orbit})`,
         pc.screenX,
         pc.screenY - 24
       );

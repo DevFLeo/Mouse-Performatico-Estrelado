@@ -23,8 +23,10 @@ namespace MpeNative
     internal static class MpeHook
     {
         private const int WH_MOUSE_LL = 14;
+        private const int WM_LBUTTONDOWN = 0x0201;
         private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_RBUTTONUP = 0x0205;
+        private const uint WM_QUIT = 0x0012;
 
         private const int VK_SHIFT = 0x10;
         private const int VK_CONTROL = 0x11;
@@ -44,6 +46,12 @@ namespace MpeNative
         private static LowLevelMouseProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
         private static bool _suppressNextRightUp = false;
+        private static volatile bool _isRecording = false;
+        private static uint _mainThreadId = 0;
+        private static readonly object _stdoutLock = new object();
+        private static readonly DateTime _unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        private static readonly long _startEpochMs = (long)(DateTime.UtcNow - _unixEpoch).TotalMilliseconds;
+        private static readonly Stopwatch _monoWatch = Stopwatch.StartNew();
         private static IntPtr _lastForegroundHwnd = IntPtr.Zero;
         private static string _lastWindowTitle = "";
         private static string _cacheDir = "";
@@ -148,6 +156,38 @@ namespace MpeNative
         [DllImport("user32.dll")]
         private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
 
+        [DllImport("user32.dll")]
+        private static extern bool PostThreadMessage(uint idThread, uint Msg, UIntPtr wParam, IntPtr lParam);
+
+        private static long GetNowMs()
+        {
+            return _startEpochMs + _monoWatch.ElapsedMilliseconds;
+        }
+
+        private static void WriteStdoutLine(string msg)
+        {
+            lock (_stdoutLock)
+            {
+                Console.WriteLine(msg);
+                Console.Out.Flush();
+            }
+        }
+
+        private static void ShutdownDaemon()
+        {
+            _isRecording = false;
+            try { Application.Exit(); } catch { }
+            if (_mainThreadId != 0)
+            {
+                try { PostThreadMessage(_mainThreadId, WM_QUIT, UIntPtr.Zero, IntPtr.Zero); } catch { }
+            }
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                Thread.Sleep(400);
+                Environment.Exit(0);
+            });
+        }
+
         [STAThread]
         public static void Main(string[] args)
         {
@@ -180,6 +220,8 @@ namespace MpeNative
                 return;
             }
 
+            _mainThreadId = GetCurrentThreadId();
+
             Thread stdinThread = new Thread(ListenStdin)
             {
                 IsBackground = true
@@ -188,12 +230,11 @@ namespace MpeNative
 
             _winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
             _hookID = SetHook(_proc);
-            Console.WriteLine("MPE_HOOK_READY");
-            Console.Out.Flush();
+            WriteStdoutLine("MPE_HOOK_READY");
 
             Application.Run();
             if (_winEventHook != IntPtr.Zero) UnhookWinEvent(_winEventHook);
-            UnhookWindowsHookEx(_hookID);
+            if (_hookID != IntPtr.Zero) UnhookWindowsHookEx(_hookID);
         }
 
         private static void WinEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
@@ -343,12 +384,16 @@ namespace MpeNative
             string qRaw = query.Trim().ToLowerInvariant();
             string qNormalized = qRaw.Replace("|", " ");
 
+            bool isExactCodeWord = qRaw == "code" || qRaw == "code.exe";
             bool isNotepadQuery = qRaw.Contains("bloco") || qRaw.Contains("nota") || qRaw.Contains("notepad");
             bool isPaintQuery = qRaw.Contains("paint") || qRaw.Contains("desenho");
             bool isCalcQuery = qRaw.Contains("calc") || qRaw.Contains("calcul");
             bool isWordQuery = qRaw.Contains("word") || qRaw.Contains("winword");
             bool isExcelQuery = qRaw.Contains("excel");
             bool isTelegramQuery = qRaw.Contains("leonardo") || qRaw.Contains("eu |") || qRaw.Contains("voce") || qRaw.Contains("você") || qRaw.Contains("telegram");
+            bool isVsCodeQuery = isExactCodeWord || qRaw.Contains("vscode") || qRaw.Contains("vs code") || qRaw.Contains("visual studio code");
+            bool isWhatsAppQuery = qRaw.Contains("whatsapp") || qRaw.Contains("whats");
+            bool isDiscordQuery = qRaw.Contains("discord");
 
             // 1. Busca direta pelo titulo exato/parcial (incluindo "Eu | Você | Leonardo") nos processos
             foreach (Process p in Process.GetProcesses())
@@ -364,7 +409,7 @@ namespace MpeNative
                     string titleNorm = titleLow.Replace("|", " ");
                     string procLow = procName.ToLowerInvariant();
 
-                    if (titleLow.Contains(qRaw) || titleNorm.Contains(qNormalized) || procLow.Contains(qRaw))
+                    if (!isExactCodeWord && (titleLow.Contains(qRaw) || titleNorm.Contains(qNormalized) || procLow.Contains(qRaw)))
                     {
                         return p.MainWindowHandle;
                     }
@@ -398,6 +443,21 @@ namespace MpeNative
                     {
                         return p.MainWindowHandle;
                     }
+
+                    if (isVsCodeQuery && (procLow == "code" || titleLow.Contains("visual studio code")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isWhatsAppQuery && (procLow.Contains("whatsapp") || titleLow.Contains("whatsapp")))
+                    {
+                        return p.MainWindowHandle;
+                    }
+
+                    if (isDiscordQuery && (procLow.Contains("discord") || titleLow.Contains("discord")))
+                    {
+                        return p.MainWindowHandle;
+                    }
                 }
                 catch { }
             }
@@ -412,7 +472,7 @@ namespace MpeNative
                 if (title.Contains("M.P.E") || title.Contains("Mouse Perform")) return true;
 
                 string titleLow = title.ToLowerInvariant();
-                if (titleLow.Contains(qRaw) || titleLow.Contains(qNormalized))
+                if (!isExactCodeWord && (titleLow.Contains(qRaw) || titleLow.Contains(qNormalized)))
                 {
                     found = hWnd;
                     return false;
@@ -437,6 +497,45 @@ namespace MpeNative
                 }
 
                 if (isTelegramQuery && (titleLow.Contains("telegram") || titleLow.Contains("leonardo")))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
+                if (isVsCodeQuery)
+                {
+                    if (titleLow.Contains("visual studio code"))
+                    {
+                        found = hWnd;
+                        return false;
+                    }
+                    try
+                    {
+                        uint winPid;
+                        GetWindowThreadProcessId(hWnd, out winPid);
+                        if (winPid != 0)
+                        {
+                            using (Process wp = Process.GetProcessById((int)winPid))
+                            {
+                                string wpLow = (wp.ProcessName ?? "").ToLowerInvariant();
+                                if (wpLow == "code")
+                                {
+                                    found = hWnd;
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (isWhatsAppQuery && titleLow.Contains("whatsapp"))
+                {
+                    found = hWnd;
+                    return false;
+                }
+
+                if (isDiscordQuery && titleLow.Contains("discord"))
                 {
                     found = hWnd;
                     return false;
@@ -508,6 +607,7 @@ namespace MpeNative
                 new string[] { "msedge", "Microsoft Edge" },
                 new string[] { "chrome", "Google Chrome" },
                 new string[] { "notepad", "Bloco de Notas (Notepad)" },
+                new string[] { "vscode", "Visual Studio Code" },
                 new string[] { "mspaint", "Paint" },
                 new string[] { "explorer", "Windows Explorer" }
             };
@@ -652,17 +752,30 @@ namespace MpeNative
                 string line;
                 while ((line = Console.ReadLine()) != null)
                 {
-                    string trimmed = line.Trim();
-                    if (trimmed == "QUIT" || trimmed == "EXIT")
+                    string cmd = line.Trim().ToUpperInvariant();
+                    if (cmd == "QUIT" || cmd == "EXIT")
                     {
-                        Application.Exit();
-                        break;
+                        ShutdownDaemon();
+                        return;
+                    }
+                    else if (cmd == "RECORD_ON")
+                    {
+                        _isRecording = true;
+                    }
+                    else if (cmd == "RECORD_OFF")
+                    {
+                        _isRecording = false;
+                    }
+                    else if (cmd == "PING")
+                    {
+                        WriteStdoutLine("PONG");
                     }
                 }
+                ShutdownDaemon();
             }
             catch
             {
-                Application.Exit();
+                ShutdownDaemon();
             }
         }
 
@@ -702,7 +815,15 @@ namespace MpeNative
             {
                 int msg = wParam.ToInt32();
 
-                if (msg == WM_RBUTTONDOWN)
+                if (msg == WM_LBUTTONDOWN)
+                {
+                    if (_isRecording)
+                    {
+                        MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
+                        WriteStdoutLine(string.Format("REC_CLICK|L|{0}|{1}|{2}", hookStruct.pt.x, hookStruct.pt.y, GetNowMs()));
+                    }
+                }
+                else if (msg == WM_RBUTTONDOWN)
                 {
                     bool shift = IsKeyDown(VK_SHIFT);
                     bool ctrl = IsKeyDown(VK_CONTROL);
@@ -721,7 +842,7 @@ namespace MpeNative
 
                         _suppressNextRightUp = true;
 
-                        Console.WriteLine(string.Format(
+                        WriteStdoutLine(string.Format(
                             "TRIGGER_HUD|{0}|{1}|{2}|{3}|{4}|{5}|{6}",
                             hookStruct.pt.x,
                             hookStruct.pt.y,
@@ -731,32 +852,13 @@ namespace MpeNative
                             winSnap,
                             winTitle
                         ));
-                        Console.Out.Flush();
 
                         return (IntPtr)1;
                     }
-                    else if (shift && ctrl && !alt)
+                    else if (_isRecording)
                     {
-                        // Atalho: Shift + Ctrl + Botao Direito do Mouse -> Mini Ajudante Flutuante
                         MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
-                        _lastForegroundHwnd = GetForegroundWindow();
-                        string winTitle = GetWindowTitle(_lastForegroundHwnd);
-                        RECT r = GetAccurateWindowRect(_lastForegroundHwnd);
-                        string rectStr = string.Format("{0},{1},{2},{3}", r.Left, r.Top, r.Right, r.Bottom);
-
-                        _suppressNextRightUp = true;
-
-                        Console.WriteLine(string.Format(
-                            "TRIGGER_MINI|{0}|{1}|{2}|{3}|||{4}",
-                            hookStruct.pt.x,
-                            hookStruct.pt.y,
-                            _lastForegroundHwnd.ToInt64(),
-                            rectStr,
-                            winTitle
-                        ));
-                        Console.Out.Flush();
-
-                        return (IntPtr)1;
+                        WriteStdoutLine(string.Format("REC_CLICK|R|{0}|{1}|{2}", hookStruct.pt.x, hookStruct.pt.y, GetNowMs()));
                     }
                 }
                 else if (msg == WM_RBUTTONUP && _suppressNextRightUp)

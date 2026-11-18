@@ -12,9 +12,12 @@ const REG_VALUE_NAME = 'M.P.E - Mouse Performatico Estrelado';
  * e na pasta Startup do Windows para aparecer em "Aplicativos de inicializacao" do Gerenciador de Tarefas.
  */
 class StartupManager {
-  constructor(rootDir, codeDir) {
+  constructor(rootDir, codeDir, options = {}) {
     this.rootDir = rootDir;
     this.codeDir = codeDir || path.join(rootDir, 'codigo');
+    this.consentManager = options.consentManager || null;
+    this.configManager = options.configManager || null;
+    this.execFile = typeof options.execFile === 'function' ? options.execFile : execFile;
     this.launcherExe = path.join(rootDir, 'MPE.exe');
     this.startupFolder = path.join(
       os.homedir(),
@@ -29,6 +32,41 @@ class StartupManager {
     this.shortcutPath = path.join(this.startupFolder, 'M.P.E - Mouse Performatico Estrelado.lnk');
   }
 
+  setConsentManager(consentManager) {
+    this.consentManager = consentManager || null;
+  }
+
+  setConfigManager(configManager) {
+    this.configManager = configManager || null;
+  }
+
+  hasBackgroundConsent() {
+    if (this.consentManager && typeof this.consentManager.isActionAllowed === 'function') {
+      return this.consentManager.isActionAllowed('backgroundExecution');
+    }
+    if (this.configManager && typeof this.configManager.get === 'function') {
+      const cfg = this.configManager.get();
+      const c = cfg && cfg.consent;
+      return Boolean(
+        c &&
+          c.accepted === true &&
+          (!c.permissions || c.permissions.backgroundExecution !== false)
+      );
+    }
+    return false;
+  }
+
+  getConsentBlockedResponse() {
+    if (this.consentManager && typeof this.consentManager.gateResult === 'function') {
+      return this.consentManager.gateResult();
+    }
+    return {
+      ok: false,
+      blockedByConsent: true,
+      message: 'Aceite de primeiro acesso necessario.'
+    };
+  }
+
   getStartupCommand() {
     if (fs.existsSync(this.launcherExe)) {
       return `"${this.launcherExe}" --startup`;
@@ -39,19 +77,32 @@ class StartupManager {
 
   setStartup(enable) {
     return new Promise((resolve) => {
+      const shouldEnable = Boolean(enable);
+
+      if (shouldEnable && !this.hasBackgroundConsent()) {
+        return resolve(this.getConsentBlockedResponse());
+      }
+
       if (process.platform !== 'win32') {
         return resolve({ ok: false, reason: 'Apenas suportado no Windows' });
       }
 
       if (fs.existsSync(this.launcherExe)) {
-        const flag = enable ? '--enable-startup' : '--disable-startup';
-        execFile(this.launcherExe, [flag], { windowsHide: true }, () => {
-          resolve({ ok: true, enabled: Boolean(enable), command: this.getStartupCommand() });
+        const flag = shouldEnable ? '--enable-startup' : '--disable-startup';
+        this.execFile(this.launcherExe, [flag], { windowsHide: true }, (err) => {
+          if (err) {
+            return resolve({
+              ok: false,
+              enabled: !shouldEnable,
+              error: err.message
+            });
+          }
+          resolve({ ok: true, enabled: shouldEnable, command: this.getStartupCommand() });
         });
         return;
       }
 
-      resolve({ ok: true, enabled: Boolean(enable) });
+      resolve({ ok: true, enabled: shouldEnable });
     });
   }
 
@@ -64,7 +115,7 @@ class StartupManager {
       if (fs.existsSync(this.shortcutPath)) {
         try { fs.unlinkSync(this.shortcutPath); } catch (_) {}
       }
-      execFile(
+      this.execFile(
         'reg.exe',
         ['query', REG_KEY, '/v', REG_VALUE_NAME],
         { windowsHide: true },
@@ -83,7 +134,7 @@ class StartupManager {
     return new Promise((resolve) => {
       try {
         if (fs.existsSync(this.launcherExe)) {
-          execFile(this.launcherExe, ['--ensure-shortcuts'], { windowsHide: true }, (err) => {
+          this.execFile(this.launcherExe, ['--ensure-shortcuts'], { windowsHide: true }, (err) => {
             resolve({ ok: !err });
           });
           return;
@@ -113,7 +164,7 @@ class StartupManager {
           $sc.Description = 'M.P.E - Mouse Performatico Estrelado'
           $sc.Save()
         `;
-        execFile('powershell.exe', ['-NoProfile', '-Command', psScript], { windowsHide: true }, (err) => {
+        this.execFile('powershell.exe', ['-NoProfile', '-Command', psScript], { windowsHide: true }, (err) => {
           resolve({ ok: !err });
         });
       } catch (_) {

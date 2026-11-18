@@ -16,14 +16,7 @@
 ## 4. Integracao Proativa com Sistemas de Destino
 - Ao transferir texto ou prints para um sistema (ex: "Bloco de Notas", "Telegram", "Paint", "Word"), se a janela nao estiver aberta no momento, o executor deve disparar o executavel correspondente e aguardar via polling a janela surgir para colar o conteudo, em vez de falhar silenciosamente.
 
-## 5. Roteamento de Atalhos Duplos de Mouse no Hook Win32
-- Diferenciar no hook de mouse de baixo nivel (`WH_MOUSE_LL`):
-  - `Shift + Ctrl + Alt + Botao Direito`: Convocacao do Astrolabio Circular 3D/2D com pulso estelar de abertura reforçado.
-  - `Shift + Ctrl + Botao Direito` (sem Alt): Convocacao do Mini Assistente Flutuante (Lower Third Sci-Fi).
-- Ambos devem emitir identificadores distintos (`TRIGGER_HUD|` e `TRIGGER_MINI|`) com captura previa de janela e coordenadas `(x, y)` sem lag.
-
-## 6. Mini Assistente Flutuante (Lower Third Sci-Fi) e I.A Local
-- Layout inspirado em lower thirds holograficos: no circular esquerdo com ECG/telemetria animada + capsula chanfrada horizontal.
-- Garantia de persistencia visual: a janela e o widget permanecem sobrepostos na tela mesmo apos interacao ou digitacao, fechando exclusivamente quando o usuario apertar a tecla ESC (`mpe:escape-pressed`) ou o botao fechar.
-- I.A Local Offline com motor embutido de regras gramaticais (~2ms de latencia) e suporte opcional a Ollama / LM Studio.
-- Gravacao direta em Markdown (`.md`) no cofre do Obsidian com metadados YAML (`title`, `date`, `folder`, `tags`, `source`).
+## 5. Hook Win32 Exclusivo do Astrolabio
+- Interceptar no hook de mouse de baixo nivel (`WH_MOUSE_LL`):
+  - `Shift + Ctrl + Alt + Botao Direito`: Convocacao do Astrolabio Circular 3D/2D com pulso estelar de abertura reforcado (`TRIGGER_HUD|`), captura previa de janela e coordenadas `(x, y)` sem lag.
+  - Nao bloquear `Shift + Ctrl + Botao Direito` (sem Alt), permitindo coexistencia simultanea com o projeto irmao Katharos AI (`Artharos`).
