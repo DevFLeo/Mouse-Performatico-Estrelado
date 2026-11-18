@@ -174,24 +174,10 @@
   }
 
   function buildSlotHaloSvg() {
-    const cx = 32;
-    const cy = 32;
-    const rOuter = 30.5;
-    const rInner = 27.2;
-    const ticks = [];
-    for (let i = 0; i < 20; i++) {
-      const a = (i / 20) * Math.PI * 2;
-      const len = i % 2 === 0 ? rInner - 1.2 : rInner;
-      const x1 = (cx + Math.cos(a) * rOuter).toFixed(1);
-      const y1 = (cy + Math.sin(a) * rOuter).toFixed(1);
-      const x2 = (cx + Math.cos(a) * len).toFixed(1);
-      const y2 = (cy + Math.sin(a) * len).toFixed(1);
-      ticks.push(`M${x1} ${y1} L${x2} ${y2}`);
-    }
+    // Anel fino unico (os dentes de serra foram removidos: poluiam o leque)
     return (
       '<svg class="fan-slot-halo" viewBox="0 0 64 64" aria-hidden="true">' +
-      `<circle cx="32" cy="32" r="28.5" fill="none" stroke="var(--gold-primary)" stroke-width="0.9" stroke-opacity="0.6" />` +
-      `<path d="${ticks.join(' ')}" stroke="var(--gold-secondary)" stroke-width="1.15" stroke-linecap="round" stroke-opacity="0.85" />` +
+      '<circle cx="32" cy="32" r="28.5" fill="none" stroke="var(--gold-primary)" stroke-width="0.9" stroke-opacity="0.6" />' +
       '</svg>'
     );
   }
@@ -724,6 +710,10 @@
       if (String(s.slotNumber).length >= 2) btn.classList.add('is-two-digits');
       btn.style.left = `${s.x}px`;
       btn.style.top = `${s.y}px`;
+      // Ponto de partida da animacao de abertura: o centro do Mini
+      btn.style.setProperty('--from-x', `${Math.round((state.hubLocalX || s.x) - s.x)}px`);
+      btn.style.setProperty('--from-y', `${Math.round((state.hubLocalY || s.y) - s.y)}px`);
+      btn.style.setProperty('--i', String(state.buttonRects.length));
       btn.dataset.vectorStyle = s.vectorStyle || 'gold';
       btn.dataset.slotNumber = String(s.slotNumber);
       if (s.point) {
@@ -787,6 +777,11 @@
     state.expanded = true;
     state.paused = true;
     state.justExpandedUntil = Date.now() + 180;
+    if (rootEl) {
+      rootEl.classList.add('is-blooming');
+      clearTimeout(state.bloomTimer);
+      state.bloomTimer = setTimeout(() => rootEl && rootEl.classList.remove('is-blooming'), 320);
+    }
     syncRootAttributes();
     setIgnoreMouseCached(false, false);
 

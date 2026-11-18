@@ -51,15 +51,15 @@ body {
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
+  /* Disco escuro de verdade: o conteudo da janela de tras nao aparece entre os botoes */
   background: radial-gradient(
     circle,
-    rgba(4, 4, 6, 0.56) 0%,
-    rgba(12, 10, 8, 0.34) 55%,
-    rgba(4, 4, 6, 0.04) 88%,
-    rgba(4, 4, 6, 0.015) 97%,
+    rgba(4, 4, 6, 0.94) 0%,
+    rgba(6, 6, 9, 0.9) 62%,
+    rgba(6, 6, 9, 0.55) 82%,
     transparent 100%
   );
-  transition: opacity 140ms ease;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .mini-root.is-expanded .mini-fan-hitplate {
@@ -133,7 +133,8 @@ body {
   display: block;
   transform-origin: 50% 50%;
   will-change: transform;
-  animation: mpeMiniSpin 24s steps(240, end) infinite;
+  /* Giro continuo (antes: steps(240) = 10 quadros/s, parecia engasgado). So transform: roda no compositor. */
+  animation: mpeMiniSpin 30s linear infinite;
   animation-play-state: running;
   pointer-events: none;
 }
@@ -183,7 +184,7 @@ body {
   pointer-events: none;
   outline: none;
   z-index: 15;
-  transition: transform 110ms ease, background-color 110ms ease, border-color 110ms ease, color 110ms ease;
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .mini-root.is-expanded .fan-slot-btn {
@@ -259,8 +260,19 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: auto;
+  pointer-events: none;
   text-align: center;
+  /* Nome so no botao sob o mouse (ou com foco): sem 12 rotulos cortados e sobrepostos */
+  opacity: 0;
+  max-width: none;
+  overflow: visible;
+  z-index: 40;
+  transition: opacity 120ms ease;
+}
+
+.fan-slot-btn:hover .fan-slot-label,
+.fan-slot-btn:focus-visible .fan-slot-label {
+  opacity: 1;
 }
 
 .fan-slot-label.align-left {
@@ -360,4 +372,31 @@ body {
 
 .mini-status.hidden {
   display: none;
+}
+
+/* Abertura do leque: cada botao sai do centro ate o seu lugar, em sequencia (~0,2 s no total) */
+@keyframes mpeFanBloom {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--from-x, 0px), var(--from-y, 0px)) scale(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.mini-root.is-blooming .fan-slot-btn {
+  animation: mpeFanBloom 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 4ms);
+}
+
+/* Windows com 'reduzir movimento': sem giro e sem florescer */
+@media (prefers-reduced-motion: reduce) {
+  .mini-rotator {
+    animation: none;
+  }
+  .mini-root.is-blooming .fan-slot-btn {
+    animation: none;
+  }
 }
