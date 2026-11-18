@@ -1161,6 +1161,11 @@ app.whenReady().then(async () => {
   }
   if (typeof PythonScheduler === 'function') {
     pythonScheduler = new PythonScheduler(managerCtx);
+    // Atalhos (Mini e HUD) que rodam script usam o mesmo agendador: evento de execucao,
+    // HUD escondido na execucao real e mesma politica de timeout.
+    if (actionExecutor && typeof actionExecutor.setPythonScheduler === 'function') {
+      actionExecutor.setPythonScheduler(pythonScheduler);
+    }
   }
 
   if (!isIsolatedConfig && !isSelfTest) {

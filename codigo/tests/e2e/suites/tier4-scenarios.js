@@ -14,6 +14,17 @@ function t(id, features, name, fn) {
   return { id, tier: 4, feature: features, name, fn };
 }
 
+function appMemoryBytes(stats) {
+  let app = 0;
+  let gpu = 0;
+  for (const p of stats.processes) {
+    if (/--type=gpu-process/.test(p.commandLine || '')) gpu += p.workingSetBytes;
+    else app += p.workingSetBytes;
+  }
+  console.log(`[T4-05 MEMORIA] app=${(app / 1048576).toFixed(1)}MB gpu=${(gpu / 1048576).toFixed(1)}MB`);
+  return app;
+}
+
 const tier4Tests = [
   // =========================================================================
   // Scenario 1: Clean-Install Onboarding -> Consent -> Slots 1-4 Execution (Main & Mini)
@@ -163,10 +174,15 @@ const tier4Tests = [
         assert.strictEqual(slot2Exec.lastExecType, 'launch_app_project', `Unexpected Mini Slot 2 type: ${JSON.stringify(slot2Exec)}`);
         assert.strictEqual(slot2Exec.statusIsError, false, `Mini Slot 2 showed error status: ${JSON.stringify(slot2Exec)}`);
 
-        await mini.clickAt(vis[2].rect.cx, vis[2].rect.cy);
+        // Os padroes de fabrica sao 3 (Notas, VS Code, Organizar): localizar os novos pelo nome.
+        const byTitle = (re) => vis.find((v) => re.test(v.title) || re.test(v.text));
+        const urlSlot = byTitle(/Abrir Link Mock/);
+        const chatSlot = byTitle(/Enviar Link Chat/);
+        assert.ok(urlSlot && chatSlot, `Slots de link/chat nao encontrados entre ${vis.length}`);
+        await mini.clickAt(urlSlot.rect.cx, urlSlot.rect.cy);
         const urlHit = await mock.waitForRequest((r) => r.path === '/ok' && r.query.t4 === '1', 5000);
         assert.strictEqual(urlHit.method, 'GET');
-        await mini.clickAt(vis[3].rect.cx, vis[3].rect.cy);
+        await mini.clickAt(chatSlot.rect.cx, chatSlot.rect.cy);
         const chatHit = await mock.waitForRequest((r) => r.path === '/hook', 5000);
         assert.ok(chatHit.bodyRaw.includes('https://mpe.local/scenario1'));
         assert.deepStrictEqual(p2.getErrors(), []);
@@ -511,11 +527,13 @@ const tier4Tests = [
 
           durations.push(Date.now() - cStart);
 
+          // Vazamento real = processos do app (main/renderer). O working set do processo de GPU
+          // oscila em GB por decisao do driver/Windows (diagnostico T5-09) e e reportado a parte.
           if (cycle === 5) {
-            memCycle5 = ctx.processManager.getProcessTreeStats(rootPid).totalWorkingSetBytes;
+            memCycle5 = appMemoryBytes(ctx.processManager.getProcessTreeStats(rootPid));
           }
           if (cycle === 25) {
-            memCycle25 = ctx.processManager.getProcessTreeStats(rootPid).totalWorkingSetBytes;
+            memCycle25 = appMemoryBytes(ctx.processManager.getProcessTreeStats(rootPid));
           }
         }
 

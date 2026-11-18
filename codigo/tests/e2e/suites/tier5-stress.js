@@ -376,6 +376,43 @@ const tier5Tests = [
       await app.close();
     }
   }),
+
+  t('T5-10', 'STRESS', 'Sonda: clique sintetico chega na janela alvo (sem M.P.E, com M.P.E, HUD oculto)', async (ctx) => {
+    const mock = new MockServer();
+    await mock.start();
+    let target = null;
+    let app = null;
+    const results = {};
+    const probe = async (label) => {
+      mock.clear();
+      const b = target.bounds;
+      h.performWin32Click(b.x + 60, b.y + 60);
+      await sleep(700);
+      results[label] = mock.getClickEvents().length;
+    };
+    try {
+      target = await h.launchClickTargetWindow(ctx, mock, { x: 120, y: 120, width: 260, height: 260 });
+      await probe('sem_mpe');
+      app = await h.launchIsolatedApp(ctx, 'T5-10');
+      await sleep(800);
+      await probe('mpe_hud_visivel');
+      await app.mainPage.eval(() => window.mpeApi.hideHud());
+      await sleep(500);
+      await probe('mpe_hud_oculto');
+      const vis = await app.mainPage.eval(async () =>
+        window.mpeApi.isMainWindowVisible ? window.mpeApi.isMainWindowVisible() : 'n/a'
+      );
+      const detail = `${JSON.stringify(results)} mainVisivelAposHide=${vis}`;
+      console.log(`[T5-10 SONDA] ${detail}`);
+      assert.ok(results.sem_mpe >= 1, `Clique sintetico nao chega nem sem o M.P.E: ${detail}`);
+      assert.ok(results.mpe_hud_oculto >= 1, `Com HUD oculto o clique nao chega: ${detail}`);
+      return detail;
+    } finally {
+      if (target) await target.close();
+      if (app) await app.close();
+      await mock.stop();
+    }
+  }),
 ];
 
 module.exports = { tier5Tests };
