@@ -324,6 +324,14 @@
     }
 
     if (splash) {
+      // Entrada suave dos paineis quando a tela de boas-vindas some (antes: tudo aparecia de uma vez)
+      new MutationObserver(() => {
+        if (splash.classList.contains('hidden') && !document.body.classList.contains('hud-entered')) {
+          document.body.classList.add('hud-entering', 'hud-entered');
+          setTimeout(() => document.body.classList.remove('hud-entering'), 700);
+        }
+      }).observe(splash, { attributes: true, attributeFilter: ['class'] });
+
       const splashObs = new MutationObserver(() => {
         if (
           splash.classList.contains('hidden') &&
@@ -2236,8 +2244,16 @@
     }
 
     const canvas = document.getElementById('astrolabe-canvas');
+    const blackDotCore = document.getElementById('central-black-dot-core');
     astrolabe = new window.Astrolabe3D(canvas, {
       startPaused: true,
+      // Um centro so: o ponto preto 'M.P.E' fica exatamente sobre o pivo do astrolabio
+      onNexusMove: (x, y) => {
+        if (blackDotCore) {
+          blackDotCore.style.left = `${x}px`;
+          blackDotCore.style.top = `${y}px`;
+        }
+      },
       onPointHover: handlePointHover,
       onPointClick: handlePointExecute,
       onModeChange: (newMode) => {

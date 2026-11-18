@@ -1069,6 +1069,16 @@ class Astrolabe3D {
 
     const nexusScreen = this.project3D(nexus3D.x, nexus3D.y, nexus3D.z, baseR);
     this.nexusScreenPos = { x: nexusScreen.x, y: nexusScreen.y, r: 22 };
+    // Avisa a interface quando o pivo muda de lugar (o ponto preto central acompanha)
+    if (this.callbacks && typeof this.callbacks.onNexusMove === 'function') {
+      const nx = Math.round(nexusScreen.x);
+      const ny = Math.round(nexusScreen.y);
+      if (nx !== this._lastNexusX || ny !== this._lastNexusY) {
+        this._lastNexusX = nx;
+        this._lastNexusY = ny;
+        this.callbacks.onNexusMove(nx, ny);
+      }
+    }
 
     // Varredura de Radar: segue o mouse com suavizacao (menor caminho angular)
     if (typeof this.pointerX === 'number') {

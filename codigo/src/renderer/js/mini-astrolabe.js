@@ -724,9 +724,7 @@
         'aria-label',
         s.isEmptyCta ? 'Nenhum atalho salvo' : `Atalho ${s.slotNumber}: ${s.title}`
       );
-      btn.title = s.isEmptyCta
-        ? 'Nenhum atalho salvo'
-        : `${s.slotNumber}${s.point && s.point.hotkeyLetter ? ' ou ' + s.point.hotkeyLetter : ''}. ${s.title}`;
+      // Sem 'title' nativo: o rotulo dourado ja mostra o nome (a dica do Windows duplicava o texto)
 
       const numSpan = document.createElement('span');
       numSpan.className = 'fan-slot-num';
