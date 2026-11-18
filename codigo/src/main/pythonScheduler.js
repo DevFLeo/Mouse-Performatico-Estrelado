@@ -148,6 +148,9 @@ function killProcessTreeSync(proc, pid) {
 
 class PythonScheduler {
   constructor(ctx = {}) {
+    // Execucao real: esconde o HUD antes (senao o script clica no proprio M.P.E) e restaura depois.
+    this.onBeforeRealReplay =
+      typeof ctx.onBeforeRealReplay === 'function' ? ctx.onBeforeRealReplay : null;
     this.configManager = ctx.configManager || null;
     this.consentManager = ctx.consentManager || null;
     this.broadcastToAllWindows =
@@ -366,6 +369,26 @@ class PythonScheduler {
     }
   }
 
+  async _withReplayGuard(dryRun, runFn) {
+    let restore = null;
+    if (!dryRun && this.onBeforeRealReplay) {
+      try {
+        restore = await this.onBeforeRealReplay();
+      } catch (_) {
+        restore = null;
+      }
+    }
+    try {
+      return await runFn();
+    } finally {
+      if (typeof restore === 'function') {
+        try {
+          restore();
+        } catch (_) {}
+      }
+    }
+  }
+
   async runScript(scriptIdOrPathOrPayload, options = {}) {
     const gate = this._checkConsent();
     if (gate) return gate;
@@ -427,7 +450,7 @@ class PythonScheduler {
     const py = this.resolvePythonBinary();
     const args = [...py.prefixArgs, scriptPath, ...(dryRun ? ['--dry-run'] : [])];
 
-    return await new Promise((resolve) => {
+    return await this._withReplayGuard(dryRun, () => new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
       let settled = false;
@@ -542,7 +565,7 @@ class PythonScheduler {
       child.on('close', (code, signal) => {
         finish(code, signal);
       });
-    });
+    }));
   }
 
   async scheduleScript(scriptId, schedule = {}) {

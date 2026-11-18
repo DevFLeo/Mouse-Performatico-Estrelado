@@ -1136,7 +1136,22 @@ app.whenReady().then(async () => {
     broadcastToAllWindows,
     broadcastConfigUpdated,
     codeDir: CODE_DIR,
-    rootDir: ROOT_DIR
+    rootDir: ROOT_DIR,
+    // Antes de um auto-script real: esconde o HUD (sempre por cima) para os cliques chegarem
+    // nos aplicativos de baixo. Devolve a funcao que restaura o HUD ao terminar.
+    onBeforeRealReplay: async () => {
+      const wasVisible = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+      if (wasVisible) {
+        mainWindow.hide();
+        await new Promise((r) => setTimeout(r, 180));
+      }
+      logDebug(`[PY REPLAY] HUD ${wasVisible ? 'escondido' : 'ja oculto'} antes da execucao real`);
+      return () => {
+        if (wasVisible && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.showInactive();
+        }
+      };
+    }
   };
   if (typeof MiniAstrolabeManager === 'function') {
     miniAstrolabeManager = new MiniAstrolabeManager(managerCtx);
