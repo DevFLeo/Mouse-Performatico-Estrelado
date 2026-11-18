@@ -869,7 +869,8 @@ async function main() {
           50,
           `canto ${corner.name}`
         );
-        await sleep(100);
+        // Espera o redesenho apos mudar o tamanho da janela (100 ms as vezes media o layout anterior)
+        await sleep(350);
 
         const g = await miniCdp.eval(`
           (async () => {

@@ -133,9 +133,9 @@ body {
   display: block;
   transform-origin: 50% 50%;
   will-change: transform;
-  /* 20 quadros/s em 30 s por volta = 0,6 grau por passo: parece continuo e gasta cerca de metade
-     da CPU do giro a 60 quadros/s (antes: 10 quadros/s, 1,5 grau por passo, parecia engasgado). */
-  animation: mpeMiniSpin 30s steps(600, end) infinite;
+  /* Giro lento: 60 s por volta em 600 passos = 10 quadros/s (mesma CPU do original, ~0,45%),
+     mas so 0,6 grau por passo, entao parece continuo. Antes: 1,5 grau por passo, parecia engasgado. */
+  animation: mpeMiniSpin 60s steps(600, end) infinite;
   animation-play-state: running;
   pointer-events: none;
 }
