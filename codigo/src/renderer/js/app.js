@@ -178,10 +178,10 @@
       if (span) span.textContent = text;
       else el.textContent = text;
     };
-    setBtnLabel('btn-add-star', 'Novo Botão');
+    setBtnLabel('btn-add-star', 'Criar atalho');
     setBtnLabel('btn-settings', dict.btnSettings || 'Configurações');
     setBtnLabel('btn-recenter', dict.btnRecenter || 'Centralizar');
-    setBtnLabel('btn-hide-hud', dict.btnHide || 'Minimizar');
+    setBtnLabel('btn-hide-hud', dict.btnHide || 'Fechar (ESC)');
 
     const regTitle = document.getElementById('reg-modal-title');
     if (regTitle) regTitle.textContent = dict.registerTitle;
@@ -497,7 +497,7 @@
     const badge = document.getElementById('hud-mode-badge');
     if (btn2d) btn2d.classList.toggle('active', mode === '2d');
     if (btn3d) btn3d.classList.toggle('active', mode === '3d');
-    if (badge) badge.textContent = mode === '2d' ? '2D WIN32' : '3D WIN32';
+    if (badge) badge.textContent = mode === '2d' ? 'Visão 2D' : 'Visão 3D';
   }
 
   async function executeQuick2DAction() {
@@ -1506,19 +1506,19 @@
       execBtn.type = 'button';
       execBtn.className = 'slot-mini-btn slot-exec-btn';
       execBtn.title = `Executar Slot ${idx + 1}`;
-      execBtn.textContent = 'Ir';
+      execBtn.textContent = 'Usar';
       execBtn.addEventListener('click', () => handlePointExecute(pt));
 
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
       editBtn.className = 'slot-mini-btn slot-edit-btn';
       editBtn.title = `Editar Slot ${idx + 1}`;
-      editBtn.textContent = 'Ed';
+      editBtn.textContent = 'Editar';
       editBtn.addEventListener('click', () => openPointModal(pt));
 
       const upBtn = document.createElement('button');
       upBtn.type = 'button';
-      upBtn.className = 'slot-mini-btn slot-reorder-btn';
+      upBtn.className = 'slot-mini-btn slot-reorder-btn advanced-only';
       upBtn.dataset.reorderDir = 'up';
       upBtn.dataset.index = String(idx);
       upBtn.disabled = idx === 0;
@@ -1528,7 +1528,7 @@
 
       const downBtn = document.createElement('button');
       downBtn.type = 'button';
-      downBtn.className = 'slot-mini-btn slot-reorder-btn';
+      downBtn.className = 'slot-mini-btn slot-reorder-btn advanced-only';
       downBtn.dataset.reorderDir = 'down';
       downBtn.dataset.index = String(idx);
       downBtn.disabled = idx === pts.length - 1;
@@ -1929,6 +1929,8 @@
       if (!el) return;
       el.classList.toggle('is-floating-custom', Boolean(st.floating));
       el.classList.toggle('dock-lateral', Boolean(st.lateral));
+      // Menu na lateral: afasta o painel 'Meus atalhos' para nao ficar por baixo do menu
+      document.body.classList.toggle('topbar-lateral', Boolean(st.lateral));
       el.classList.toggle('cascade-mode', Boolean(st.cascade));
 
       if (st.floating) {

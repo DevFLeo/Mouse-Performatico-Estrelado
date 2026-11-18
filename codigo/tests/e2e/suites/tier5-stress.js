@@ -369,8 +369,13 @@ const tier5Tests = [
       const lines = Object.entries(report).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
       ctx.diagnostic = lines.join(' | ');
       console.log(`[T5-09 MEMORIA] ${ctx.diagnostic}`);
-      const worst = Object.entries(report).sort((a, b) => b[1].total - a[1].total)[0];
-      assert.ok(worst[1].total <= 60, `Etapa '${worst[0]}' cresceu ${worst[1].total} MB em 15 ciclos -> ${lines.join(' | ')}`);
+      // Reprova so por crescimento dos processos do app; a GPU (driver) e apenas reportada.
+      const appGrowth = (v) => v.total - (v['gpu-process'] || 0);
+      const worst = Object.entries(report).sort((a, b) => appGrowth(b[1]) - appGrowth(a[1]))[0];
+      assert.ok(
+        appGrowth(worst[1]) <= 60,
+        `Etapa '${worst[0]}' cresceu ${appGrowth(worst[1])} MB (sem GPU) em 15 ciclos -> ${lines.join(' | ')}`
+      );
       return lines.join(' | ');
     } finally {
       await app.close();

@@ -3157,3 +3157,9 @@ body.theme-light .workspace-tab.active {
   background: #B88A1E;
   color: #08070A;
 }
+
+/* Menu lateral a esquerda: painel de atalhos vai para o lado dele, sem sobrepor */
+body.topbar-lateral .central-slots-panel {
+  left: 240px;
+  top: 16px;
+}

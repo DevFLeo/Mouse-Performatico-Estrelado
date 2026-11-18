@@ -21,7 +21,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Ponto',
     btnSettings: 'Configurações',
     btnRecenter: 'Centralizar',
-    btnHide: 'Minimizar',
+    btnHide: 'Fechar (ESC)',
     toastExecuted: (title) => `Ponto "${title}" executado.`,
     toastSaved: 'Configurações salvas.'
   },
@@ -41,7 +41,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Ponto',
     btnSettings: 'Configurações',
     btnRecenter: 'Centralizar',
-    btnHide: 'Minimizar',
+    btnHide: 'Fechar (ESC)',
     toastExecuted: (title) => `Ponto "${title}" executado.`,
     toastSaved: 'Configurações salvas.'
   },
@@ -61,7 +61,7 @@ window.MPE_TONES = {
     btnAddStar: '+ Ponto',
     btnSettings: 'Configurações',
     btnRecenter: 'Centralizar',
-    btnHide: 'Minimizar',
+    btnHide: 'Fechar (ESC)',
     toastExecuted: (title) => `Operação "${title}" concluída.`,
     toastSaved: 'Configurações salvas.'
   }
