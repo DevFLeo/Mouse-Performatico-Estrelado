@@ -869,8 +869,9 @@ async function main() {
           50,
           `canto ${corner.name}`
         );
-        // Espera o redesenho apos mudar o tamanho da janela (100 ms as vezes media o layout anterior)
-        await sleep(350);
+        // 100 ms: o leque foi aberto pela API, sem o mouse por cima; esperar mais deixa o
+        // recolhimento automatico (correto no uso real) encolher a janela antes da medicao.
+        await sleep(100);
 
         const g = await miniCdp.eval(`
           (async () => {
@@ -908,7 +909,10 @@ async function main() {
             const a = g.btns[i];
             const b = g.btns[j];
             const ov = !(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1);
-            assert.ok(!ov, `Canto ${corner.name} sobreposicao entre slots ${a.slot} e ${b.slot}`);
+            assert.ok(
+              !ov,
+              `Canto ${corner.name} sobreposicao entre slots ${a.slot} e ${b.slot}: ${JSON.stringify({ a, b, bounds: g.bounds, workArea: g.workArea, todos: g.btns })}`
+            );
           }
         }
       }
