@@ -232,10 +232,23 @@ const tier5Tests = [
       }
       await sleep(3000);
       const s1 = ctx.processManager.getProcessTreeStats(app.session.pid);
-      const mb = (s1.totalWorkingSetBytes - s0.totalWorkingSetBytes) / (1024 * 1024);
-      assert.ok(mb <= 60, `Memoria cresceu ${mb.toFixed(1)} MB em 200 aberturas`);
+      // Mesmo criterio de T4-05/T5-09: processos do app; GPU (driver) so reportada.
+      const split = (st) => {
+        let app = 0;
+        let gpu = 0;
+        for (const p of st.processes) {
+          if (/--type=gpu-process/.test(p.commandLine || '')) gpu += p.workingSetBytes;
+          else app += p.workingSetBytes;
+        }
+        return { app, gpu };
+      };
+      const a0 = split(s0);
+      const a1 = split(s1);
+      const mb = (a1.app - a0.app) / (1024 * 1024);
+      const gpuMb = (a1.gpu - a0.gpu) / (1024 * 1024);
+      assert.ok(mb <= 60, `Memoria do app cresceu ${mb.toFixed(1)} MB em 200 aberturas (GPU ${gpuMb.toFixed(1)} MB)`);
       assert.deepStrictEqual(mini.getErrors(), []);
-      return `crescimento ${mb.toFixed(1)} MB`;
+      return `app ${mb.toFixed(1)} MB, GPU ${gpuMb.toFixed(1)} MB`;
     } finally {
       await app.close();
     }
