@@ -446,7 +446,7 @@
       const ctrlHalfW = controls.w / 2;
       const ctrlHalfH = controls.h / 2;
 
-      for (let iter = 0; iter < 64; iter++) {
+      for (let iter = 0; iter < 200; iter++) { // 200: converge mesmo com hub + cantos (M4-05)
         let movedAny = false;
 
         for (let i = 0; i < slots.length; i++) {
