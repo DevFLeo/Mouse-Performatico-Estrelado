@@ -71,7 +71,10 @@ class MiniAstrolabeManager {
     const cfg = this.configManager && typeof this.configManager.get === 'function'
       ? this.configManager.get()
       : null;
-    return cfg && Array.isArray(cfg.points) ? cfg.points.length : 0;
+    const pts = cfg && Array.isArray(cfg.points) ? cfg.points : [];
+    // Mesma regra do leque: favoritos (showInMini) se houver, limitado a 12 (layout validado sem sobreposicao).
+    const favCount = pts.filter((p) => p && p.showInMini === true).length;
+    return Math.min(12, favCount > 0 ? favCount : pts.length);
   }
 
   normalizeMiniConfig(raw = {}) {

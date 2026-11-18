@@ -470,7 +470,9 @@
 
     const pts = (currentConfig && Array.isArray(currentConfig.points)) ? currentConfig.points : [];
     const hotkeyIdx = pts.findIndex((p) => p && p.id === point.id);
-    document.getElementById('insp-code').textContent = point.code || '00 1';
+    const inspCodeEl = document.getElementById('insp-code');
+    inspCodeEl.textContent = hotkeyIdx >= 0 ? `Atalho ${hotkeyIdx + 1}` : (point.code || '00 1');
+    inspCodeEl.title = point.code ? `Codigo estelar: ${point.code}` : '';
     document.getElementById('insp-title').textContent = point.title || 'Ponto Estelar';
     const hotkeyEl = document.getElementById('insp-hotkey');
     if (hotkeyEl) {
@@ -974,6 +976,9 @@
         typeof point.customRadius === 'number' ? String(point.customRadius) : '';
       document.getElementById('pt-vector-style').value = point.vectorStyle || 'gold';
       document.getElementById('pt-glyph').value = point.glyph || '';
+      if (document.getElementById('pt-show-in-mini')) {
+        document.getElementById('pt-show-in-mini').checked = point.showInMini === true;
+      }
 
       const p = point.params || {};
       const defaultScope = (point.actionType || '').startsWith('area_') ? 'area' : (p.captureScope || 'active_window');
@@ -1043,6 +1048,9 @@
       document.getElementById('pt-custom-radius').value = '';
       document.getElementById('pt-vector-style').value = 'gold';
       document.getElementById('pt-glyph').value = 'Π';
+      if (document.getElementById('pt-show-in-mini')) {
+        document.getElementById('pt-show-in-mini').checked = false;
+      }
 
       document.getElementById('pt-save-dir').value =
         (currentConfig.telegram && currentConfig.telegram.savedScreenshotsFolder) ||
@@ -1313,6 +1321,7 @@
       vectorStyle,
       glyph,
       hasArrow: vectorStyle === 'blue',
+      showInMini: Boolean(document.getElementById('pt-show-in-mini') && document.getElementById('pt-show-in-mini').checked),
       params
     };
   }

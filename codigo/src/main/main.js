@@ -38,6 +38,27 @@ process.on('exit', (code) => {
 // Identificador unico do aplicativo no Windows para agrupar e fixar na Barra de Tarefas com o icone do M.P.E
 const APP_USER_MODEL_ID = 'DevFLeo.MousePerformaticoEstrelado';
 app.setAppUserModelId(APP_USER_MODEL_ID);
+
+// Registro de travamentos: toda janela que congelar (UI sem resposta) fica anotada no log com a duracao.
+app.on('browser-window-created', (_evt, win) => {
+  let frozenSince = 0;
+  const label = () => {
+    try { return win.getTitle() || `janela-${win.id}`; } catch (_) { return 'janela'; }
+  };
+  win.on('unresponsive', () => {
+    frozenSince = Date.now();
+    logDebug(`[FREEZE] ${label()} parou de responder`);
+  });
+  win.on('responsive', () => {
+    if (frozenSince) {
+      logDebug(`[FREEZE END] ${label()} voltou apos ${Date.now() - frozenSince}ms`);
+      frozenSince = 0;
+    }
+  });
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logDebug(`[RENDER GONE] ${label()} reason=${details && details.reason} exitCode=${details && details.exitCode}`);
+  });
+});
 app.name = 'M.P.E - Mouse Performatico Estrelado';
 
 // Otimizacoes de GPU e memoria para maxima fluidez do motor 2D e 3D

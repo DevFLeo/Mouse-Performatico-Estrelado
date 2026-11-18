@@ -143,11 +143,24 @@
     renderFan();
   }
 
+  // Mesmo numero do M.P.E principal: slotNumber = posicao na lista unica de pontos.
+  // Se houver favoritos marcados (showInMini), o leque mostra so eles; senao os primeiros.
+  const MINI_MAX_SLOTS = 12;
+  function selectMiniPoints(rawPoints) {
+    const all = Array.isArray(rawPoints) ? rawPoints : [];
+    const numbered = all.map((pt, idx) =>
+      Object.assign({}, pt, { slotNumber: Number(pt && pt.slotNumber) || idx + 1 })
+    );
+    const favorites = numbered.filter((pt) => pt && pt.showInMini === true);
+    const base = favorites.length > 0 ? favorites : numbered;
+    return base.slice(0, MINI_MAX_SLOTS);
+  }
+
   function applyConfig(cfg) {
     if (!cfg || typeof cfg !== 'object') return;
     state.config = cfg;
     applyTheme(cfg);
-    state.points = Array.isArray(cfg.points) ? cfg.points.slice() : [];
+    state.points = selectMiniPoints(cfg.points);
     if (cfg.consent && typeof cfg.consent.accepted === 'boolean') {
       state.consentAccepted = cfg.consent.accepted;
     }
@@ -412,7 +425,7 @@
           const by = clamp(hubY + Math.sin(ang) * ringR, safeTop, safeBottom);
           slots.push({
             point: pt,
-            slotNumber: cursor + 1,
+            slotNumber: (pt && Number(pt.slotNumber)) || cursor + 1,
             title: (pt && pt.title) || `Atalho ${cursor + 1}`,
             vectorStyle: (pt && pt.vectorStyle) || 'gold',
             x: bx,
@@ -986,12 +999,13 @@
         return;
       }
       if (/^[1-9]$/.test(e.key) && state.expanded) {
-        const idx = Number(e.key) - 1;
-        if (state.points[idx]) {
+        const wanted = Number(e.key);
+        const pt = state.points.find((p) => Number(p && p.slotNumber) === wanted);
+        if (pt) {
           handleSlotExecute({
-            point: state.points[idx],
-            slotNumber: idx + 1,
-            title: state.points[idx].title || `Atalho ${idx + 1}`
+            point: pt,
+            slotNumber: wanted,
+            title: pt.title || `Atalho ${wanted}`
           });
         }
       }

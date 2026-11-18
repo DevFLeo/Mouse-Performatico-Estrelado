@@ -378,6 +378,15 @@ class ConfigManager {
       rootData.autoScripts = [];
     }
 
+    // Numero unico e compartilhado (M.P.E principal e Mini Astrolabio): posicao + 1.
+    if (Array.isArray(rootData.points)) {
+      rootData.points = rootData.points.map((pt, idx) =>
+        pt && typeof pt === 'object'
+          ? Object.assign({}, pt, { slotIndex: idx, slotNumber: idx + 1 })
+          : pt
+      );
+    }
+
     if (rootData.points.length === 0 && (!fileExisted || isInitialCleanState || !wasRegistered)) {
       rootData.points = createCleanDefaultPoints();
     }
@@ -499,6 +508,13 @@ class ConfigManager {
       }
       if ('autoScripts' in safePatch && !Array.isArray(safePatch.autoScripts)) {
         delete safePatch.autoScripts;
+      }
+      if (Array.isArray(safePatch.points)) {
+        safePatch.points = safePatch.points.map((pt, idx) =>
+          pt && typeof pt === 'object'
+            ? Object.assign({}, pt, { slotIndex: idx, slotNumber: idx + 1 })
+            : pt
+        );
       }
       this.config = Object.assign({}, this.config || {}, safePatch);
     }
