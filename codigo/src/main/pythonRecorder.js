@@ -911,6 +911,9 @@ class PythonRecorder {
       const stoppedPayload = {
         active: false,
         stepCount: finalSteps.length,
+        // Os cliques vao junto: parar pelo ESC ou pela faixa de gravacao nao devolve nada ao painel,
+        // e sem eles o botao 'Salvar Script .py' nao tinha o que salvar.
+        steps: finalSteps.map((s) => Object.assign({}, s)),
         lastStep,
         startedAt: this._startedAt || null,
         elapsedMs: this._startedAt ? Math.max(0, Date.now() - this._startedAt) : 0

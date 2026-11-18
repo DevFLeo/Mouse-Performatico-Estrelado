@@ -2172,6 +2172,17 @@
           prev.classList.remove('hidden');
           prev.textContent = `Ultimo clique: (${st.lastStep.x}, ${st.lastStep.y}) [${st.lastStep.button || 'left'}] +${st.lastStep.waitMs || 0}ms`;
         }
+        // Gravacao parada por qualquer caminho (botao, ESC, faixa de gravacao): guarda os cliques
+        // e libera o Salvar.
+        if (!isRecordingPython && Array.isArray(st.steps)) {
+          lastRecordedSteps = st.steps;
+          const saveBtn = document.getElementById('btn-py-save-script');
+          if (saveBtn) saveBtn.disabled = lastRecordedSteps.length === 0;
+          if (prev && lastRecordedSteps.length > 0) {
+            prev.classList.remove('hidden');
+            prev.textContent = `${lastRecordedSteps.length} clique(s) gravado(s). Clique em Salvar Script .py.`;
+          }
+        }
       });
     }
     if (window.mpeApi && window.mpeApi.onPythonScriptExecuted) {
@@ -2506,6 +2517,11 @@
             prev.textContent = `${lastRecordedSteps.length} clique(s) gravado(s). Clique em Salvar Script .py.`;
           }
           if (res.script) {
+            // Parar pelo botao do painel ja salva o script: evita um segundo Salvar duplicado
+            lastRecordedSteps = [];
+            if (btnPySave) btnPySave.disabled = true;
+            if (prev) prev.textContent = `Script "${res.script.name || name}" salvo com ${res.steps.length} clique(s).`;
+            showToast(`Script Python "${res.script.name || name}" salvo.`);
             currentConfig = await window.mpeApi.getConfig();
             applySyncedConfig(currentConfig);
           }

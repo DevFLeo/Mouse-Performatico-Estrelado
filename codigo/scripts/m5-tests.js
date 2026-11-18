@@ -1156,6 +1156,35 @@ async function runM5Suite({ runCase, makeTempDir: extMakeTempDir, rmSafe: extRmS
     }
   });
 
+  await runCase('M5 - Stop via ESC/Overlay', 'M5-16', 'Parar pelo ESC ou pela faixa de gravacao entrega os cliques ao painel (para poder Salvar)', async () => {
+    const tmpDir = mkTmp('mpe-m5-16-');
+    const env = createIsolatedEnv(tmpDir, true, true);
+    try {
+      const rec = new PythonRecorder(env.ctx);
+      const started = await rec.startRecording({ headless: true });
+      assert.strictEqual(started.ok, true, `start falhou: ${JSON.stringify(started)}`);
+      env.ctx.hookBridge.emit('rec-click', { button: 'left', rawButton: 'L', x: 1019, y: 524, timestampMs: 1000 });
+      env.ctx.hookBridge.emit('rec-click', { button: 'left', rawButton: 'L', x: 300, y: 200, timestampMs: 1655 });
+      // ESC e a faixa de gravacao param sem nome (o painel nao recebe o retorno da chamada)
+      await rec.stopRecording({ reason: 'escape' });
+      const stopped = env.broadcasts
+        .filter((b) => b.channel === 'mpe:py-recording-state' && b.payload && b.payload.active === false)
+        .pop();
+      assert.ok(stopped, 'Nenhum aviso de parada foi enviado');
+      assert.ok(Array.isArray(stopped.payload.steps), 'Aviso de parada sem a lista de cliques: o painel nao consegue salvar');
+      assert.strictEqual(stopped.payload.steps.length, 2);
+      assert.strictEqual(stopped.payload.steps[0].x, 1019);
+      // E o painel consegue salvar com esses cliques
+      const saved = await rec.saveScript({ name: 'jorhge', steps: stopped.payload.steps });
+      assert.strictEqual(saved.ok, true, `save falhou: ${JSON.stringify(saved)}`);
+      assert.ok(fs.existsSync(saved.script.filePath), 'Arquivo .py nao foi criado');
+      return `2 cliques no aviso de parada; salvo em ${path.basename(saved.script.filePath)}`;
+    } finally {
+      if (env.restoreEnv) env.restoreEnv();
+      rmTmp(tmpDir);
+    }
+  });
+
   await runCase('M5 - Production Isolation', 'M5-10', 'Arquivos de producao mpe.config.json e codigo/data/ permanecem intactos', () => {
     const prodConfigShaAfter = sha256File(prodConfigPath);
     const prodDataAfter = snapshotDirEntries(prodDataDir);
