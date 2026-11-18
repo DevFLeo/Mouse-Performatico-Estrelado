@@ -310,7 +310,72 @@ const tier5Tests = [
       await app.close();
       await mock.stop();
     }
-  })
+  }),
+
+  t('T5-09', 'STRESS', 'Diagnostico de memoria por etapa (HUD, Organizador, 2D/3D, Mini) e por processo', async (ctx) => {
+    const app = await h.launchIsolatedApp(ctx, 'T5-09');
+    const rootPid = app.session.pid;
+    const byType = () => {
+      const st = ctx.processManager.getProcessTreeStats(rootPid);
+      const out = {};
+      for (const p of st.processes) {
+        const m = /--type=([a-z-]+)/.exec(p.commandLine || '');
+        const k = m ? m[1] : (p.name || 'proc').toLowerCase();
+        out[k] = (out[k] || 0) + p.workingSetBytes;
+      }
+      out.total = st.totalWorkingSetBytes;
+      return out;
+    };
+    const diff = (a, b) => {
+      const r = {};
+      for (const k of Object.keys(b)) r[k] = Math.round(((b[k] || 0) - (a[k] || 0)) / (1024 * 1024));
+      return r;
+    };
+    try {
+      const mini = await h.connectMiniPage(app.session);
+      await sleep(5000);
+      const phases = {
+        hud_hide_show: async () => {
+          await app.mainPage.eval(() => window.mpeApi.hideHud());
+          await sleep(40);
+          await app.mainPage.eval(() =>
+            window.mpeApi.executePoint({ id: 'wake', actionType: 'open_organizer', params: {} })
+          );
+          await sleep(40);
+        },
+        organizer_tab: async () => {
+          await app.mainPage.click('#btn-dock-organizer');
+          await app.mainPage.waitForSelector('#organizer-workspace', 2500).catch(() => {});
+          await app.mainPage.click('#btn-org-back-astrolabe');
+          await sleep(40);
+        },
+        toggle_2d_3d: async () => {
+          await app.mainPage.pressKey('Tab', 'Tab');
+          await sleep(60);
+        },
+        mini_hover: async () => {
+          await mini.hover(HUB_SEL);
+          await sleep(60);
+          await mini.moveOutside();
+        }
+      };
+      const report = {};
+      for (const [name, fn] of Object.entries(phases)) {
+        const before = byType();
+        for (let i = 0; i < 15; i++) await fn();
+        await sleep(2500);
+        report[name] = diff(before, byType());
+      }
+      const lines = Object.entries(report).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+      ctx.diagnostic = lines.join(' | ');
+      console.log(`[T5-09 MEMORIA] ${ctx.diagnostic}`);
+      const worst = Object.entries(report).sort((a, b) => b[1].total - a[1].total)[0];
+      assert.ok(worst[1].total <= 60, `Etapa '${worst[0]}' cresceu ${worst[1].total} MB em 15 ciclos -> ${lines.join(' | ')}`);
+      return lines.join(' | ');
+    } finally {
+      await app.close();
+    }
+  }),
 ];
 
 module.exports = { tier5Tests };
