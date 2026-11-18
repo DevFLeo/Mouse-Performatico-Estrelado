@@ -533,6 +533,44 @@
 
         if (!movedAny) break;
       }
+
+      // Passada final deterministica: o empurra-empurra acima pode oscilar em cantos (M4-05).
+      // Se dois botoes ainda se sobrepoem, o mais distante do centro sai para fora na propria
+      // direcao; se a borda impedir, desliza ao longo dela.
+      const boxOverlap = (a, b) =>
+        Math.abs(a.x - b.x) < aabbMinSep && Math.abs(a.y - b.y) < aabbMinSep;
+      for (let pass = 0; pass < 80; pass++) {
+        let fixed = false;
+        for (let i = 0; i < slots.length; i++) {
+          for (let j = i + 1; j < slots.length; j++) {
+            const a = slots[i];
+            const b = slots[j];
+            if (!boxOverlap(a, b)) continue;
+            const da = Math.hypot(a.x - hubX, a.y - hubY);
+            const db = Math.hypot(b.x - hubX, b.y - hubY);
+            const mover = db >= da ? b : a;
+            const other = mover === b ? a : b;
+            const dist = Math.max(1, Math.hypot(mover.x - hubX, mover.y - hubY));
+            const ux = (mover.x - hubX) / dist;
+            const uy = (mover.y - hubY) / dist;
+            const step = aabbMinSep / 2;
+            const beforeX = mover.x;
+            const beforeY = mover.y;
+            mover.x = clamp(mover.x + ux * step, safeLeft, safeRight);
+            mover.y = clamp(mover.y + uy * step, safeTop, safeBottom);
+            if (Math.abs(mover.x - beforeX) < 0.5 && Math.abs(mover.y - beforeY) < 0.5) {
+              // Preso na borda: desliza perpendicular, para longe do outro botao
+              const px = -uy;
+              const py = ux;
+              const sign = (mover.x - other.x) * px + (mover.y - other.y) * py >= 0 ? 1 : -1;
+              mover.x = clamp(mover.x + px * sign * step, safeLeft, safeRight);
+              mover.y = clamp(mover.y + py * sign * step, safeTop, safeBottom);
+            }
+            fixed = true;
+          }
+        }
+        if (!fixed) break;
+      }
     }
 
     let maxReach = hubDia / 2 + 32;
