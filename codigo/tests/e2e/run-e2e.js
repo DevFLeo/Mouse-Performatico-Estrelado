@@ -16,6 +16,7 @@ const { tier1Tests } = require('./suites/tier1-features');
 const { tier2Tests } = require('./suites/tier2-boundaries');
 const { tier3Tests } = require('./suites/tier3-combinations');
 const { tier4Tests } = require('./suites/tier4-scenarios');
+const { tier5Tests } = require('./suites/tier5-stress');
 
 function parseArgs(argv) {
   const opts = {
@@ -54,9 +55,10 @@ function getSelectedTests(opts) {
   else if (opts.tier === '2') pool = tier2Tests;
   else if (opts.tier === '3') pool = tier3Tests;
   else if (opts.tier === '4') pool = tier4Tests;
-  else if (opts.tier === 'all') pool = [...tier1Tests, ...tier2Tests, ...tier3Tests, ...tier4Tests];
+  else if (opts.tier === '5') pool = tier5Tests;
+  else if (opts.tier === 'all') pool = [...tier1Tests, ...tier2Tests, ...tier3Tests, ...tier4Tests, ...tier5Tests];
   else {
-    throw new Error(`Invalid --tier value "${opts.tier}". Expected 1|2|3|4|all`);
+    throw new Error(`Invalid --tier value "${opts.tier}". Expected 1|2|3|4|5|all`);
   }
 
   if (opts.filter) {
@@ -266,7 +268,8 @@ async function runSuite(opts) {
       tier2: tier2Tests.length,
       tier3: tier3Tests.length,
       tier4: tier4Tests.length,
-      total: tier1Tests.length + tier2Tests.length + tier3Tests.length + tier4Tests.length
+      tier5: tier5Tests.length,
+      total: tier1Tests.length + tier2Tests.length + tier3Tests.length + tier4Tests.length + tier5Tests.length
     };
     if (opts.json) {
       console.log(

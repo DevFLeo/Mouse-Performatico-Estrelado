@@ -9,6 +9,12 @@ const Module = require('module');
 const CODE_DIR = path.resolve(__dirname, '..');
 const ROOT_DIR = path.resolve(CODE_DIR, '..');
 
+// A bateria e auto-isolada: variaveis MPE_* herdadas (ex.: quando chamada de dentro do e2e)
+// apontariam a configuracao para outra pasta e quebrariam CFG-02.
+for (const key of Object.keys(process.env)) {
+  if (/^MPE_/.test(key)) delete process.env[key];
+}
+
 // Shim leve de 'electron' quando executado via Node CLI puro
 const openedUrls = [];
 const openedPaths = [];
