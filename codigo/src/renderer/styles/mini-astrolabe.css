@@ -133,8 +133,9 @@ body {
   display: block;
   transform-origin: 50% 50%;
   will-change: transform;
-  /* Giro continuo (antes: steps(240) = 10 quadros/s, parecia engasgado). So transform: roda no compositor. */
-  animation: mpeMiniSpin 30s linear infinite;
+  /* 20 quadros/s em 30 s por volta = 0,6 grau por passo: parece continuo e gasta cerca de metade
+     da CPU do giro a 60 quadros/s (antes: 10 quadros/s, 1,5 grau por passo, parecia engasgado). */
+  animation: mpeMiniSpin 30s steps(600, end) infinite;
   animation-play-state: running;
   pointer-events: none;
 }

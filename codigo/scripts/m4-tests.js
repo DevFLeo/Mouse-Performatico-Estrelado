@@ -611,6 +611,7 @@ async function main() {
         () =>
           miniCdp.eval(`
             document.getElementById('mini-root').dataset.expanded === 'true' &&
+              !document.getElementById('mini-root').classList.contains('is-blooming') &&
             getComputedStyle(document.getElementById('mini-rotator')).animationPlayState === 'paused'
           `),
         4000,
@@ -677,6 +678,7 @@ async function main() {
           () =>
             miniCdp.eval(`
               document.getElementById('mini-root').dataset.expanded === 'true' &&
+              !document.getElementById('mini-root').classList.contains('is-blooming') &&
               document.querySelectorAll('.fan-slot-btn').length === ${c.count}
             `),
           4000,
@@ -860,6 +862,7 @@ async function main() {
           () =>
             miniCdp.eval(`
               document.getElementById('mini-root').dataset.expanded === 'true' &&
+              !document.getElementById('mini-root').classList.contains('is-blooming') &&
               document.querySelectorAll('.fan-slot-btn').length === 12
             `),
           4000,
@@ -1017,7 +1020,7 @@ async function main() {
     await runTest('M4-07', 'Contraste WCAG 2.1 (>= 7:1 numeros, >= 4.5:1 rotulos) e 0 emojis nos arquivos M4', async () => {
       await mainCdp.eval(`window.mpeApi.setMiniExpandedBounds(true)`);
       await waitFor(
-        () => miniCdp.eval(`document.getElementById('mini-root').dataset.expanded === 'true'`),
+        () => miniCdp.eval(`document.getElementById('mini-root').dataset.expanded === 'true' && !document.getElementById('mini-root').classList.contains('is-blooming')`),
         3000,
         50,
         'expand para leitura de contraste'
