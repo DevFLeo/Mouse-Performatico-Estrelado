@@ -1930,7 +1930,9 @@
       el.classList.toggle('is-floating-custom', Boolean(st.floating));
       el.classList.toggle('dock-lateral', Boolean(st.lateral));
       // Menu na lateral: afasta o painel 'Meus atalhos' para nao ficar por baixo do menu
-      document.body.classList.toggle('topbar-lateral', Boolean(st.lateral));
+      if (el.id === 'hud-topbar') {
+        document.body.classList.toggle('topbar-lateral', Boolean(st.lateral));
+      }
       el.classList.toggle('cascade-mode', Boolean(st.cascade));
 
       if (st.floating) {
