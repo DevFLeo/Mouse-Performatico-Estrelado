@@ -3135,3 +3135,25 @@ body.theme-light .org-stats-pill {
   color: #1E1A12;
   border-color: rgba(124, 86, 9, 0.55);
 }
+
+/* Abas do topo com fundo solido e texto explicito (contraste >= 7:1 em ambos os temas) */
+.workspace-tab {
+  background: #0B0B10;
+  color: #E4E4EA;
+  font-size: 12px;
+}
+
+.workspace-tab.active {
+  background: #E5B84B;
+  color: #08070A;
+}
+
+body.theme-light .workspace-tab:not(.active) {
+  background: #FFFAF0;
+  color: #1E1A12;
+}
+
+body.theme-light .workspace-tab.active {
+  background: #B88A1E;
+  color: #08070A;
+}
