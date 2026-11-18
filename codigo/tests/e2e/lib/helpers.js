@@ -299,6 +299,17 @@ async function getMiniRotorSample(miniPage) {
 
 async function clickConsentDecision(mainPage, accept, opts = {}) {
   const allowIpcFallback = Boolean(opts && opts.allowIpcFallback);
+  // O modal de aceite aparece apos o carregamento inicial; espera ate 5s em vez de falhar na corrida.
+  await mainPage
+    .waitForFunction(() => {
+      const splash = document.getElementById('splash-screen');
+      if (splash && !splash.classList.contains('hidden')) splash.click();
+      const modal = document.querySelector('#modal-consent, [data-consent-modal], .consent-modal');
+      if (!modal) return false;
+      const cs = getComputedStyle(modal);
+      return !modal.classList.contains('hidden') && cs.display !== 'none' && cs.visibility !== 'hidden';
+    }, [], 5000)
+    .catch(() => {});
   const clicked = await mainPage.eval((doAccept) => {
     const modal = document.querySelector('#modal-consent, [data-consent-modal], .consent-modal');
     if (!modal) return { ok: false, reason: 'Consent modal element not found in DOM' };

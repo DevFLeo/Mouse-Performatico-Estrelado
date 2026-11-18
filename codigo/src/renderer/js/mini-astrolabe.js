@@ -452,19 +452,20 @@
         for (let i = 0; i < slots.length; i++) {
           const s = slots[i];
 
-          // Hub exclusion
+          // Hub exclusion (distancia de Chebyshev: botoes e hub sao caixas, nao circulos;
+          // na diagonal a distancia circular deixava o canto do botao sobre o hub)
           let hdx = s.x - hubX;
           let hdy = s.y - hubY;
-          let hDist = Math.hypot(hdx, hdy);
-          if (hDist < hubSafeDist) {
-            if (hDist < 0.01) {
+          let hCheb = Math.max(Math.abs(hdx), Math.abs(hdy));
+          if (hCheb < hubSafeDist) {
+            if (hCheb < 0.01) {
               hdx = Math.cos(s.angle);
               hdy = Math.sin(s.angle);
-              hDist = 1;
+              hCheb = Math.max(Math.abs(hdx), Math.abs(hdy));
             }
-            const push = hubSafeDist - hDist + 1;
-            s.x += (hdx / hDist) * push;
-            s.y += (hdy / hDist) * push;
+            const factor = (hubSafeDist + 1) / hCheb;
+            s.x = hubX + hdx * factor;
+            s.y = hubY + hdy * factor;
             movedAny = true;
           }
 
@@ -695,7 +696,9 @@
         'aria-label',
         s.isEmptyCta ? 'Nenhum atalho salvo' : `Atalho ${s.slotNumber}: ${s.title}`
       );
-      btn.title = s.isEmptyCta ? 'Nenhum atalho salvo' : `${s.slotNumber}. ${s.title}`;
+      btn.title = s.isEmptyCta
+        ? 'Nenhum atalho salvo'
+        : `${s.slotNumber}${s.point && s.point.hotkeyLetter ? ' ou ' + s.point.hotkeyLetter : ''}. ${s.title}`;
 
       const numSpan = document.createElement('span');
       numSpan.className = 'fan-slot-num';
@@ -705,7 +708,7 @@
       labelSpan.className = 'fan-slot-label';
       if (s.labelAlign === 'left') labelSpan.classList.add('align-left');
       else if (s.labelAlign === 'right') labelSpan.classList.add('align-right');
-      labelSpan.textContent = s.title;
+      labelSpan.textContent = s.point && s.point.hotkeyLetter ? `${s.point.hotkeyLetter} - ${s.title}` : s.title;
 
       btn.innerHTML = haloSvg;
       btn.appendChild(numSpan);
@@ -996,6 +999,15 @@
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && state.expanded) {
         collapseNow(true);
+        return;
+      }
+      if (/^[a-zA-Z]$/.test(e.key) && state.expanded && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const letter = e.key.toUpperCase();
+        const all = state.config && Array.isArray(state.config.points) ? state.config.points : [];
+        const pt = all.find((p) => p && p.hotkeyLetter === letter);
+        if (pt) {
+          handleSlotExecute({ point: pt, slotNumber: pt.slotNumber, title: pt.title || `Atalho ${letter}` });
+        }
         return;
       }
       if (/^[1-9]$/.test(e.key) && state.expanded) {

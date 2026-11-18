@@ -18,6 +18,30 @@ function parseCliFlagValue(argv, flagName) {
   return '';
 }
 
+/**
+ * Numero (posicao + 1) e letra de atalho opcional (A-Z, sem repeticao: a primeira vence).
+ */
+function normalizeHotkeyLetter(raw) {
+  const letter = String(raw || '').trim().toUpperCase();
+  return /^[A-Z]$/.test(letter) ? letter : '';
+}
+
+function normalizeSlotPoints(points) {
+  const usedLetters = new Set();
+  return points.map((pt, idx) => {
+    if (!pt || typeof pt !== 'object') return pt;
+    const next = Object.assign({}, pt, { slotIndex: idx, slotNumber: idx + 1 });
+    const letter = normalizeHotkeyLetter(pt.hotkeyLetter);
+    if (letter && !usedLetters.has(letter)) {
+      usedLetters.add(letter);
+      next.hotkeyLetter = letter;
+    } else {
+      delete next.hotkeyLetter;
+    }
+    return next;
+  });
+}
+
 function createDefaultConsent() {
   return {
     accepted: false,
@@ -380,11 +404,7 @@ class ConfigManager {
 
     // Numero unico e compartilhado (M.P.E principal e Mini Astrolabio): posicao + 1.
     if (Array.isArray(rootData.points)) {
-      rootData.points = rootData.points.map((pt, idx) =>
-        pt && typeof pt === 'object'
-          ? Object.assign({}, pt, { slotIndex: idx, slotNumber: idx + 1 })
-          : pt
-      );
+      rootData.points = normalizeSlotPoints(rootData.points);
     }
 
     if (rootData.points.length === 0 && (!fileExisted || isInitialCleanState || !wasRegistered)) {
@@ -510,11 +530,7 @@ class ConfigManager {
         delete safePatch.autoScripts;
       }
       if (Array.isArray(safePatch.points)) {
-        safePatch.points = safePatch.points.map((pt, idx) =>
-          pt && typeof pt === 'object'
-            ? Object.assign({}, pt, { slotIndex: idx, slotNumber: idx + 1 })
-            : pt
-        );
+        safePatch.points = normalizeSlotPoints(safePatch.points);
       }
       this.config = Object.assign({}, this.config || {}, safePatch);
     }

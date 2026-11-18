@@ -1367,9 +1367,8 @@ class Astrolabe3D {
 
       // Numero de atalho e codigo com fundo opaco de alto contraste (>= 15:1)
       const slotNum = Number(point.slotNumber) || item.idx + 1;
-      const codeText = point.code || '00 1';
-      const badgeLabel = `${slotNum} | ${codeText}`;
-      const badgeFontPx = Math.max(12, Math.round(13.5 * sp.scale));
+      const badgeLabel = point.hotkeyLetter ? `${slotNum} | ${point.hotkeyLetter}` : String(slotNum);
+      const badgeFontPx = Math.max(15, Math.round(16.5 * sp.scale));
       ctx.font = `800 ${badgeFontPx}px "Consolas", "Orbitron", "Segoe UI", monospace`;
       const badgeMetrics = ctx.measureText(badgeLabel);
       const badgeW = Math.max(44, badgeMetrics.width + 14);
@@ -1396,8 +1395,8 @@ class Astrolabe3D {
       ctx.textBaseline = 'alphabetic';
 
       if (point.title) {
-        const titleStr = point.title.toUpperCase();
-        const titleFontPx = Math.max(10, Math.round((isHovered ? 12.2 : 11.0) * sp.scale));
+        const titleStr = point.title;
+        const titleFontPx = Math.max(13, Math.round((isHovered ? 14.5 : 13.5) * sp.scale));
         ctx.font = `700 ${titleFontPx}px "Segoe UI", sans-serif`;
         const titleMetrics = ctx.measureText(titleStr);
         const titleW = titleMetrics.width + 12;
@@ -1417,7 +1416,7 @@ class Astrolabe3D {
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = isHovered ? '#FFFFFF' : '#FFE08A';
+        ctx.fillStyle = '#FFFFFF';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(titleStr, sp.x, titleY + titleH / 2 + 0.5);

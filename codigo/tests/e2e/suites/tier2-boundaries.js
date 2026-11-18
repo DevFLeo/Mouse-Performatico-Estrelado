@@ -898,6 +898,8 @@ const tier2Tests = [
     const app = await h.launchIsolatedApp(ctx, 'T2-F09-05', { startup: true });
     try {
       const miniPage = await h.connectMiniPage(app.session);
+      // Aquecimento: o carregamento inicial do Electron (GPU, renderers) nao e vazamento.
+      await sleep(6000);
       const s0 = ctx.processManager.getProcessTreeStats(app.session.pid);
       await sleep(10000);
       const s1 = ctx.processManager.getProcessTreeStats(app.session.pid);

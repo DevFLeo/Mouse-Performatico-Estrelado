@@ -546,7 +546,10 @@ class MiniAstrolabeManager {
       blockedByConsent: !this.isBackgroundAllowed(),
       expanded,
       dragging: Boolean(this.dragging),
-      enabled: miniCfg.enabled !== false,
+      // enabled = estado efetivo (preferencia + aceite); a preferencia salva fica em preferenceEnabled
+      // para o Mini voltar sozinho quando o aceite for concedido de novo.
+      enabled: miniCfg.enabled !== false && this.isBackgroundAllowed(),
+      preferenceEnabled: miniCfg.enabled !== false,
       x: miniCfg.x,
       y: miniCfg.y,
       size: miniCfg.size,

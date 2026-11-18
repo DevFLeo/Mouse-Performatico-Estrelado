@@ -51,7 +51,7 @@
         <circle cx="110" cy="110" r="64" fill="none" stroke="#E5B84B" stroke-width="1.2" stroke-dasharray="6 4" opacity="0.55" />
         <circle cx="110" cy="110" r="44" fill="#040406" stroke="#E5B84B" stroke-width="2" />
         <circle cx="110" cy="110" r="36" fill="#050508" stroke="#9E2A2B" stroke-width="1.4" />
-        <text x="110" y="114" text-anchor="middle" fill="#FFE08A" font-size="11" font-weight="800" letter-spacing="2">M.P.E</text>
+        <text x="110" y="114" text-anchor="middle" fill="#FFE08A" font-size="13" font-weight="800" letter-spacing="2">M.P.E</text>
       </svg>
     </div>
 
@@ -188,17 +188,17 @@
       <div class="workspace-tabs" id="workspace-tabs">
         <button id="btn-tab-astrolabe" class="workspace-tab active" data-tab="astrolabe">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
-          <span>Astrolábio</span>
+          <span>Meus atalhos</span>
         </button>
         <button id="btn-tab-organizer" class="workspace-tab" data-tab="organizer">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          <span>Organizador</span>
+          <span>Organizar arquivos</span>
         </button>
       </div>
     </div>
 
     <!-- Seletor Rapido de Tom de Linguagem -->
-    <div class="tone-switcher" title="Tom de Linguagem">
+    <div class="tone-switcher advanced-only" title="Tom de Linguagem">
       <button class="tone-pill active" data-tone="amigavel">Amigável</button>
       <button class="tone-pill" data-tone="neutra">Neutra</button>
       <button class="tone-pill" data-tone="profissional">Profissional</button>
@@ -208,15 +208,15 @@
       <div class="hud-btn-group">
         <button id="btn-add-star" class="hud-btn primary" title="Criar novo botao no Astrolabio">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Novo Botão</span>
+          <span>Criar atalho</span>
         </button>
         <button id="btn-named-print" class="hud-btn" title="Capturar tela, nomear e salvar em categoria">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
-          <span>Print Nomeado</span>
+          <span>Tirar print</span>
         </button>
         <button id="btn-move-stars-top" class="hud-btn" title="Arrastar estrelas no anel">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/></svg>
-          <span>Mover</span>
+          <span>Mudar lugar</span>
         </button>
       </div>
       <span class="topbar-divider" aria-hidden="true"></span>
@@ -226,15 +226,16 @@
           <span>Atalhos</span>
           <kbd class="topbar-kbd">F1</kbd>
         </button>
-        <button id="btn-open-register" class="hud-btn ghost" title="Perfil e linguagem">Perfil</button>
+        <button id="btn-open-register" class="hud-btn ghost advanced-only" title="Perfil e linguagem">Perfil</button>
         <button id="btn-settings" class="hud-btn ghost" title="Configuracoes gerais">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>Ajustes</span>
         </button>
-        <button id="btn-recenter" class="hud-btn ghost" title="Centralizar Astrolabio">Centralizar</button>
-        <button id="btn-replay-intro" class="hud-btn ghost" title="Rever animacao inicial">Intro</button>
+        <button id="btn-recenter" class="hud-btn ghost advanced-only" title="Centralizar Astrolabio">Centralizar</button>
+        <button id="btn-replay-intro" class="hud-btn ghost advanced-only" title="Rever animacao inicial">Intro</button>
+        <button type="button" id="btn-toggle-advanced" class="hud-btn ghost" title="Mostrar ou esconder opcoes avancadas" aria-expanded="false">Mais opções</button>
       </div>
-      <button id="btn-hide-hud" class="hud-btn subtle close-hud-btn" title="Recolher para a bandeja (ESC)">Minimizar</button>
+      <button id="btn-hide-hud" class="hud-btn subtle close-hud-btn" title="Recolher para a bandeja (ESC)">Fechar (ESC)</button>
       <div class="hud-float-controls">
         <button type="button" id="btn-topbar-pos" class="hud-btn ghost icon-only" title="Alternar posição: Topo ou Lateral">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/></svg>
@@ -413,6 +414,10 @@
           <div class="wiz-field-block">
             <label class="field-label" for="pt-title">Nome fácil do botão (aparece no Astrolábio)</label>
             <input type="text" id="pt-title" class="field-input" placeholder="Ex: Mandar print pro WhatsApp" />
+          </div>
+          <div class="wiz-field-block">
+            <label class="field-label" for="pt-hotkey-letter">Letra do atalho (opcional): aperte essa letra para executar</label>
+            <input type="text" id="pt-hotkey-letter" class="field-input hotkey-letter-input" maxlength="1" placeholder="Ex: N" autocomplete="off" />
           </div>
 
           <div id="group-capture-scope" class="wiz-field-block">

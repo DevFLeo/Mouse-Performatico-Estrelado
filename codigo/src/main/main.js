@@ -822,6 +822,12 @@ function setupIpcHandlers() {
     return res;
   });
 
+  // Visibilidade real da janela principal (document.hidden nao serve: backgroundThrottling=false
+  // faz a pagina sempre se declarar visivel).
+  ipcMain.handle('mpe:main-window-visible', () =>
+    Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible())
+  );
+
   ipcMain.handle('mpe:list-open-windows', async () => {
     return await hookBridge.listOpenWindows();
   });

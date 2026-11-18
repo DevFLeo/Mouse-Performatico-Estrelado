@@ -471,7 +471,9 @@
     const pts = (currentConfig && Array.isArray(currentConfig.points)) ? currentConfig.points : [];
     const hotkeyIdx = pts.findIndex((p) => p && p.id === point.id);
     const inspCodeEl = document.getElementById('insp-code');
-    inspCodeEl.textContent = hotkeyIdx >= 0 ? `Atalho ${hotkeyIdx + 1}` : (point.code || '00 1');
+    inspCodeEl.textContent = hotkeyIdx >= 0
+      ? `Atalho ${hotkeyIdx + 1}${point.hotkeyLetter ? ' | ' + point.hotkeyLetter : ''}`
+      : (point.code || '00 1');
     inspCodeEl.title = point.code ? `Codigo estelar: ${point.code}` : '';
     document.getElementById('insp-title').textContent = point.title || 'Ponto Estelar';
     const hotkeyEl = document.getElementById('insp-hotkey');
@@ -966,6 +968,7 @@
       delBtn.classList.remove('hidden');
 
       document.getElementById('pt-title').value = point.title || '';
+      setHotkeyLetterField(point.hotkeyLetter || '');
       document.getElementById('pt-code').value = point.code || '10 7';
       document.getElementById('pt-action-type').value = point.actionType || 'system_to_system_print';
       document.getElementById('pt-desc').value = point.description || '';
@@ -1040,6 +1043,7 @@
       document.getElementById('pt-action-type').value = 'system_to_system_print';
       document.getElementById('pt-capture-scope').value = 'active_window';
       document.getElementById('pt-title').value = 'Print -> Telegram';
+      setHotkeyLetterField('');
       document.getElementById('pt-code').value = `${String(nextNum).padStart(2, '0')} 7`;
       document.getElementById('pt-desc').value = '';
       document.getElementById('pt-orbit').value = '3';
@@ -1322,12 +1326,38 @@
       glyph,
       hasArrow: vectorStyle === 'blue',
       showInMini: Boolean(document.getElementById('pt-show-in-mini') && document.getElementById('pt-show-in-mini').checked),
+      hotkeyLetter: readHotkeyLetterField(),
       params
     };
   }
 
+  function readHotkeyLetterField() {
+    const el = document.getElementById('pt-hotkey-letter');
+    const letter = el ? String(el.value || '').trim().toUpperCase() : '';
+    return /^[A-Z]$/.test(letter) ? letter : '';
+  }
+
+  function setHotkeyLetterField(letter) {
+    const el = document.getElementById('pt-hotkey-letter');
+    if (el) el.value = letter || '';
+  }
+
+  function findPointByHotkeyLetter(letter) {
+    const pts = (currentConfig && Array.isArray(currentConfig.points)) ? currentConfig.points : [];
+    return pts.find((p) => p && p.hotkeyLetter === letter) || null;
+  }
+
   async function savePointFromModal() {
     const pointObj = buildPointPayloadFromForm();
+    if (pointObj.hotkeyLetter) {
+      const owner = findPointByHotkeyLetter(pointObj.hotkeyLetter);
+      if (owner && owner.id !== pointObj.id) {
+        showToast(`A letra ${pointObj.hotkeyLetter} ja esta no atalho "${owner.title || owner.code}". Escolha outra.`);
+        const letterEl = document.getElementById('pt-hotkey-letter');
+        if (letterEl) letterEl.focus();
+        return;
+      }
+    }
     if (pointObj.actionType === 'open_url' && !(pointObj.params && pointObj.params.url)) {
       showToast('Informe o endereco do site (URL) antes de salvar.');
       setWizardStep(2);
@@ -1417,7 +1447,7 @@
     }
     if (pill) {
       pill.classList.remove('active', 'blocked');
-      if (blocked && miniState.enabled) {
+      if (blocked && (miniState.preferenceEnabled !== undefined ? miniState.preferenceEnabled : miniState.enabled)) {
         pill.textContent = 'Bloqueado';
         pill.classList.add('blocked');
       } else if (isActive) {
@@ -3263,6 +3293,16 @@
       window.mpeApi.hideHud();
     }
 
+    // Interface simples: opcoes avancadas (tom, perfil, centralizar, intro) ficam escondidas ate pedir.
+    const advancedBtn = document.getElementById('btn-toggle-advanced');
+    if (advancedBtn) {
+      advancedBtn.addEventListener('click', () => {
+        const on = document.body.classList.toggle('show-advanced');
+        advancedBtn.textContent = on ? 'Menos opções' : 'Mais opções';
+        advancedBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      });
+    }
+
     window.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement && document.activeElement.tagName) || '';
       const isTypingField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag);
@@ -3300,6 +3340,15 @@
           const idx = parseInt(e.key, 10) - 1;
           if (currentConfig.points[idx]) {
             handlePointExecute(currentConfig.points[idx]);
+          }
+        }
+      } else if (/^[a-zA-Z]$/.test(e.key) && !isTypingField && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
+        if (openModals.length === 0 && !splashVisible) {
+          const pt = findPointByHotkeyLetter(e.key.toUpperCase());
+          if (pt) {
+            e.preventDefault();
+            handlePointExecute(pt);
           }
         }
       }

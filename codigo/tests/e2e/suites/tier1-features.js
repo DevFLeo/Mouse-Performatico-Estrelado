@@ -61,8 +61,10 @@ const tier1Tests = [
     const app = await h.launchIsolatedApp(ctx, 'T1-F01-03', { startup: true });
     try {
       await sleep(500);
-      const state = await app.mainPage.eval(() => ({
-        hidden: document.hidden || document.visibilityState === 'hidden',
+      const state = await app.mainPage.eval(async () => ({
+        hidden: window.mpeApi.isMainWindowVisible
+          ? !(await window.mpeApi.isMainWindowVisible())
+          : document.hidden || document.visibilityState === 'hidden',
         hasAstrolabe: Boolean(window.astrolabe),
         astrolabePaused: window.astrolabe ? Boolean(window.astrolabe.isPaused) : null,
         rafId: window.astrolabe ? window.astrolabe.rafId : 'MISSING_ASTROLABE'

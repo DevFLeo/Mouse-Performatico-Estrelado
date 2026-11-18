@@ -802,7 +802,7 @@ kbd {
 }
 
 .insp-sep {
-  color: rgba(229, 184, 75, 0.4);
+  color: #C9C9D1;
   font-size: 10px;
 }
 
@@ -2668,7 +2668,7 @@ body.mode-organizer-open .central-black-dot-hub {
   height: 152px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  opacity: 0.72;
+  opacity: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2911,7 +2911,7 @@ body.mode-hud-only .central-slots-panel {
 
 .slot-mini-btn {
   padding: 3px 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
   border-radius: 6px;
   border: 1px solid rgba(229, 184, 75, 0.48);
@@ -2926,7 +2926,8 @@ body.mode-hud-only .central-slots-panel {
 }
 
 .slot-mini-btn:disabled {
-  opacity: 0.4;
+  color: #9A9AA4;
+  border-color: rgba(154, 154, 164, 0.5);
   cursor: not-allowed;
 }
 
@@ -3074,4 +3075,54 @@ body.theme-light .mini-range-item {
 body.theme-light .slots-panel-sub,
 body.theme-light .slot-sub {
   color: #5C4E32;
+}
+
+.hotkey-letter-input {
+  width: 72px;
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.mini-fav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+/* Interface simples: avancado so aparece com 'Mais opcoes' */
+body:not(.show-advanced) .advanced-only {
+  display: none !important;
+}
+
+/* Tema claro: texto escuro em fundo claro para manter contraste >= 4.5:1 */
+body.theme-light .hud-btn:not(.primary),
+body.theme-light .hud-btn.ghost,
+body.theme-light .hud-btn.subtle {
+  background: #FFFAF0;
+  color: #1E1A12;
+  border-color: rgba(124, 86, 9, 0.55);
+}
+
+body.theme-light .hud-btn.ghost:hover,
+body.theme-light .hud-btn.subtle:hover {
+  background: #F1E3BF;
+  color: #1E1A12;
+}
+
+body.theme-light .brand-title {
+  color: #5A3E05;
+}
+
+body.theme-light .org-scope-btn {
+  color: #3D3220;
+}
+
+body.theme-light .org-scope-btn.active {
+  background: #E9D29A;
+  color: #1E1A12;
 }
