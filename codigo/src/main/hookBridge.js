@@ -246,7 +246,8 @@ class HookBridge extends EventEmitter {
             const hwnd = parts[1] || '0';
             const rectRaw = (parts[2] || '0,0,0,0').split(',').map((n) => parseInt(n, 10));
             const winTitle = parts.slice(3).join(' ').trim();
-            if (hwnd !== '0') {
+            const isMpeWindow = /M\.P\.E|Mouse Perform/i.test(winTitle);
+            if (hwnd !== '0' && !isMpeWindow) {
               this.lastHwnd = hwnd;
               if (winTitle) this.lastWindowTitle = winTitle;
               if (rectRaw.length === 4 && rectRaw[2] > rectRaw[0] && rectRaw[3] > rectRaw[1]) {

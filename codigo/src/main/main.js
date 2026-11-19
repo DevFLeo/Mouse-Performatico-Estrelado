@@ -521,8 +521,9 @@ async function summonHud({ x, y, playIntro = false, mode = 'hud-only', source = 
   if (
     consentManager.isActionAllowed('backgroundExecution') &&
     source !== 'mouse-hook' &&
-    (!hookBridge.lastHwnd || hookBridge.lastHwnd === '0')
+    !(mainWindow.isVisible && mainWindow.isVisible())
   ) {
+    // Sempre: a janela de origem e a que estava ativa ao abrir o HUD (antes so quando vazia)
     await hookBridge.refreshForegroundWindow();
   }
 

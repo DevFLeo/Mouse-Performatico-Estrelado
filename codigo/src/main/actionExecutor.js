@@ -1753,6 +1753,18 @@ class ActionExecutor {
 
     const type = point.actionType || 'print';
     const params = point.params || {};
+    // Acoes que usam a janela de origem (texto selecionado, print da janela ativa). Com o HUD
+    // fechado (disparo pelo Mini, pela letra ou por atalho), a origem e a janela ativa AGORA:
+    // o Mini nao rouba o foco. Antes ficava a janela da ultima abertura do HUD (as vezes de horas atras).
+    const ORIGIN_TYPES = ['text_selection', 'text_to_system', 'text_telegram', 'print', 'print_telegram',
+      'named_print', 'system_to_system_print', 'system'];
+    const hudVisible = Boolean(mainWindow && typeof mainWindow.isVisible === 'function' && mainWindow.isVisible());
+    if (!hudVisible && ORIGIN_TYPES.includes(type) && this.hookBridge &&
+        typeof this.hookBridge.refreshForegroundWindow === 'function') {
+      try {
+        await this.hookBridge.refreshForegroundWindow();
+      } catch (_) {}
+    }
     const originTitle = (this.hookBridge && this.hookBridge.lastWindowTitle) || 'Sistema Atual';
 
     try {
@@ -1952,10 +1964,23 @@ class ActionExecutor {
             mainWindow.hide();
             await new Promise((r) => setTimeout(r, 120));
           }
+          // Area de transferencia limpa antes do Ctrl+C: assim sabemos se veio texto de verdade.
+          // Antes, sem selecao, colava o que ja estava copiado (ou '[M.P.E] Mensagem rapida') e dava Enter.
+          const prevClipboardText = this._clipboard.readText() || '';
+          try { this._clipboard.writeText(''); } catch (_) {}
           if (this.hookBridge) {
             await this.hookBridge.copySelectionFromLastWindow();
           }
-          const selectedText = this._clipboard.readText() || '[M.P.E] Mensagem rapida';
+          await new Promise((r) => setTimeout(r, 120));
+          const selectedText = (this._clipboard.readText() || '').trim() ? this._clipboard.readText() : '';
+          if (!selectedText) {
+            try { this._clipboard.writeText(prevClipboardText); } catch (_) {}
+            return {
+              ok: false,
+              type,
+              message: `Nenhum texto selecionado em [${originTitle}]. Selecione o texto e use o atalho de novo.`
+            };
+          }
           if (type === 'text_to_system' && params.targetSystem) {
             const delivery = await this.dispatchToTargetSystem({
               targetSystem: params.targetSystem,
