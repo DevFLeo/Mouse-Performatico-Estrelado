@@ -401,3 +401,29 @@ body {
     animation: none;
   }
 }
+
+/* Selo da letra do atalho: canto inferior direito do botao, sempre visivel, alto contraste */
+.fan-slot-letter {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: #E5B84B;
+  border: 1.5px solid #040406;
+  color: #040406;
+  font-family: "Segoe UI", Consolas, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.fan-slot-btn:hover .fan-slot-letter,
+.fan-slot-btn:focus-visible .fan-slot-letter {
+  background: #FFFFFF;
+}

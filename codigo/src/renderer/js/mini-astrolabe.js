@@ -738,6 +738,14 @@
 
       btn.innerHTML = haloSvg;
       btn.appendChild(numSpan);
+      // Letra do atalho sempre visivel (selo no canto); o nome continua so ao passar o mouse
+      if (s.point && /^[A-Z]$/.test(String(s.point.hotkeyLetter || ''))) {
+        const letterSpan = document.createElement('span');
+        letterSpan.className = 'fan-slot-letter';
+        letterSpan.textContent = s.point.hotkeyLetter;
+        letterSpan.setAttribute('aria-hidden', 'true');
+        btn.appendChild(letterSpan);
+      }
       btn.appendChild(labelSpan);
 
       btn.addEventListener('click', (ev) => {

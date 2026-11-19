@@ -1494,7 +1494,8 @@
 
       const badge = document.createElement('span');
       badge.className = 'slot-num-badge';
-      badge.textContent = String(idx + 1);
+      // Numero e letra do atalho (ex.: '9 Z'), a mesma informacao do Mini e das estrelas
+      badge.textContent = pt && pt.hotkeyLetter ? `${idx + 1} ${pt.hotkeyLetter}` : String(idx + 1);
 
       const meta = document.createElement('div');
       meta.className = 'slot-meta';
