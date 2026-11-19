@@ -1,5 +1,7 @@
 const path = require('path');
-const { BrowserWindow, screen } = require('electron');
+const electron = require('electron');
+const { BrowserWindow, screen } = electron;
+const globalShortcut = electron.globalShortcut || null;
 
 function createDefaultMiniConfig() {
   return {
@@ -355,6 +357,7 @@ class MiniAstrolabeManager {
   }
 
   closeWindow(forceDestroy = false) {
+    this.syncFanHotkeys(false);
     this.stopWatchdog();
     this.expanded = false;
     this.dragging = false;
@@ -681,14 +684,54 @@ class MiniAstrolabeManager {
     } else {
       this.stopWatchdog();
     }
+    this.syncFanHotkeys(nextExpanded);
 
     const state = this.getState();
     this.broadcastToAllWindows('mpe:mini-state-changed', state);
     return state;
   }
 
+  /**
+   * A janela do Mini e 'focusable: false' (para nao roubar o foco de quem esta digitando),
+   * entao ela nunca recebe o teclado. Enquanto o leque esta aberto, os numeros 1-9 e as
+   * letras em uso viram atalhos globais; ao fechar o leque, as teclas voltam ao normal.
+   */
+  syncFanHotkeys(enable) {
+    if (!globalShortcut) return;
+    if (!this._fanHotkeys) this._fanHotkeys = [];
+    for (const accel of this._fanHotkeys) {
+      try { globalShortcut.unregister(accel); } catch (_) {}
+    }
+    this._fanHotkeys = [];
+    if (!enable || !this.win || (typeof this.win.isDestroyed === 'function' && this.win.isDestroyed())) {
+      return;
+    }
+    const cfg = this.configManager && typeof this.configManager.get === 'function' ? this.configManager.get() : null;
+    const pts = cfg && Array.isArray(cfg.points) ? cfg.points : [];
+    const keys = [];
+    for (let i = 1; i <= Math.min(9, pts.length); i++) {
+      keys.push({ accel: String(i), key: String(i) });
+      keys.push({ accel: `num${i}`, key: String(i) });
+    }
+    for (const p of pts) {
+      const letter = p && /^[A-Z]$/.test(String(p.hotkeyLetter || '')) ? p.hotkeyLetter : '';
+      if (letter) keys.push({ accel: letter, key: letter });
+    }
+    for (const k of keys) {
+      try {
+        const ok = globalShortcut.register(k.accel, () => {
+          if (this.win && !(typeof this.win.isDestroyed === 'function' && this.win.isDestroyed())) {
+            this.win.webContents.send('mpe:mini-hotkey', { key: k.key });
+          }
+        });
+        if (ok) this._fanHotkeys.push(k.accel);
+      } catch (_) {}
+    }
+  }
+
   destroy() {
     this.destroyed = true;
+    this.syncFanHotkeys(false);
     this.stopWatchdog();
     this.closeWindow(true);
   }

@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld('mpeApi', {
   // Mini Astrolabio (MiniAstrolabeManager)
   toggleMiniAstrolabe: (enabled) => ipcRenderer.invoke('mpe:mini-toggle', { enabled }),
   getMiniAstrolabeState: () => ipcRenderer.invoke('mpe:mini-get-state'),
+  onMiniHotkey: (callback) => {
+    ipcRenderer.on('mpe:mini-hotkey', (_e, payload) => callback(payload));
+  },
   isMainWindowVisible: () => ipcRenderer.invoke('mpe:main-window-visible'),
   updateMiniAstrolabeLayout: (payload) =>
     ipcRenderer.invoke('mpe:mini-update-layout', payload || {}),

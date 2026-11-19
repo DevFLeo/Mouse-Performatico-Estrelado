@@ -1027,6 +1027,23 @@
       });
     }
 
+    // Teclas vindas do sistema enquanto o leque esta aberto (a janela do Mini nao recebe foco)
+    if (window.mpeApi && typeof window.mpeApi.onMiniHotkey === 'function') {
+      window.mpeApi.onMiniHotkey((payload) => {
+        const key = payload && payload.key ? String(payload.key) : '';
+        if (!state.expanded || !key) return;
+        if (/^[1-9]$/.test(key)) {
+          const wanted = Number(key);
+          const pt = state.points.find((p) => Number(p && p.slotNumber) === wanted);
+          if (pt) handleSlotExecute({ point: pt, slotNumber: wanted, title: pt.title || `Atalho ${wanted}` });
+        } else if (/^[A-Z]$/.test(key)) {
+          const all = state.config && Array.isArray(state.config.points) ? state.config.points : [];
+          const pt = all.find((p) => p && p.hotkeyLetter === key);
+          if (pt) handleSlotExecute({ point: pt, slotNumber: pt.slotNumber, title: pt.title || `Atalho ${key}` });
+        }
+      });
+    }
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && state.expanded) {
         collapseNow(true);
