@@ -746,10 +746,16 @@ namespace MpeNative
 
                 string codigoDir = Path.Combine(baseDir.TrimEnd('\\'), "codigo");
                 string appDir = Directory.Exists(codigoDir) ? codigoDir : baseDir.TrimEnd('\\');
-                string electronExe = Path.Combine(appDir, "node_modules", "electron", "dist", "electron.exe");
+                string mpeAppExe = Path.Combine(appDir, "node_modules", "electron", "dist", "MPE-App.exe");
+                string electronExe = File.Exists(mpeAppExe)
+                    ? mpeAppExe
+                    : Path.Combine(appDir, "node_modules", "electron", "dist", "electron.exe");
                 if (!File.Exists(electronExe))
                 {
-                    electronExe = Path.Combine(baseDir.TrimEnd('\\'), "node_modules", "electron", "dist", "electron.exe");
+                    string altMpeApp = Path.Combine(baseDir.TrimEnd('\\'), "node_modules", "electron", "dist", "MPE-App.exe");
+                    electronExe = File.Exists(altMpeApp)
+                        ? altMpeApp
+                        : Path.Combine(baseDir.TrimEnd('\\'), "node_modules", "electron", "dist", "electron.exe");
                 }
 
                 string passedArgs = FormatCommandLineArgs(args);

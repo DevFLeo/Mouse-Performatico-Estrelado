@@ -81,6 +81,117 @@ $launcherSrc = Join-Path $CodeDir "src\native\MpeLauncher.cs"
 $launcherOut = Join-Path $RootDir "MPE.exe"
 & $csc /nologo /optimize+ /target:winexe /win32icon:$icoPath /out:$launcherOut $launcherSrc
 
+# 3. Gerar MPE-App.exe (copia de electron.exe com identidade/icone do M.P.E no Gerenciador de Tarefas)
+$electronDist = Join-Path $CodeDir "node_modules\electron\dist"
+$electronExe = Join-Path $electronDist "electron.exe"
+$mpeAppExe = Join-Path $electronDist "MPE-App.exe"
+if (Test-Path $electronExe) {
+    Copy-Item -Path $electronExe -Destination $mpeAppExe -Force
+    Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+
+public static class MpePeBrander {
+    private delegate bool EnumResNameProc(IntPtr hModule, IntPtr lpszType, IntPtr lpszName, IntPtr lParam);
+    private delegate bool EnumResLangProc(IntPtr hModule, IntPtr lpszType, IntPtr lpszName, ushort wIDLanguage, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FreeLibrary(IntPtr hModule);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool EnumResourceNames(IntPtr hModule, IntPtr lpszType, EnumResNameProc lpEnumFunc, IntPtr lParam);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool EnumResourceLanguages(IntPtr hModule, IntPtr lpszType, IntPtr lpszName, EnumResLangProc lpEnumFunc, IntPtr lParam);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr FindResourceEx(IntPtr hModule, IntPtr lpType, IntPtr lpName, ushort wLanguage);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr LoadResource(IntPtr hModule, IntPtr hResInfo);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr LockResource(IntPtr hResData);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint SizeofResource(IntPtr hModule, IntPtr hResInfo);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr BeginUpdateResource(string pFileName, bool bDeleteExistingResources);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool UpdateResource(IntPtr hUpdate, IntPtr lpType, IntPtr lpName, ushort wLanguage, byte[] lpData, uint cbData);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool EndUpdateResource(IntPtr hUpdate, bool fDiscard);
+
+    private static byte[] ReadRes(IntPtr hMod, int typeId, IntPtr nameId, ushort lang) {
+        IntPtr hRes = FindResourceEx(hMod, new IntPtr(typeId), nameId, lang);
+        if (hRes == IntPtr.Zero) return null;
+        uint sz = SizeofResource(hMod, hRes);
+        if (sz == 0) return null;
+        IntPtr hLoaded = LoadResource(hMod, hRes);
+        IntPtr ptr = LockResource(hLoaded);
+        byte[] buf = new byte[sz];
+        Marshal.Copy(ptr, buf, 0, (int)sz);
+        return buf;
+    }
+
+    public static void ApplyBranding(string sourceExe, string targetExe) {
+        IntPtr hSrc = LoadLibraryEx(sourceExe, IntPtr.Zero, 2);
+        if (hSrc == IntPtr.Zero) throw new Exception("Nao foi possivel carregar " + sourceExe);
+        try {
+            var icons = new List<Tuple<IntPtr, byte[]>>();
+            byte[] groupIcon = null;
+            byte[] versionInfo = null;
+
+            EnumResourceNames(hSrc, new IntPtr(3), (hm, lt, ln, lp) => {
+                EnumResourceLanguages(hm, lt, ln, (hm2, lt2, ln2, lang, lp2) => {
+                    var data = ReadRes(hm2, 3, ln2, lang);
+                    if (data != null) icons.Add(Tuple.Create(ln2, data));
+                    return false;
+                }, IntPtr.Zero);
+                return true;
+            }, IntPtr.Zero);
+
+            EnumResourceNames(hSrc, new IntPtr(14), (hm, lt, ln, lp) => {
+                EnumResourceLanguages(hm, lt, ln, (hm2, lt2, ln2, lang, lp2) => {
+                    groupIcon = ReadRes(hm2, 14, ln2, lang);
+                    return false;
+                }, IntPtr.Zero);
+                return false;
+            }, IntPtr.Zero);
+
+            EnumResourceNames(hSrc, new IntPtr(16), (hm, lt, ln, lp) => {
+                EnumResourceLanguages(hm, lt, ln, (hm2, lt2, ln2, lang, lp2) => {
+                    versionInfo = ReadRes(hm2, 16, ln2, lang);
+                    return false;
+                }, IntPtr.Zero);
+                return false;
+            }, IntPtr.Zero);
+
+            IntPtr hUpd = BeginUpdateResource(targetExe, false);
+            if (hUpd == IntPtr.Zero) throw new Exception("BeginUpdateResource falhou em " + targetExe);
+            bool ok = true;
+            try {
+                if (versionInfo != null) {
+                    ok = ok && UpdateResource(hUpd, new IntPtr(16), new IntPtr(1), 1033, versionInfo, (uint)versionInfo.Length);
+                }
+                foreach (var ic in icons) {
+                    ok = ok && UpdateResource(hUpd, new IntPtr(3), ic.Item1, 1033, ic.Item2, (uint)ic.Item2.Length);
+                }
+                if (groupIcon != null) {
+                    ok = ok && UpdateResource(hUpd, new IntPtr(14), new IntPtr(1), 1033, groupIcon, (uint)groupIcon.Length);
+                }
+            } finally {
+                if (!EndUpdateResource(hUpd, !ok)) {
+                    throw new Exception("EndUpdateResource falhou em " + targetExe);
+                }
+            }
+        } finally {
+            FreeLibrary(hSrc);
+        }
+    }
+}
+"@
+    [MpePeBrander]::ApplyBranding($launcherOut, $mpeAppExe)
+    Write-Host "  -> $mpeAppExe (identidade M.P.E aplicada)"
+}
+
 Write-Host "[M.P.E] Binarios nativos compilados com sucesso:"
 Write-Host "  -> $hookOut"
 Write-Host "  -> $launcherOut"
