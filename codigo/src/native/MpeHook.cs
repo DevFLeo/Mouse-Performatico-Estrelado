@@ -36,6 +36,8 @@ namespace MpeNative
         private const byte VK_V = 0x56;
         private const byte VK_RETURN = 0x0D;
         private const uint KEYEVENTF_KEYUP = 0x0002;
+        // Tecla sem uso (vkE8) para "mascarar" o toque de ALT, como o AutoHotkey faz (MenuMaskKey)
+        private const byte VK_MENU_MASK = 0xE8;
         private const int SW_RESTORE = 9;
         private const int SW_SHOW = 5;
         private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
@@ -122,6 +124,10 @@ namespace MpeNative
 
         [DllImport("user32.dll")]
         private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+        private const uint GA_ROOT = 2;
 
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
@@ -334,12 +340,34 @@ namespace MpeNative
             }
         }
 
-        private static void ForceActivateWindow(IntPtr hWnd)
+        private static bool IsTargetForeground(IntPtr hWnd)
         {
-            if (hWnd == IntPtr.Zero) return;
+            IntPtr fg = GetForegroundWindow();
+            if (fg == IntPtr.Zero || hWnd == IntPtr.Zero) return false;
+            if (fg == hWnd) return true;
+            // Apps UWP: o handle do processo e filho da janela de moldura (ApplicationFrameHost)
+            return GetAncestor(hWnd, GA_ROOT) == fg;
+        }
 
-            // 1. Simula toque na tecla ALT para desarmar a restricao de foco do Windows (LockSetForegroundWindow)
+        private static bool ForceActivateWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return false;
+
+            // Se a janela ja esta em primeiro plano e visivel (ex: acionamento via Mini Astrolabio),
+            // NAO dispara ALT nem reativa a janela — pulsar ALT em janela ja focada ativa a barra de menu
+            // (Chrome/Bloco de Notas/VS Code) e faz o Ctrl+C falhar ou fechar menus abertos.
+            if (GetForegroundWindow() == hWnd && !IsIconic(hWnd))
+            {
+                return true;
+            }
+
+            // 1. ALT mascarado para desarmar a restricao de foco do Windows (LockSetForegroundWindow).
+            //    Um toque de ALT sozinho ativa o menu da janela: as teclas seguintes viram comandos
+            //    de menu (o C do Ctrl+C aciona "Fechar" no menu de sistema; Ctrl+V e Enter sao engolidos).
+            //    Com uma tecla sem uso entre o ALT down e o ALT up, o Windows nao entra no modo menu.
             keybd_event((byte)VK_MENU, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_MENU_MASK, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_MENU_MASK, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
 
             if (IsIconic(hWnd))
@@ -368,6 +396,14 @@ namespace MpeNative
                 BringWindowToTop(hWnd);
                 SetForegroundWindow(hWnd);
             }
+
+            // Aguarda ate ~400ms a janela realmente ficar em primeiro plano
+            for (int i = 0; i < 20; i++)
+            {
+                if (IsTargetForeground(hWnd)) return true;
+                Thread.Sleep(20);
+            }
+            return IsTargetForeground(hWnd);
         }
 
         private static string GetWindowTitle(IntPtr hWnd)
@@ -690,8 +726,21 @@ namespace MpeNative
                 if (hwndVal != 0)
                 {
                     IntPtr targetHwnd = new IntPtr(hwndVal);
-                    ForceActivateWindow(targetHwnd);
-                    Thread.Sleep(220);
+                    bool alreadyFg = (GetForegroundWindow() == targetHwnd && !IsIconic(targetHwnd));
+                    if (!alreadyFg)
+                    {
+                        if (!ForceActivateWindow(targetHwnd))
+                        {
+                            // Sem foco garantido, o Ctrl+C iria para outra janela: aborta
+                            Console.WriteLine("COPY_ABORTED|" + hwndVal);
+                            return;
+                        }
+                        Thread.Sleep(220);
+                    }
+                    else
+                    {
+                        Thread.Sleep(40);
+                    }
                 }
                 SendCtrlKey(VK_C);
                 Thread.Sleep(200);
@@ -718,9 +767,13 @@ namespace MpeNative
                 bool autoSend = args.Length <= 2 || args[2] != "0";
 
                 IntPtr targetHwnd = FindSystemWindow(targetQuery);
-                if (targetHwnd != IntPtr.Zero)
+                if (targetHwnd != IntPtr.Zero && !ForceActivateWindow(targetHwnd))
                 {
-                    ForceActivateWindow(targetHwnd);
+                    // Sem foco no destino, Ctrl+V + Enter cairiam em outra janela: nao envia teclas
+                    Console.WriteLine("WINDOW_NOT_FOCUSED|" + GetWindowTitle(targetHwnd));
+                }
+                else if (targetHwnd != IntPtr.Zero)
+                {
                     Thread.Sleep(350);
                     SendCtrlKey(VK_V);
                     if (autoSend)

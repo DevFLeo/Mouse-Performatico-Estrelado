@@ -659,6 +659,8 @@
         showStatus(res.message || 'Aceite de primeiro acesso necessario.', true);
       } else if (!ok) {
         showStatus((res && res.message) || 'Falha ao executar atalho.', true);
+      } else if (res && res.forwardedToHud) {
+        collapseNow(true);
       } else if (
         res &&
         ['open_organizer', 'organize_files_quick', 'open_settings', 'request_area_crop', 'request_named_print', 'text_selection'].includes(res.type)

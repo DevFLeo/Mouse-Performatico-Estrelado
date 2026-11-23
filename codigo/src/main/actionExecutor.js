@@ -810,6 +810,27 @@ class ActionExecutor {
     };
   }
 
+  _isTelegramTarget(rawTarget) {
+    const t = String(rawTarget || '').trim().toLowerCase();
+    if (!t) return false;
+    if (
+      t.includes('tg://') ||
+      t.startsWith('@') ||
+      t.includes('telegram') ||
+      t.includes('eu |') ||
+      t.includes('você') ||
+      t.includes('voce')
+    ) {
+      return true;
+    }
+    const cfg =
+      this.configManager && typeof this.configManager.get === 'function'
+        ? this.configManager.get()
+        : null;
+    const savedChat = String((cfg && cfg.telegram && cfg.telegram.savedChatPath) || '').trim().toLowerCase();
+    return Boolean(savedChat && t === savedChat);
+  }
+
   /**
    * Transfere o conteudo (Print ou Texto ja no Clipboard) para qualquer outro Sistema no Windows
    * Se o sistema informado nao estiver aberto, o M.P.E inicia o executavel/protocolo e aguarda a janela abrir para colar.
@@ -821,7 +842,7 @@ class ActionExecutor {
     const blocked = this._checkConsent('launchAppsAndLinks', 'dispatchToTargetSystem');
     if (blocked) return blocked;
 
-    if (isTelegram) {
+    if (isTelegram || this._isTelegramTarget(targetSystem)) {
       return await this.dispatchToTelegram({
         pngBuffer,
         filePath,

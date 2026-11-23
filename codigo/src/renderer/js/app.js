@@ -534,11 +534,20 @@
     }
   }
 
-  async function handlePointExecute(point) {
-    if (!point) return;
-    playUiSound('execute');
+  async function handlePointExecutionResult(point, res, fromExternal = false) {
+    if (handleBlockedResult(res)) {
+      return;
+    }
+    if (!res || !res.ok) {
+      showToast((res && res.message) || 'Erro ao executar ponto.');
+      return;
+    }
 
-    if (point.actionType === 'toggle_2d_3d') {
+    if (fromExternal) {
+      forceUnlockToAstrolabe();
+    }
+
+    if (res.type === 'toggle_2d_3d') {
       if (astrolabe) {
         const nextMode = astrolabe.toggleProjectionMode();
         syncDimensionButtons(nextMode);
@@ -551,29 +560,16 @@
       return;
     }
 
-    if (point.actionType === 'action_2d_scan') {
-      await executeQuick2DAction();
-      return;
-    }
-
-    if (point.actionType === 'open_settings') {
+    if (res.type === 'open_settings') {
+      if (fromExternal) setInterfaceMode('executable-editor');
       startAddPointFlow();
-      return;
-    }
-
-    const res = await window.mpeApi.executePoint(point);
-    if (handleBlockedResult(res)) {
-      return;
-    }
-    if (!res || !res.ok) {
-      showToast((res && res.message) || 'Erro ao executar ponto.');
       return;
     }
 
     if (res.type === 'request_area_crop') {
       areaSelector.open(res.fullScreenDataUrl, {
         nextAction: res.nextAction,
-        point: res.point
+        point: res.point || point
       });
       return;
     }
@@ -617,6 +613,7 @@
 
     // Organizador de Arquivos integrado ao Astrolabio
     if (res.type === 'open_organizer') {
+      if (fromExternal) setInterfaceMode('executable-editor');
       if (organizerUI) {
         organizerUI.setScope(res.scope || 'arquivos');
         organizerUI.setWorkspaceTab('organizer', false);
@@ -626,6 +623,7 @@
     }
 
     if (res.type === 'organize_files_quick') {
+      if (fromExternal) setInterfaceMode('executable-editor');
       if (organizerUI) {
         await organizerUI.quickOrganize({
           scope: res.scope || 'arquivos',
@@ -647,7 +645,38 @@
     }
 
     const dict = getToneDict();
-    showToast(res.message || dict.toastExecuted(point.title));
+    showToast(res.message || dict.toastExecuted((point && point.title) || 'Atalho'));
+  }
+
+  async function handlePointExecute(point) {
+    if (!point) return;
+    playUiSound('execute');
+
+    if (point.actionType === 'toggle_2d_3d') {
+      if (astrolabe) {
+        const nextMode = astrolabe.toggleProjectionMode();
+        syncDimensionButtons(nextMode);
+        showToast(
+          nextMode === '2d'
+            ? 'Modo 2D Ativado (Base Fiel da Imagem com Animacoes 2D)'
+            : 'Modo 3D Ativado (Constelacao Orbital em Profundidade)'
+        );
+      }
+      return;
+    }
+
+    if (point.actionType === 'action_2d_scan') {
+      await executeQuick2DAction();
+      return;
+    }
+
+    if (point.actionType === 'open_settings') {
+      startAddPointFlow();
+      return;
+    }
+
+    const res = await window.mpeApi.executePoint(point);
+    await handlePointExecutionResult(point, res, false);
   }
 
   let currentWizStep = 1;
@@ -3396,6 +3425,14 @@
     if (window.mpeApi.onEscapePressed) {
       window.mpeApi.onEscapePressed(() => {
         handleEscapeKey();
+      });
+    }
+
+    if (window.mpeApi.onHudActionResult) {
+      window.mpeApi.onHudActionResult((payload) => {
+        if (!payload || !payload.result) return;
+        playUiSound('execute');
+        handlePointExecutionResult(payload.point || {}, payload.result, true);
       });
     }
 

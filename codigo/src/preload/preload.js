@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('mpeApi', {
   onHudSummoned: (callback) => {
     ipcRenderer.on('mpe:hud-summoned', (_event, data) => callback(data));
   },
+  onHudActionResult: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('mpe:hud-action-result', listener);
+    return () => ipcRenderer.removeListener('mpe:hud-action-result', listener);
+  },
   onConfigUpdated: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('mpe:config-updated', listener);

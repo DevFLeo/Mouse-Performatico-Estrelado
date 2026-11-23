@@ -763,11 +763,86 @@ function setupIpcHandlers() {
     return { ok: true, consent };
   });
 
-  ipcMain.handle('mpe:execute-point', async (_event, point) => {
+  const HUD_UI_RESULT_TYPES = new Set([
+    'request_area_crop',
+    'request_named_print',
+    'text_selection',
+    'open_organizer',
+    'organize_files_quick',
+    'open_settings',
+    'toggle_2d_3d'
+  ]);
+  const CAPTURE_ACTION_TYPES = new Set([
+    'print',
+    'named_print',
+    'system_to_system_print',
+    'print_telegram',
+    'area_print',
+    'area_print_telegram',
+    'area_print_system',
+    'action_2d_scan'
+  ]);
+
+  ipcMain.handle('mpe:execute-point', async (event, point) => {
     if (!consentManager.isActionAllowed('launchAppsAndLinks')) {
       return getConsentBlockedResponse();
     }
-    return await actionExecutor.executePoint(point, mainWindow);
+    const sourceWindow = getSourceWindowName(event);
+    const actionType = point && point.actionType ? String(point.actionType) : '';
+
+    // Ao disparar captura de tela pelo Mini Astrolabio, recolhe o leque antes do print
+    // para que o leque nao apareca na imagem capturada. Para outras acoes (ex: texto/pasta),
+    // mantem o Mini aberto para exibir o feedback sem fechar o leque abruptamente.
+    if (
+      sourceWindow === 'mini-astrolabe' &&
+      CAPTURE_ACTION_TYPES.has(actionType) &&
+      miniAstrolabeManager &&
+      miniAstrolabeManager.expanded &&
+      typeof miniAstrolabeManager.setExpanded === 'function'
+    ) {
+      try {
+        miniAstrolabeManager.setExpanded(false);
+      } catch (_) {}
+      await new Promise((r) => setTimeout(r, 80));
+    }
+
+    const res = await actionExecutor.executePoint(point, mainWindow);
+
+    if (
+      sourceWindow !== 'main' &&
+      res &&
+      res.ok !== false &&
+      HUD_UI_RESULT_TYPES.has(res.type) &&
+      mainWindow &&
+      !mainWindow.isDestroyed()
+    ) {
+      try {
+        if (
+          sourceWindow === 'mini-astrolabe' &&
+          miniAstrolabeManager &&
+          miniAstrolabeManager.expanded &&
+          typeof miniAstrolabeManager.setExpanded === 'function'
+        ) {
+          miniAstrolabeManager.setExpanded(false);
+        }
+        const cursor = screen.getCursorScreenPoint();
+        const currentDisplay = screen.getDisplayNearestPoint({ x: cursor.x, y: cursor.y });
+        mainWindow.setBounds(currentDisplay.bounds);
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.send('mpe:hud-action-result', {
+            point,
+            result: res,
+            source: sourceWindow
+          });
+        }
+        return Object.assign({}, res, { forwardedToHud: true });
+      } catch (_) {}
+    }
+
+    return res;
   });
 
   ipcMain.handle('mpe:complete-area-crop', async (_event, payload) => {

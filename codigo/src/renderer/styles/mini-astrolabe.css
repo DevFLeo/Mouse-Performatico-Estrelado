@@ -358,9 +358,13 @@ body {
   font-size: 12px;
   font-weight: 700;
   max-width: calc(100% - 16px);
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   z-index: 30;
   pointer-events: none;
 }
